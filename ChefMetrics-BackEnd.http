@@ -1,0 +1,6 @@
+@ChefMetrics_BackEnd_HostAddress = http://localhost:5017
+
+GET {{ChefMetrics_BackEnd_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
