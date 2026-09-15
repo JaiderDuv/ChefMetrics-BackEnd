@@ -1,0 +1,12 @@
+﻿using ChefMetrics_BackEnd.Model;
+
+namespace ChefMetrics_BackEnd.Repositories
+{
+    public interface IUserRepository
+    {
+        Task<bool> ExisteCorreoAsync(string email);
+        Task<UsuarioEmprendedor> RegistrarUsuarioAsync(UsuarioEmprendedor user);
+        Task<UsuarioEmprendedor?> ObtenerPorEmailAsync(string email);
+        Task ActualizarAsync(UsuarioEmprendedor user);
+    }
+}
