@@ -7,9 +7,9 @@ namespace ChefMetrics_BackEnd.Services
 {
     public class UsuarioService : IUsuarioService
     {
-        private readonly IUsuarioRepository _usuarioRepository;
+        private readonly IUserRepository _usuarioRepository;
 
-        public UsuarioService(IUsuarioRepository usuarioRepository)
+        public UsuarioService(IUserRepository usuarioRepository)
         {
             _usuarioRepository = usuarioRepository;
         }
