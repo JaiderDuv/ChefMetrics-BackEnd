@@ -12,6 +12,12 @@ public partial class RefreshToken
 
     public bool CorreoVerificado { get; set; }
 
+    public string? RefreshTokenHash { get; set; }
+
+    public DateTime? RefreshTokenExpira { get; set; }
+
+    public bool RefreshTokenRevocado { get; set; }
+
     public virtual UsuarioEmprendedor IdUsuarioEmprendedorNavigation { get; set; } = null!;
 
 }

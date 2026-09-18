@@ -95,6 +95,22 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("int")
                         .HasColumnName("IdUsuario_Emprendedor");
 
+                    b.Property<DateTime?>("RefreshTokenExpira")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("RefreshToken_Expira");
+
+                    b.Property<string>("RefreshTokenHash")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("RefreshToken_Hash");
+
+                    b.Property<bool>("RefreshTokenRevocado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasColumnName("RefreshToken_Revocado");
+
                     b.Property<DateTime?>("TokenVerificacionExpira")
                         .HasColumnType("datetime2")
                         .HasColumnName("Token_Verificacion_Expira");
