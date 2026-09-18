@@ -93,6 +93,15 @@ public partial class ChedMetricsContext : DbContext
             entity.Property(e => e.CorreoVerificado)
                 .HasDefaultValue(false)
                 .HasColumnName("Correo_Verificado");
+            entity.Property(e => e.RefreshTokenHash)
+                .HasMaxLength(64)
+                .IsUnicode(false)
+                .HasColumnName("RefreshToken_Hash");
+            entity.Property(e => e.RefreshTokenExpira)
+                .HasColumnName("RefreshToken_Expira");
+            entity.Property(e => e.RefreshTokenRevocado)
+                .HasDefaultValue(false)
+                .HasColumnName("RefreshToken_Revocado");
 
             entity.HasOne(d => d.IdUsuarioEmprendedorNavigation)
                 .WithMany(p => p.RefreshTokens)
