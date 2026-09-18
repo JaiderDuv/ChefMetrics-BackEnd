@@ -44,10 +44,38 @@ namespace ChefMetrics_BackEnd.Repositories
                 .FirstOrDefaultAsync(t => t.TokenVerificacionHash == tokenHash);
         }
 
+        public async Task<RefreshToken?> ObtenerPorTokenRecuperacionHashAsync(string tokenHash)
+        {
+            return await _context.RefreshTokens
+                .Include(t => t.IdUsuarioEmprendedorNavigation)
+                .FirstOrDefaultAsync(t => t.PasswordResetTokenHash == tokenHash);
+        }
+
         public async Task ActualizarRefreshTokenAsync(RefreshToken refreshToken)
         {
             _context.RefreshTokens.Update(refreshToken);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task RestablecerPasswordYRevocarSesionesAsync(
+            UsuarioEmprendedor usuario,
+            RefreshToken tokenRecuperacion)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            tokenRecuperacion.PasswordResetTokenUsado = true;
+            _context.UsuarioEmprendedors.Update(usuario);
+            _context.RefreshTokens.Update(tokenRecuperacion);
+
+            await _context.RefreshTokens
+                .Where(t => t.IdUsuarioEmprendedor == usuario.IdUsuarioEmprendedor &&
+                            t.RefreshTokenHash != null &&
+                            !t.RefreshTokenRevocado)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(t => t.RefreshTokenRevocado, true));
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
 
         public async Task ActualizarAsync(UsuarioEmprendedor user)

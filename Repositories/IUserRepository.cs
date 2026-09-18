@@ -9,7 +9,11 @@ namespace ChefMetrics_BackEnd.Repositories
         Task<UsuarioEmprendedor?> ObtenerPorEmailAsync(string email);
         Task<RefreshToken> RegistrarRefreshTokenAsync(RefreshToken refreshToken);
         Task<RefreshToken?> ObtenerPorTokenVerificacionHashAsync(string tokenHash);
+        Task<RefreshToken?> ObtenerPorTokenRecuperacionHashAsync(string tokenHash);
         Task ActualizarRefreshTokenAsync(RefreshToken refreshToken);
+        Task RestablecerPasswordYRevocarSesionesAsync(
+            UsuarioEmprendedor usuario,
+            RefreshToken tokenRecuperacion);
         Task ActualizarAsync(UsuarioEmprendedor user);
     }
 }
