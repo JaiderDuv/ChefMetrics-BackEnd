@@ -34,4 +34,6 @@ public partial class UsuarioEmprendedor
     public string HashContrasena { get; set; } = null!;
 
     public virtual Role IdRolNavigation { get; set; } = null!;
+
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

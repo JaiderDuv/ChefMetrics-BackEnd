@@ -52,5 +52,25 @@ namespace ChefMetrics_BackEnd.Controllers
                 return BadRequest(new { mensaje = ex.Message });
             }
         }
+        [HttpGet("validar-token")]
+        public async Task<IActionResult> ValidarToken([FromQuery] string token)
+        {
+            var valido = await _usuarioService.ValidarTokenAsync(token);
+
+            if (!valido)
+            {
+                return BadRequest(new
+                {
+                    exito = false,
+                    mensaje = "El token es inválido, ya fue utilizado o ha expirado."
+                });
+            }
+
+            return Ok(new
+            {
+                exito = true,
+                mensaje = "Correo electrónico verificado correctamente."
+            });
+        }
     }
 }

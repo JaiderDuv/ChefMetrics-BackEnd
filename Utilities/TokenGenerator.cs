@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 
 namespace ChefMetrics_BackEnd.Utilities
 {
@@ -10,11 +11,25 @@ namespace ChefMetrics_BackEnd.Utilities
             using var rng = RandomNumberGenerator.Create();
             rng.GetBytes(randomBytes);
 
-            // Convierte a Base64 y elimina caracteres especiales para URLs
             return Convert.ToBase64String(randomBytes)
                 .Replace("+", "-")
                 .Replace("/", "_")
                 .Replace("=", "");
+        }
+
+        public static string GenerarTokenVerificacion()
+        {
+            var randomBytes = RandomNumberGenerator.GetBytes(32);
+            return Convert.ToBase64String(randomBytes)
+                .Replace("+", "-")
+                .Replace("/", "_")
+                .Replace("=", "");
+        }
+
+        public static string CalcularHash(string token)
+        {
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(hash);
         }
     }
 }

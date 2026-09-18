@@ -6,5 +6,6 @@ namespace ChefMetrics_BackEnd.Services
     {
         Task<bool> RegistrarEmprendedorFormalizadoAsync(EmprendedorFormalizado dto);
         Task<bool> RegistrarEmprendedorAsync(Emprendedor dto);
+        Task<bool> ValidarTokenAsync(string token);
     }
 }
