@@ -19,6 +19,8 @@ public partial class ChedMetricsContext : DbContext
 
     public virtual DbSet<Role> Roles { get; set; }
 
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
     public virtual DbSet<UsuarioEmprendedor> UsuarioEmprendedors { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -67,7 +69,36 @@ public partial class ChedMetricsContext : DbContext
             entity.Property(e => e.NombreRol)
                 .HasMaxLength(50)
                 .IsUnicode(false)
-                .HasColumnName("Nombre_Rol");
+                 .HasColumnName("Nombre_Rol");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.IdRefreshToken);
+
+            entity.ToTable("RefreshTokens");
+
+            entity.HasIndex(e => e.TokenVerificacionHash);
+
+            entity.Property(e => e.IdRefreshToken)
+                .HasColumnName("Id_RefreshToken");
+            entity.Property(e => e.IdUsuarioEmprendedor)
+                .HasColumnName("IdUsuario_Emprendedor");
+            entity.Property(e => e.TokenVerificacionHash)
+                .HasMaxLength(64)
+                .IsUnicode(false)
+                .HasColumnName("Token_Verificacion_Hash");
+            entity.Property(e => e.TokenVerificacionExpira)
+                .HasColumnName("Token_Verificacion_Expira");
+            entity.Property(e => e.CorreoVerificado)
+                .HasDefaultValue(false)
+                .HasColumnName("Correo_Verificado");
+
+            entity.HasOne(d => d.IdUsuarioEmprendedorNavigation)
+                .WithMany(p => p.RefreshTokens)
+                .HasForeignKey(d => d.IdUsuarioEmprendedor)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_RefreshTokens_UsuarioEmprendedor");
         });
 
         modelBuilder.Entity<UsuarioEmprendedor>(entity =>
@@ -120,7 +151,6 @@ public partial class ChedMetricsContext : DbContext
                 .HasMaxLength(20)
                 .IsUnicode(false)
                 .HasColumnName("Tipo_Documento");
-
             entity.HasOne(d => d.IdRolNavigation).WithMany(p => p.UsuarioEmprendedors)
                 .HasForeignKey(d => d.IdRol)
                 .OnDelete(DeleteBehavior.ClientSetNull)

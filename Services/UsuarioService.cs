@@ -8,10 +8,12 @@ namespace ChefMetrics_BackEnd.Services
     public class UsuarioService : IUsuarioService
     {
         private readonly IUserRepository _usuarioRepository;
+        private readonly IEmailService _emailService;
 
-        public UsuarioService(IUserRepository usuarioRepository)
+        public UsuarioService(IUserRepository usuarioRepository, IEmailService emailService)
         {
             _usuarioRepository = usuarioRepository;
+            _emailService = emailService;
         }
 
         public async Task<bool> RegistrarEmprendedorFormalizadoAsync(EmprendedorFormalizado dto)
@@ -22,6 +24,7 @@ namespace ChefMetrics_BackEnd.Services
             }
 
             string hashPassword = PasswordHasher.HashPassword(dto.HashContrasena);
+            string token = TokenGenerator.GenerarTokenVerificacion();
 
             var nuevoUsuario = new UsuarioEmprendedor
             {
@@ -40,6 +43,14 @@ namespace ChefMetrics_BackEnd.Services
 
             // d. Persistir en base de datos
             var resultado = await _usuarioRepository.RegistrarUsuarioAsync(nuevoUsuario);
+            await _usuarioRepository.RegistrarRefreshTokenAsync(new RefreshToken
+            {
+                IdUsuarioEmprendedor = nuevoUsuario.IdUsuarioEmprendedor,
+                TokenVerificacionHash = TokenGenerator.CalcularHash(token),
+                TokenVerificacionExpira = DateTime.UtcNow.AddHours(24),
+                CorreoVerificado = false
+            });
+            await _emailService.EnviarCorreoVerificacionAsync(nuevoUsuario.CorreoElectronico, token);
             return resultado != null;
         }
 
@@ -51,6 +62,7 @@ namespace ChefMetrics_BackEnd.Services
             }
 
             string hashPassword = PasswordHasher.HashPassword(dto.HashContrasena);
+            string token = TokenGenerator.GenerarTokenVerificacion();
 
             var nuevoUsuario = new UsuarioEmprendedor
             {
@@ -68,7 +80,39 @@ namespace ChefMetrics_BackEnd.Services
             };
 
             var resultado = await _usuarioRepository.RegistrarUsuarioAsync(nuevoUsuario);
+            await _usuarioRepository.RegistrarRefreshTokenAsync(new RefreshToken
+            {
+                IdUsuarioEmprendedor = nuevoUsuario.IdUsuarioEmprendedor,
+                TokenVerificacionHash = TokenGenerator.CalcularHash(token),
+                TokenVerificacionExpira = DateTime.UtcNow.AddHours(24),
+                CorreoVerificado = false
+            });
+            await _emailService.EnviarCorreoVerificacionAsync(nuevoUsuario.CorreoElectronico, token);
             return resultado != null;
+        }
+
+        public async Task<bool> ValidarTokenAsync(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return false;
+            }
+
+            var refreshToken = await _usuarioRepository.ObtenerPorTokenVerificacionHashAsync(
+                TokenGenerator.CalcularHash(token));
+
+            if (refreshToken == null || refreshToken.CorreoVerificado ||
+                refreshToken.TokenVerificacionExpira <= DateTime.UtcNow)
+            {
+                return false;
+            }
+
+            refreshToken.CorreoVerificado = true;
+            refreshToken.TokenVerificacionHash = null;
+            refreshToken.TokenVerificacionExpira = null;
+            await _usuarioRepository.ActualizarRefreshTokenAsync(refreshToken);
+
+            return true;
         }
     }
 }
