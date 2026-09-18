@@ -18,6 +18,12 @@ public partial class RefreshToken
 
     public bool RefreshTokenRevocado { get; set; }
 
+    public string? PasswordResetTokenHash { get; set; }
+
+    public DateTime? PasswordResetTokenExpira { get; set; }
+
+    public bool PasswordResetTokenUsado { get; set; }
+
     public virtual UsuarioEmprendedor IdUsuarioEmprendedorNavigation { get; set; } = null!;
 
 }

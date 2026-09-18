@@ -102,6 +102,15 @@ public partial class ChedMetricsContext : DbContext
             entity.Property(e => e.RefreshTokenRevocado)
                 .HasDefaultValue(false)
                 .HasColumnName("RefreshToken_Revocado");
+            entity.Property(e => e.PasswordResetTokenHash)
+                .HasMaxLength(64)
+                .IsUnicode(false)
+                .HasColumnName("PasswordResetToken_Hash");
+            entity.Property(e => e.PasswordResetTokenExpira)
+                .HasColumnName("PasswordResetToken_Expira");
+            entity.Property(e => e.PasswordResetTokenUsado)
+                .HasDefaultValue(false)
+                .HasColumnName("PasswordResetToken_Usado");
 
             entity.HasOne(d => d.IdUsuarioEmprendedorNavigation)
                 .WithMany(p => p.RefreshTokens)

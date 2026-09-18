@@ -10,6 +10,7 @@ namespace ChefMetrics_BackEnd.Services
     public class AuthService : IAuthService
     {
         private readonly IUserRepository _userRepository;
+        private readonly IEmailService _emailService;
         private readonly JwtSettings _jwtSettings;
         private readonly IMemoryCache _loginAttempts;
 
@@ -18,10 +19,12 @@ namespace ChefMetrics_BackEnd.Services
 
         public AuthService(
             IUserRepository userRepository,
+            IEmailService emailService,
             IOptions<JwtSettings> jwtOptions,
             IMemoryCache loginAttempts)
         {
             _userRepository = userRepository;
+            _emailService = emailService;
             _jwtSettings = jwtOptions.Value;
             _loginAttempts = loginAttempts;
         }
@@ -147,13 +150,22 @@ namespace ChefMetrics_BackEnd.Services
                 throw new ArgumentException("El correo electrónico es obligatorio.");
             }
 
-            var usuario = await _userRepository.ObtenerPorEmailAsync(dto.CorreoElectronico);
+            var email = dto.CorreoElectronico.Trim().ToLowerInvariant();
+            var usuario = await _userRepository.ObtenerPorEmailAsync(email);
             if (usuario == null)
             {
                 return false;
             }
 
             string tokenRecuperacion = TokenGenerator.GenerarTokenRecuperacion();
+            await _userRepository.RegistrarRefreshTokenAsync(new RefreshToken
+            {
+                IdUsuarioEmprendedor = usuario.IdUsuarioEmprendedor,
+                PasswordResetTokenHash = TokenGenerator.CalcularHash(tokenRecuperacion),
+                PasswordResetTokenExpira = DateTime.UtcNow.AddMinutes(15),
+                PasswordResetTokenUsado = false
+            });
+            await _emailService.EnviarCorreoRecuperacionAsync(email, tokenRecuperacion);
             return true;
         }
 
@@ -164,16 +176,28 @@ namespace ChefMetrics_BackEnd.Services
                 throw new ArgumentException("Las contraseñas no coinciden.");
             }
 
-            var usuario = await _userRepository.ObtenerPorEmailAsync(dto.CorreoElectronico);
-            if (usuario == null)
+            var tokenRecuperacion = await _userRepository.ObtenerPorTokenRecuperacionHashAsync(
+                TokenGenerator.CalcularHash(dto.Token));
+
+            if (tokenRecuperacion == null ||
+                tokenRecuperacion.PasswordResetTokenUsado ||
+                tokenRecuperacion.PasswordResetTokenExpira <= DateTime.UtcNow)
             {
-                throw new KeyNotFoundException("No se encontró un usuario asociado al correo especificado.");
+                throw new KeyNotFoundException("El token de recuperación es inválido o ha expirado.");
+            }
+
+            var usuario = tokenRecuperacion.IdUsuarioEmprendedorNavigation;
+            if (!string.Equals(usuario.CorreoElectronico, dto.CorreoElectronico,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                throw new KeyNotFoundException("El token de recuperación no corresponde al usuario.");
             }
 
             string nuevoHash = PasswordHasher.HashPassword(dto.NuevaPassword);
             usuario.HashContrasena = nuevoHash;
 
-            await _userRepository.ActualizarAsync(usuario);
+            await _userRepository.RestablecerPasswordYRevocarSesionesAsync(
+                usuario, tokenRecuperacion);
             return true;
         }
     }

@@ -16,24 +16,48 @@ namespace ChefMetrics_BackEnd.Services
 
         public async Task EnviarCorreoVerificacionAsync(string destinatario, string token)
         {
+            await EnviarCorreoAsync(
+                destinatario,
+                token,
+                _settings.VerificationUrl,
+                "Verifica tu correo electrónico - ChefMetrics",
+                "verificación");
+        }
+
+        public async Task EnviarCorreoRecuperacionAsync(string destinatario, string token)
+        {
+            await EnviarCorreoAsync(
+                destinatario,
+                token,
+                _settings.PasswordResetUrl,
+                "Restablece tu contraseña - ChefMetrics",
+                "recuperación de contraseña");
+        }
+
+        private async Task EnviarCorreoAsync(
+            string destinatario,
+            string token,
+            string baseUrl,
+            string subject,
+            string emailType)
+        {
             if (string.IsNullOrWhiteSpace(_settings.Host) ||
                 string.IsNullOrWhiteSpace(_settings.Username) ||
                 string.IsNullOrWhiteSpace(_settings.Password) ||
                 string.IsNullOrWhiteSpace(_settings.From) ||
-                string.IsNullOrWhiteSpace(_settings.VerificationUrl))
+                string.IsNullOrWhiteSpace(baseUrl))
             {
                 throw new InvalidOperationException(
-                    "La configuración SMTP del correo de verificación está incompleta.");
+                    $"La configuración SMTP del correo de {emailType} está incompleta.");
             }
 
-            var verificationUrl = QueryHelpers.AddQueryString(
-                _settings.VerificationUrl, "token", token);
+            var link = QueryHelpers.AddQueryString(baseUrl, "token", token);
 
             using var message = new MailMessage
             {
                 From = new MailAddress(_settings.From),
-                Subject = "Verifica tu correo electrónico - ChefMetrics",
-                Body = $"Haz clic en el siguiente enlace para verificar tu correo electrónico: {verificationUrl}",
+                Subject = subject,
+                Body = $"Haz clic en el siguiente enlace: {link}",
                 IsBodyHtml = false
             };
             message.To.Add(destinatario);
