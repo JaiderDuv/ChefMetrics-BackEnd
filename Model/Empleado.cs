@@ -5,19 +5,31 @@ namespace ChefMetrics_BackEnd.Model;
 
 public partial class Empleado
 {
-    public int IdEmpleado { get; set; }
+    public int Id { get; set; }
 
-    public int IdRol { get; set; }
+    public int? CuentaId { get; set; }
 
-    public string NombreEmpleado { get; set; } = null!;
+    public int NegocioId { get; set; }
 
-    public string DocIdentidadEmpleado { get; set; } = null!;
+    public int RolId { get; set; }
 
-    public string CorreoElectronicoEmpleado { get; set; } = null!;
+    public string CorreoInvitado { get; set; } = null!;
 
-    public string? NumeroTel { get; set; }
+    public string EstadoInvitacion { get; set; } = null!;
 
-    public string HashContrasena { get; set; } = null!;
+    public string? TokenInvitacion { get; set; }
 
-    public virtual Role IdRolNavigation { get; set; } = null!;
+    public int InvitadoPor { get; set; }
+
+    public DateTime FechaInvitacion { get; set; }
+
+    public DateTime? FechaAceptacion { get; set; }
+
+    public virtual Cuentum? Cuenta { get; set; }
+
+    public virtual UsuarioEmprendedor InvitadoPorNavigation { get; set; } = null!;
+
+    public virtual Negocio Negocio { get; set; } = null!;
+
+    public virtual Role Rol { get; set; } = null!;
 }
