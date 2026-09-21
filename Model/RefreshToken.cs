@@ -1,29 +1,21 @@
+﻿using System;
+using System.Collections.Generic;
+
 namespace ChefMetrics_BackEnd.Model;
 
 public partial class RefreshToken
 {
-    public int IdRefreshToken { get; set; }
+    public int Id { get; set; }
 
-    public int IdUsuarioEmprendedor { get; set; }
+    public int CuentaId { get; set; }
 
-    public string? TokenVerificacionHash { get; set; }
+    public string TokenHash { get; set; } = null!;
 
-    public DateTime? TokenVerificacionExpira { get; set; }
+    public DateTime FechaCreacion { get; set; }
 
-    public bool CorreoVerificado { get; set; }
+    public DateTime FechaExpiracion { get; set; }
 
-    public string? RefreshTokenHash { get; set; }
+    public bool Revocado { get; set; }
 
-    public DateTime? RefreshTokenExpira { get; set; }
-
-    public bool RefreshTokenRevocado { get; set; }
-
-    public string? PasswordResetTokenHash { get; set; }
-
-    public DateTime? PasswordResetTokenExpira { get; set; }
-
-    public bool PasswordResetTokenUsado { get; set; }
-
-    public virtual UsuarioEmprendedor IdUsuarioEmprendedorNavigation { get; set; } = null!;
-
+    public virtual Cuentum Cuenta { get; set; } = null!;
 }
