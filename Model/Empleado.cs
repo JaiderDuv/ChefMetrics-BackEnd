@@ -25,7 +25,7 @@ public partial class Empleado
 
     public DateTime? FechaAceptacion { get; set; }
 
-    public virtual Cuentum? Cuenta { get; set; }
+    public virtual Cuenta? Cuenta { get; set; }
 
     public virtual UsuarioEmprendedor InvitadoPorNavigation { get; set; } = null!;
 

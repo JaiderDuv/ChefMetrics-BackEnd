@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace ChefMetrics_BackEnd.Model;
 
-public partial class Cuentum
+public partial class Cuenta
 {
     public int Id { get; set; }
 

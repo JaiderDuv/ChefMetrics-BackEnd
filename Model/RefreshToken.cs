@@ -17,5 +17,5 @@ public partial class RefreshToken
 
     public bool Revocado { get; set; }
 
-    public virtual Cuentum Cuenta { get; set; } = null!;
+    public virtual Cuenta Cuenta { get; set; } = null!;
 }
