@@ -25,7 +25,7 @@ public partial class UsuarioEmprendedor
 
     public DateTime FechaCreacion { get; set; }
 
-    public virtual Cuentum Cuenta { get; set; } = null!;
+    public virtual Cuenta Cuenta { get; set; } = null!;
 
     public virtual ICollection<Empleado> Empleados { get; set; } = new List<Empleado>();
 

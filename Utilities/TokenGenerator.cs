@@ -36,7 +36,7 @@ namespace ChefMetrics_BackEnd.Utilities
             return GenerarTokenVerificacion();
         }
 
-        public static string GenerarAccessToken(UsuarioEmprendedor usuario, JwtSettings settings)
+        public static string GenerarAccessToken(Cuenta cuenta, UsuarioEmprendedor? usuario, JwtSettings settings)
         {
             if (string.IsNullOrWhiteSpace(settings.Key) || settings.Key.Length < 32)
             {
@@ -46,9 +46,9 @@ namespace ChefMetrics_BackEnd.Utilities
 
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Sub, usuario.IdUsuarioEmprendedor.ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, usuario.CorreoElectronico),
-                new Claim(JwtRegisteredClaimNames.UniqueName, usuario.NombreEmprendimiento ?? string.Empty)
+                new Claim(JwtRegisteredClaimNames.Sub, cuenta.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, cuenta.Correo),
+                new Claim(JwtRegisteredClaimNames.UniqueName, usuario?.NombreEmprendimiento ?? string.Empty)
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.Key));

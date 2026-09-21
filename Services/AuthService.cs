@@ -50,8 +50,8 @@ namespace ChefMetrics_BackEnd.Services
                 };
             }
 
-            var usuario = await _userRepository.ObtenerPorEmailAsync(email);
-            if (usuario == null)
+            var cuenta = await _userRepository.ObtenerCuentaPorEmailAsync(email);
+            if (cuenta == null || !cuenta.Activo)
             {
                 RegistrarIntentoFallido(email);
                 return new LoginResponseDto
@@ -61,7 +61,7 @@ namespace ChefMetrics_BackEnd.Services
                 };
             }
 
-            bool passwordValida = PasswordHasher.VerifyPassword(dto.Password, usuario.HashContrasena);
+            bool passwordValida = PasswordHasher.VerifyPassword(dto.Password, cuenta.PasswordHash);
             if (!passwordValida)
             {
                 RegistrarIntentoFallido(email);
@@ -74,15 +74,16 @@ namespace ChefMetrics_BackEnd.Services
 
             _loginAttempts.Remove(email);
 
-            string accessToken = TokenGenerator.GenerarAccessToken(usuario, _jwtSettings);
+            var usuario = cuenta.UsuarioEmprendedor;
+            string accessToken = TokenGenerator.GenerarAccessToken(cuenta, usuario, _jwtSettings);
             string refreshToken = TokenGenerator.GenerarTokenRefresh();
 
             await _userRepository.RegistrarRefreshTokenAsync(new RefreshToken
             {
-                IdUsuarioEmprendedor = usuario.IdUsuarioEmprendedor,
-                RefreshTokenHash = TokenGenerator.CalcularHash(refreshToken),
-                RefreshTokenExpira = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenDays),
-                RefreshTokenRevocado = false
+                CuentaId = cuenta.Id,
+                TokenHash = TokenGenerator.CalcularHash(refreshToken),
+                FechaExpiracion = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenDays),
+                Revocado = false
             });
 
             return new LoginResponseDto
@@ -92,10 +93,10 @@ namespace ChefMetrics_BackEnd.Services
                 Token = accessToken,
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                IdUsuario = usuario.IdUsuarioEmprendedor,
-                CorreoElectronico = usuario.CorreoElectronico,
-                NombreEmprendimiento = usuario.NombreEmprendimiento,
-                OnboardingCompletado = usuario.OnboardingCompletado
+                IdUsuario = usuario?.Id ?? cuenta.Id,
+                CorreoElectronico = cuenta.Correo,
+                NombreEmprendimiento = usuario?.NombreEmprendimiento,
+                OnboardingCompletado = usuario?.OnboardingCompletado ?? false
             };
         }
 
@@ -151,19 +152,19 @@ namespace ChefMetrics_BackEnd.Services
             }
 
             var email = dto.CorreoElectronico.Trim().ToLowerInvariant();
-            var usuario = await _userRepository.ObtenerPorEmailAsync(email);
-            if (usuario == null)
+            var cuenta = await _userRepository.ObtenerCuentaPorEmailAsync(email);
+            if (cuenta == null)
             {
                 return false;
             }
 
             string tokenRecuperacion = TokenGenerator.GenerarTokenRecuperacion();
-            await _userRepository.RegistrarRefreshTokenAsync(new RefreshToken
+            await _userRepository.RegistrarPasswordResetTokenAsync(new PasswordResetToken
             {
-                IdUsuarioEmprendedor = usuario.IdUsuarioEmprendedor,
-                PasswordResetTokenHash = TokenGenerator.CalcularHash(tokenRecuperacion),
-                PasswordResetTokenExpira = DateTime.UtcNow.AddMinutes(15),
-                PasswordResetTokenUsado = false
+                CuentaId = cuenta.Id,
+                TokenHash = TokenGenerator.CalcularHash(tokenRecuperacion),
+                FechaExpiracion = DateTime.UtcNow.AddMinutes(15),
+                Usado = false
             });
             await _emailService.EnviarCorreoRecuperacionAsync(email, tokenRecuperacion);
             return true;
@@ -176,28 +177,27 @@ namespace ChefMetrics_BackEnd.Services
                 throw new ArgumentException("Las contraseñas no coinciden.");
             }
 
-            var tokenRecuperacion = await _userRepository.ObtenerPorTokenRecuperacionHashAsync(
+            var tokenRecuperacion = await _userRepository.ObtenerPasswordResetPorHashAsync(
                 TokenGenerator.CalcularHash(dto.Token));
 
             if (tokenRecuperacion == null ||
-                tokenRecuperacion.PasswordResetTokenUsado ||
-                tokenRecuperacion.PasswordResetTokenExpira <= DateTime.UtcNow)
+                tokenRecuperacion.Usado ||
+                tokenRecuperacion.FechaExpiracion <= DateTime.UtcNow)
             {
                 throw new KeyNotFoundException("El token de recuperación es inválido o ha expirado.");
             }
 
-            var usuario = tokenRecuperacion.IdUsuarioEmprendedorNavigation;
-            if (!string.Equals(usuario.CorreoElectronico, dto.CorreoElectronico,
+            var cuenta = tokenRecuperacion.Cuenta;
+            if (!string.Equals(cuenta.Correo, dto.CorreoElectronico,
                 StringComparison.OrdinalIgnoreCase))
             {
                 throw new KeyNotFoundException("El token de recuperación no corresponde al usuario.");
             }
 
             string nuevoHash = PasswordHasher.HashPassword(dto.NuevaPassword);
-            usuario.HashContrasena = nuevoHash;
 
             await _userRepository.RestablecerPasswordYRevocarSesionesAsync(
-                usuario, tokenRecuperacion);
+                cuenta, tokenRecuperacion, nuevoHash);
             return true;
         }
     }

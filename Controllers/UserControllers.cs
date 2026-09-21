@@ -4,11 +4,13 @@ using ChefMetrics_BackEnd.Model;
 
 namespace ChefMetrics_BackEnd.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class UserControllers : ControllerBase
     {
-        private readonly ChedMetricsContext _context;
+        private readonly ChefMetricsContext _context;
 
-        public UserControllers(ChedMetricsContext context)
+        public UserControllers(ChefMetricsContext context)
         {
             _context = context;
         }
@@ -16,7 +18,17 @@ namespace ChefMetrics_BackEnd.Controllers
         [HttpGet]
         public async Task<IActionResult> GetUsuarios()
         {
-            var usuarios = await _context.UsuarioEmprendedors.ToListAsync();
+            var usuarios = await _context.UsuarioEmprendedors
+                .AsNoTracking()
+                .Include(u => u.Cuenta)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.NombreEmprendimiento,
+                    u.OnboardingCompletado,
+                    Correo = u.Cuenta.Correo
+                })
+                .ToListAsync();
 
             return Ok(usuarios);
         }

@@ -17,7 +17,7 @@ public partial class ChefMetricsContext : DbContext
 
     public virtual DbSet<CostoFijo> CostoFijos { get; set; }
 
-    public virtual DbSet<Cuentum> Cuenta { get; set; }
+    public virtual DbSet<Cuenta> Cuenta { get; set; }
 
     public virtual DbSet<Empleado> Empleados { get; set; }
 
@@ -33,7 +33,7 @@ public partial class ChefMetricsContext : DbContext
 
     public virtual DbSet<RecetaInsumo> RecetaInsumos { get; set; }
 
-    public virtual DbSet<Recetum> Receta { get; set; }
+    public virtual DbSet<Receta> Receta { get; set; }
 
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
@@ -66,7 +66,7 @@ public partial class ChefMetricsContext : DbContext
                 .HasConstraintName("FK_CostoFijo_Negocio");
         });
 
-        modelBuilder.Entity<Cuentum>(entity =>
+        modelBuilder.Entity<Cuenta>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Cuenta__3214EC077F390334");
 
@@ -249,7 +249,7 @@ public partial class ChefMetricsContext : DbContext
                 .HasConstraintName("FK_RecetaInsumo_Receta");
         });
 
-        modelBuilder.Entity<Recetum>(entity =>
+        modelBuilder.Entity<Receta>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Receta__3214EC073424F899");
 

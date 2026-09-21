@@ -18,77 +18,98 @@ namespace ChefMetrics_BackEnd.Services
 
         public async Task<bool> RegistrarEmprendedorFormalizadoAsync(EmprendedorFormalizado dto)
         {
-            if (await _usuarioRepository.ExisteCorreoAsync(dto.CorreoElectronico))
-            {
-                throw new Exception("El correo electrónico ya se encuentra registrado.");
-            }
-
-            string hashPassword = PasswordHasher.HashPassword(dto.HashContrasena);
-            string token = TokenGenerator.GenerarTokenVerificacion();
-
-            var nuevoUsuario = new UsuarioEmprendedor
-            {
-                Formalizado = dto.Formalizado,
-                Nit = dto.Nit,
-                RazonSocial = dto.RazonSocial,
-                CorreoElectronico = dto.CorreoElectronico,
-                TipoDocumento = dto.TipoDocumento,
-                DocumentoIdentidadUe = dto.DocumentoIdentidadUe,
-                NombreEmprendimiento = dto.NombreEmprendimiento,
-                CategoriaNegocio = dto.CategoriaNegocio,
-                TelefonoContacto = dto.TelefonoContacto,
-                CorreoElectronicoContacto = dto.CorreoElectronicoContacto,
-                HashContrasena = hashPassword
-            };
-
-            // d. Persistir en base de datos
-            var resultado = await _usuarioRepository.RegistrarUsuarioAsync(nuevoUsuario);
-            await _usuarioRepository.RegistrarRefreshTokenAsync(new RefreshToken
-            {
-                IdUsuarioEmprendedor = nuevoUsuario.IdUsuarioEmprendedor,
-                TokenVerificacionHash = TokenGenerator.CalcularHash(token),
-                TokenVerificacionExpira = DateTime.UtcNow.AddHours(24),
-                CorreoVerificado = false
-            });
-            await _emailService.EnviarCorreoVerificacionAsync(nuevoUsuario.CorreoElectronico, token);
-            return resultado != null;
+            await RegistrarEmprendedorInternoAsync(
+                dto.CorreoElectronico,
+                dto.HashContrasena,
+                "formalizado",
+                dto.Nit,
+                dto.RazonSocial,
+                dto.TipoDocumento,
+                dto.DocumentoIdentidadUe,
+                dto.NombreEmprendimiento,
+                dto.CategoriaNegocio,
+                dto.TelefonoContacto,
+                dto.CorreoElectronicoContacto);
+            return true;
         }
 
         public async Task<bool> RegistrarEmprendedorAsync(Emprendedor dto)
         {
-            if (await _usuarioRepository.ExisteCorreoAsync(dto.CorreoElectronico))
+            await RegistrarEmprendedorInternoAsync(
+                dto.CorreoElectronico,
+                dto.HashContrasena,
+                "no_formalizado",
+                null,
+                null,
+                dto.TipoDocumento,
+                dto.DocumentoIdentidadUe,
+                dto.NombreEmprendimiento,
+                dto.CategoriaNegocio,
+                dto.TelefonoContacto,
+                dto.CorreoElectronicoContacto);
+            return true;
+        }
+
+        private async Task RegistrarEmprendedorInternoAsync(
+            string correo,
+            string passwordPlano,
+            string tipoFormalizacion,
+            string? nit,
+            string? razonSocial,
+            string tipoDocumento,
+            string numeroDocumento,
+            string nombreEmprendimiento,
+            string categoriaNegocio,
+            string telefonoContacto,
+            string correoContacto)
+        {
+            if (await _usuarioRepository.ExisteCorreoAsync(correo))
             {
                 throw new Exception("El correo electrónico ya se encuentra registrado.");
             }
 
-            string hashPassword = PasswordHasher.HashPassword(dto.HashContrasena);
-            string token = TokenGenerator.GenerarTokenVerificacion();
-
-            var nuevoUsuario = new UsuarioEmprendedor
+            var cuenta = await _usuarioRepository.RegistrarCuentaAsync(new Cuenta
             {
-                Formalizado = dto.Formalizado,
-                Nit = null,
-                RazonSocial = null,
-                CorreoElectronico = dto.CorreoElectronico,
-                TipoDocumento = dto.TipoDocumento,
-                DocumentoIdentidadUe = dto.DocumentoIdentidadUe,
-                NombreEmprendimiento = dto.NombreEmprendimiento,
-                CategoriaNegocio = dto.CategoriaNegocio,
-                TelefonoContacto = dto.TelefonoContacto,
-                CorreoElectronicoContacto = dto.CorreoElectronicoContacto,
-                HashContrasena = hashPassword
-            };
-
-            var resultado = await _usuarioRepository.RegistrarUsuarioAsync(nuevoUsuario);
-            await _usuarioRepository.RegistrarRefreshTokenAsync(new RefreshToken
-            {
-                IdUsuarioEmprendedor = nuevoUsuario.IdUsuarioEmprendedor,
-                TokenVerificacionHash = TokenGenerator.CalcularHash(token),
-                TokenVerificacionExpira = DateTime.UtcNow.AddHours(24),
-                CorreoVerificado = false
+                Correo = correo,
+                PasswordHash = PasswordHasher.HashPassword(passwordPlano),
+                TipoCuenta = "emprendedor",
+                EmailVerificado = false,
+                Activo = true
             });
-            await _emailService.EnviarCorreoVerificacionAsync(nuevoUsuario.CorreoElectronico, token);
-            return resultado != null;
+
+            var usuario = await _usuarioRepository.RegistrarUsuarioAsync(new UsuarioEmprendedor
+            {
+                CuentaId = cuenta.Id,
+                TipoFormalizacion = tipoFormalizacion,
+                Nit = nit,
+                RazonSocial = razonSocial,
+                TipoDocumento = tipoDocumento,
+                NumeroDocumento = numeroDocumento,
+                NombreEmprendimiento = nombreEmprendimiento,
+                OnboardingCompletado = false
+            });
+
+            var tipoEmprendimiento = await _usuarioRepository
+                .ObtenerOCrearTipoEmprendimientoAsync(categoriaNegocio);
+
+            await _usuarioRepository.RegistrarNegocioAsync(new Negocio
+            {
+                UsuarioId = usuario.Id,
+                TipoEmprendimientoId = tipoEmprendimiento.Id,
+                TelefonoContacto = telefonoContacto,
+                CorreoContacto = correoContacto,
+                FechaActualizacion = DateTime.UtcNow
+            });
+
+            string token = TokenGenerator.GenerarTokenVerificacion();
+            await _usuarioRepository.RegistrarPasswordResetTokenAsync(new PasswordResetToken
+            {
+                CuentaId = cuenta.Id,
+                TokenHash = TokenGenerator.CalcularHash(token),
+                FechaExpiracion = DateTime.UtcNow.AddHours(24),
+                Usado = false
+            });
+            await _emailService.EnviarCorreoVerificacionAsync(cuenta.Correo, token);
         }
 
         public async Task<bool> ValidarTokenAsync(string token)
@@ -98,19 +119,16 @@ namespace ChefMetrics_BackEnd.Services
                 return false;
             }
 
-            var refreshToken = await _usuarioRepository.ObtenerPorTokenVerificacionHashAsync(
+            var registro = await _usuarioRepository.ObtenerPasswordResetPorHashAsync(
                 TokenGenerator.CalcularHash(token));
 
-            if (refreshToken == null || refreshToken.CorreoVerificado ||
-                refreshToken.TokenVerificacionExpira <= DateTime.UtcNow)
+            if (registro == null || registro.Usado ||
+                registro.FechaExpiracion <= DateTime.UtcNow)
             {
                 return false;
             }
 
-            refreshToken.CorreoVerificado = true;
-            refreshToken.TokenVerificacionHash = null;
-            refreshToken.TokenVerificacionExpira = null;
-            await _usuarioRepository.ActualizarRefreshTokenAsync(refreshToken);
+            await _usuarioRepository.ConfirmarEmailPorTokenAsync(registro.Cuenta, registro);
 
             return true;
         }

@@ -15,5 +15,5 @@ public partial class ProductoMenuRecetum
 
     public virtual ProductoMenu ProductoMenu { get; set; } = null!;
 
-    public virtual Recetum Receta { get; set; } = null!;
+    public virtual Receta Receta { get; set; } = null!;
 }

@@ -17,5 +17,5 @@ public partial class RecetaInsumo
 
     public virtual Insumo Insumo { get; set; } = null!;
 
-    public virtual Recetum Receta { get; set; } = null!;
+    public virtual Receta Receta { get; set; } = null!;
 }
