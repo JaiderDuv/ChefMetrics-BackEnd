@@ -105,6 +105,7 @@ namespace ChefMetrics_BackEnd.Repositories
 
             token.Usado = true;
             cuenta.EmailVerificado = true;
+            cuenta.Activo = true;
 
             _context.PasswordResetTokens.Update(token);
             _context.Cuenta.Update(cuenta);
