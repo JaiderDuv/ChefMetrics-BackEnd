@@ -74,7 +74,7 @@ namespace ChefMetrics_BackEnd.Services
                 PasswordHash = PasswordHasher.HashPassword(passwordPlano),
                 TipoCuenta = "emprendedor",
                 EmailVerificado = false,
-                Activo = true
+                Activo = false
             });
 
             var usuario = await _usuarioRepository.RegistrarUsuarioAsync(new UsuarioEmprendedor

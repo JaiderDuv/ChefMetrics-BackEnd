@@ -48,13 +48,15 @@ builder.Services.AddCors(options =>
     options.AddPolicy("Frontend",
         policy =>
         {
-            policy.WithOrigins(allowedOrigins)
+            policy.WithOrigins(allowedOrigins!)
                   .AllowAnyMethod()
                   .AllowAnyHeader();
         });
 });
 
 var app = builder.Build();
+
+app.UseCors("Frontend");
 
 if (app.Environment.IsDevelopment())
 {

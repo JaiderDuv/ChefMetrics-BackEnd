@@ -51,7 +51,7 @@ namespace ChefMetrics_BackEnd.Services
             }
 
             var cuenta = await _userRepository.ObtenerCuentaPorEmailAsync(email);
-            if (cuenta == null || !cuenta.Activo)
+            if (cuenta == null || !cuenta.Activo) 
             {
                 RegistrarIntentoFallido(email);
                 return new LoginResponseDto
