@@ -1,5 +1,6 @@
 using ChefMetrics_BackEnd.Dtos;
 using ChefMetrics_BackEnd.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ChefMetrics_BackEnd.Controllers
@@ -15,9 +16,7 @@ namespace ChefMetrics_BackEnd.Controllers
             _authService = authService;
         }
 
-        /// <summary>
-        /// Inicia sesión de usuario con correo electrónico y contraseña.
-        /// </summary>
+        [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
@@ -35,9 +34,40 @@ namespace ChefMetrics_BackEnd.Controllers
             return Ok(resultado);
         }
 
-        /// <summary>
-        /// Solicita el envío de instrucciones para recuperar la contraseña.
-        /// </summary>
+        [Authorize]
+        [HttpGet("me")]
+        public IActionResult Me()
+        {
+            return Ok(new { exito = true });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh([FromBody] RefreshTokenDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var resultado = await _authService.RenovarSesionAsync(dto);
+            return resultado is null ? Unauthorized() : Ok(resultado);
+        }
+
+        [AllowAnonymous]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout([FromBody] RefreshTokenDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            await _authService.CerrarSesionAsync(dto);
+            return NoContent();
+        }
+
+        [AllowAnonymous]
         [HttpPost("recuperar-password")]
         public async Task<IActionResult> RecuperarPassword([FromBody] RecuperarPasswordDto dto)
         {
@@ -61,9 +91,7 @@ namespace ChefMetrics_BackEnd.Controllers
             }
         }
 
-        /// <summary>
-        /// Restablece la contraseña utilizando la nueva contraseña proporcionada.
-        /// </summary>
+        [AllowAnonymous]
         [HttpPost("restablecer-password")]
         public async Task<IActionResult> RestablecerPassword([FromBody] RestablecerPasswordDto dto)
         {

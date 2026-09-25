@@ -184,6 +184,9 @@ public partial class ChefMetricsContext : DbContext
             entity.Property(e => e.TokenHash)
                 .HasMaxLength(255)
                 .IsUnicode(false);
+            entity.Property(e => e.Tipo)
+                .HasMaxLength(30)
+                .IsUnicode(false);
 
             entity.HasOne(d => d.Cuenta).WithMany(p => p.PasswordResetTokens)
                 .HasForeignKey(d => d.CuentaId)

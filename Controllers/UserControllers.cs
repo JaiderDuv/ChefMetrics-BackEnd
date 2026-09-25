@@ -1,11 +1,14 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ChefMetrics_BackEnd.Model;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace ChefMetrics_BackEnd.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class UserControllers : ControllerBase
     {
         private readonly ChefMetricsContext _context;
@@ -16,11 +19,20 @@ namespace ChefMetrics_BackEnd.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetUsuarios()
+        public async Task<IActionResult> GetUsuarioActual()
         {
-            var usuarios = await _context.UsuarioEmprendedors
+            var subject = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("sub");
+
+            if (!int.TryParse(subject, out var cuentaId))
+            {
+                return Unauthorized();
+            }
+
+            var usuario = await _context.UsuarioEmprendedors
                 .AsNoTracking()
                 .Include(u => u.Cuenta)
+                .Where(u => u.CuentaId == cuentaId)
                 .Select(u => new
                 {
                     u.Id,
@@ -28,9 +40,9 @@ namespace ChefMetrics_BackEnd.Controllers
                     u.OnboardingCompletado,
                     Correo = u.Cuenta.Correo
                 })
-                .ToListAsync();
+                .SingleOrDefaultAsync();
 
-            return Ok(usuarios);
+            return usuario is null ? NotFound() : Ok(usuario);
         }
     }
 }
