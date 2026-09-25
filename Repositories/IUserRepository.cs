@@ -14,7 +14,9 @@ namespace ChefMetrics_BackEnd.Repositories
         Task<RefreshToken?> ObtenerRefreshTokenPorHashAsync(string tokenHash);
         Task RevocarRefreshTokensPorCuentaAsync(int cuentaId);
         Task<PasswordResetToken> RegistrarPasswordResetTokenAsync(PasswordResetToken token);
-        Task<PasswordResetToken?> ObtenerPasswordResetPorHashAsync(string tokenHash);
+        Task<PasswordResetToken?> ObtenerTokenPorHashAsync(string tokenHash, string tipo);
+        Task<bool> RotarRefreshTokenAsync(RefreshToken actual, RefreshToken nuevo);
+        Task<bool> RevocarRefreshTokenAsync(string tokenHash);
         Task ConfirmarEmailPorTokenAsync(Cuenta cuenta, PasswordResetToken token);
         Task RestablecerPasswordYRevocarSesionesAsync(
             Cuenta cuenta,

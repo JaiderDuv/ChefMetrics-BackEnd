@@ -51,7 +51,7 @@ namespace ChefMetrics_BackEnd.Services
             }
 
             var cuenta = await _userRepository.ObtenerCuentaPorEmailAsync(email);
-            if (cuenta == null || !cuenta.Activo) 
+            if (cuenta == null || !cuenta.Activo || !cuenta.EmailVerificado)
             {
                 RegistrarIntentoFallido(email);
                 return new LoginResponseDto
@@ -98,6 +98,70 @@ namespace ChefMetrics_BackEnd.Services
                 NombreEmprendimiento = usuario?.NombreEmprendimiento,
                 OnboardingCompletado = usuario?.OnboardingCompletado ?? false
             };
+        }
+
+        public async Task<LoginResponseDto?> RenovarSesionAsync(RefreshTokenDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Token))
+            {
+                return null;
+            }
+
+            var refreshToken = await _userRepository.ObtenerRefreshTokenPorHashAsync(
+                TokenGenerator.CalcularHash(dto.Token));
+
+            if (refreshToken == null ||
+                refreshToken.Revocado ||
+                refreshToken.FechaExpiracion <= DateTime.UtcNow ||
+                !refreshToken.Cuenta.Activo ||
+                !refreshToken.Cuenta.EmailVerificado)
+            {
+                return null;
+            }
+
+            var cuenta = refreshToken.Cuenta;
+            var usuario = cuenta.UsuarioEmprendedor;
+            var accessToken = TokenGenerator.GenerarAccessToken(cuenta, usuario, _jwtSettings);
+            var nuevoRefreshToken = TokenGenerator.GenerarTokenRefresh();
+
+            var rotado = await _userRepository.RotarRefreshTokenAsync(
+                refreshToken,
+                new RefreshToken
+                {
+                    CuentaId = cuenta.Id,
+                    TokenHash = TokenGenerator.CalcularHash(nuevoRefreshToken),
+                    FechaExpiracion = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenDays),
+                    Revocado = false
+                });
+
+            if (!rotado)
+            {
+                return null;
+            }
+
+            return new LoginResponseDto
+            {
+                Exito = true,
+                Mensaje = "Sesión renovada.",
+                Token = accessToken,
+                AccessToken = accessToken,
+                RefreshToken = nuevoRefreshToken,
+                IdUsuario = usuario?.Id ?? cuenta.Id,
+                CorreoElectronico = cuenta.Correo,
+                NombreEmprendimiento = usuario?.NombreEmprendimiento,
+                OnboardingCompletado = usuario?.OnboardingCompletado ?? false
+            };
+        }
+
+        public async Task<bool> CerrarSesionAsync(RefreshTokenDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Token))
+            {
+                return false;
+            }
+
+            return await _userRepository.RevocarRefreshTokenAsync(
+                TokenGenerator.CalcularHash(dto.Token));
         }
 
         private bool EstaBloqueado(string email)
@@ -163,6 +227,7 @@ namespace ChefMetrics_BackEnd.Services
             {
                 CuentaId = cuenta.Id,
                 TokenHash = TokenGenerator.CalcularHash(tokenRecuperacion),
+                Tipo = TokenPurposes.PasswordReset,
                 FechaExpiracion = DateTime.UtcNow.AddMinutes(15),
                 Usado = false
             });
@@ -177,8 +242,9 @@ namespace ChefMetrics_BackEnd.Services
                 throw new ArgumentException("Las contraseñas no coinciden.");
             }
 
-            var tokenRecuperacion = await _userRepository.ObtenerPasswordResetPorHashAsync(
-                TokenGenerator.CalcularHash(dto.Token));
+            var tokenRecuperacion = await _userRepository.ObtenerTokenPorHashAsync(
+                TokenGenerator.CalcularHash(dto.Token),
+                TokenPurposes.PasswordReset);
 
             if (tokenRecuperacion == null ||
                 tokenRecuperacion.Usado ||
