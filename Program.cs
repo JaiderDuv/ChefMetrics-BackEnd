@@ -70,6 +70,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseCors("Frontend");
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

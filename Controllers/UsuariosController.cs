@@ -25,6 +25,11 @@ namespace ChefMetrics_BackEnd.Controllers
                 return BadRequest(ModelState);
             }
 
+            if (dto.NombreEmprendimiento?.Length > 100)
+            {
+                return BadRequest();
+            }
+
             try
             {
                 var resultado = await _usuarioService.RegistrarEmprendedorFormalizadoAsync(dto);
@@ -43,6 +48,11 @@ namespace ChefMetrics_BackEnd.Controllers
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
+            }
+
+            if (dto.NombreEmprendimiento?.Length > 100)
+            {
+                return BadRequest();
             }
 
             try
