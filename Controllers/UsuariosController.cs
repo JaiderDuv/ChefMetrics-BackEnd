@@ -1,5 +1,6 @@
 ﻿using ChefMetrics_BackEnd.Dtos;
 using ChefMetrics_BackEnd.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ChefMetrics_BackEnd.Controllers
@@ -15,6 +16,7 @@ namespace ChefMetrics_BackEnd.Controllers
             _usuarioService = usuarioService;
         }
 
+        [AllowAnonymous]
         [HttpPost("registro-formalizado")]
         public async Task<IActionResult> RegistrarFormalizado([FromBody] EmprendedorFormalizado dto)
         {
@@ -39,6 +41,7 @@ namespace ChefMetrics_BackEnd.Controllers
             }
         }
 
+        [AllowAnonymous]
         [HttpPost("registro-no-formalizado")]
         public async Task<IActionResult> RegistrarNoFormalizado([FromBody] Emprendedor dto)
         {
@@ -62,10 +65,16 @@ namespace ChefMetrics_BackEnd.Controllers
                 return BadRequest(new { mensaje = ex.Message });
             }
         }
-        [HttpGet("validar-token")]
-        public async Task<IActionResult> ValidarToken([FromQuery] string token)
+        [AllowAnonymous]
+        [HttpPost("validar-token")]
+        public async Task<IActionResult> ValidarToken([FromBody] TokenDto dto)
         {
-            var valido = await _usuarioService.ValidarTokenAsync(token);
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var valido = await _usuarioService.ValidarTokenAsync(dto.Token);
 
             if (!valido)
             {

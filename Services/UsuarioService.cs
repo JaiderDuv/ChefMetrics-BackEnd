@@ -74,7 +74,7 @@ namespace ChefMetrics_BackEnd.Services
                 PasswordHash = PasswordHasher.HashPassword(passwordPlano),
                 TipoCuenta = "emprendedor",
                 EmailVerificado = false,
-                Activo = true
+                Activo = false
             });
 
             var usuario = await _usuarioRepository.RegistrarUsuarioAsync(new UsuarioEmprendedor
@@ -106,6 +106,7 @@ namespace ChefMetrics_BackEnd.Services
             {
                 CuentaId = cuenta.Id,
                 TokenHash = TokenGenerator.CalcularHash(token),
+                Tipo = TokenPurposes.EmailVerification,
                 FechaExpiracion = DateTime.UtcNow.AddHours(24),
                 Usado = false
             });
@@ -119,8 +120,9 @@ namespace ChefMetrics_BackEnd.Services
                 return false;
             }
 
-            var registro = await _usuarioRepository.ObtenerPasswordResetPorHashAsync(
-                TokenGenerator.CalcularHash(token));
+            var registro = await _usuarioRepository.ObtenerTokenPorHashAsync(
+                TokenGenerator.CalcularHash(token),
+                TokenPurposes.EmailVerification);
 
             if (registro == null || registro.Usado ||
                 registro.FechaExpiracion <= DateTime.UtcNow)

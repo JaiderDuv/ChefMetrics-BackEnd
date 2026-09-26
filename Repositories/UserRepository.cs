@@ -73,6 +73,7 @@ namespace ChefMetrics_BackEnd.Repositories
         {
             return await _context.RefreshTokens
                 .Include(t => t.Cuenta)
+                .ThenInclude(c => c.UsuarioEmprendedor)
                 .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
         }
 
@@ -91,12 +92,39 @@ namespace ChefMetrics_BackEnd.Repositories
             return token;
         }
 
-        public async Task<PasswordResetToken?> ObtenerPasswordResetPorHashAsync(string tokenHash)
+        public async Task<PasswordResetToken?> ObtenerTokenPorHashAsync(string tokenHash, string tipo)
         {
             return await _context.PasswordResetTokens
                 .Include(t => t.Cuenta)
                 .ThenInclude(c => c.UsuarioEmprendedor)
-                .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
+                .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && t.Tipo == tipo);
+        }
+
+        public async Task<bool> RotarRefreshTokenAsync(RefreshToken actual, RefreshToken nuevo)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var revocado = await _context.RefreshTokens
+                .Where(t => t.Id == actual.Id && !t.Revocado && t.FechaExpiracion > DateTime.UtcNow)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.Revocado, true));
+
+            if (revocado != 1)
+            {
+                await transaction.RollbackAsync();
+                return false;
+            }
+
+            await _context.RefreshTokens.AddAsync(nuevo);
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+
+        public async Task<bool> RevocarRefreshTokenAsync(string tokenHash)
+        {
+            return await _context.RefreshTokens
+                .Where(t => t.TokenHash == tokenHash && !t.Revocado)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.Revocado, true)) == 1;
         }
 
         public async Task ConfirmarEmailPorTokenAsync(Cuenta cuenta, PasswordResetToken token)
@@ -105,6 +133,7 @@ namespace ChefMetrics_BackEnd.Repositories
 
             token.Usado = true;
             cuenta.EmailVerificado = true;
+            cuenta.Activo = true;
 
             _context.PasswordResetTokens.Update(token);
             _context.Cuenta.Update(cuenta);

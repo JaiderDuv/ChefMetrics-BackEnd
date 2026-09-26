@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ChefMetrics_BackEnd</RootNamespace>
+    <UserSecretsId>ChefMetrics-BackEnd-Email</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,17 @@
     <EmbeddedResource Remove="Models\**" />
     <None Remove="Datas\**" />
     <None Remove="Models\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\PWGAPG-Frontend\Pages\EmailConfirmacion_VPrevia.razor" Link="EmailTemplates\EmailConfirmacion_VPrevia.razor">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\PWGAPG-Frontend\Pages\EmailContraseña_VPrevia.razor" Link="EmailTemplates\EmailContraseña_VPrevia.razor">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

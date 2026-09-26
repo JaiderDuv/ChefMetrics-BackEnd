@@ -6,9 +6,11 @@ namespace ChefMetrics_BackEnd.Dtos
     {
         [Required(ErrorMessage = "El correo electrónico es obligatorio.")]
         [EmailAddress(ErrorMessage = "Ingrese un correo electrónico válido.")]
+        [StringLength(255)]
         public string CorreoElectronico { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "La contraseña es obligatoria.")]
+        [StringLength(128)]
         public string Password { get; set; } = string.Empty;
     }
 

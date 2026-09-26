@@ -283,6 +283,11 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.Property<DateTime>("FechaExpiracion")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Tipo")
+                        .HasMaxLength(30)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(30)");
+
                     b.Property<string>("TokenHash")
                         .IsRequired()
                         .HasMaxLength(255)
