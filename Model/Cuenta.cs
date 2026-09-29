@@ -25,5 +25,7 @@ public partial class Cuenta
 
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 
+    public virtual ICollection<PerfilEditGrant> PerfilEditGrants { get; set; } = new List<PerfilEditGrant>();
+
     public virtual UsuarioEmprendedor? UsuarioEmprendedor { get; set; }
 }

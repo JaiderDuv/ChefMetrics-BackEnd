@@ -10,6 +10,7 @@ namespace ChefMetrics_BackEnd.Repositories
         Task<Negocio> RegistrarNegocioAsync(Negocio negocio);
         Task<TipoEmprendimiento> ObtenerOCrearTipoEmprendimientoAsync(string nombre);
         Task<Cuenta?> ObtenerCuentaPorEmailAsync(string email);
+        Task<Cuenta?> ObtenerCuentaPorIdAsync(int cuentaId);
         Task<RefreshToken> RegistrarRefreshTokenAsync(RefreshToken refreshToken);
         Task<RefreshToken?> ObtenerRefreshTokenPorHashAsync(string tokenHash);
         Task RevocarRefreshTokensPorCuentaAsync(int cuentaId);
