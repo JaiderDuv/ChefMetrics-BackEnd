@@ -1,4 +1,5 @@
 ﻿using ChefMetrics_BackEnd.Model;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChefMetrics_BackEnd.Repositories
@@ -87,6 +88,9 @@ namespace ChefMetrics_BackEnd.Repositories
 
         public async Task<PasswordResetToken> RegistrarPasswordResetTokenAsync(PasswordResetToken token)
         {
+            // Ojeconfigura ko'ápe 15 minutos aravo oguereko hag جهa opaty hagua pe token
+            token.FechaExpiracion = DateTime.UtcNow.AddMinutes(15);
+
             await _context.PasswordResetTokens.AddAsync(token);
             await _context.SaveChangesAsync();
             return token;
