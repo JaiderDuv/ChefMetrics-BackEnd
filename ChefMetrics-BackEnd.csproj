@@ -20,17 +20,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\PWGAPG-Frontend\Pages\EmailConfirmacion_VPrevia.razor" Link="EmailTemplates\EmailConfirmacion_VPrevia.razor">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
-    </Content>
-    <Content Include="..\PWGAPG-Frontend\Pages\EmailContraseña_VPrevia.razor" Link="EmailTemplates\EmailContraseña_VPrevia.razor">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />

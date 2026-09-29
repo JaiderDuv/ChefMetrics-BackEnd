@@ -41,6 +41,7 @@ namespace ChefMetrics_BackEnd.Services
             }
 
             var email = dto.CorreoElectronico.Trim().ToLowerInvariant();
+
             if (EstaBloqueado(email))
             {
                 return new LoginResponseDto
@@ -50,8 +51,9 @@ namespace ChefMetrics_BackEnd.Services
                 };
             }
 
+            // 1. Verificar si la cuenta existe y está activa
             var cuenta = await _userRepository.ObtenerCuentaPorEmailAsync(email);
-            if (cuenta == null || !cuenta.Activo || !cuenta.EmailVerificado)
+            if (cuenta == null || !cuenta.Activo)
             {
                 RegistrarIntentoFallido(email);
                 return new LoginResponseDto
@@ -61,6 +63,7 @@ namespace ChefMetrics_BackEnd.Services
                 };
             }
 
+            // 2. Comprobar si la contraseña es correcta
             bool passwordValida = PasswordHasher.VerifyPassword(dto.Password, cuenta.PasswordHash);
             if (!passwordValida)
             {
@@ -72,6 +75,17 @@ namespace ChefMetrics_BackEnd.Services
                 };
             }
 
+            // 3. Comprobar verificación de email (únicamente tras validar la contraseña correcta)
+            if (!cuenta.EmailVerificado)
+            {
+                return new LoginResponseDto
+                {
+                    Exito = false,
+                    Mensaje = "Tu cuenta aún no ha sido verificada. Por favor, revisa tu correo electrónico para confirmar tu registro antes de iniciar sesión."
+                };
+            }
+
+            // Si todo es correcto, reiniciamos intentos fallidos
             _loginAttempts.Remove(email);
 
             var usuario = cuenta.UsuarioEmprendedor;
@@ -222,6 +236,13 @@ namespace ChefMetrics_BackEnd.Services
                 return false;
             }
 
+            // 1. Extraer los nombres y apellidos del usuario
+            var usuario = cuenta.UsuarioEmprendedor;
+            string nombreCompleto = usuario != null
+                ? $"{usuario.Nombres} {usuario.Apellidos}".Trim()
+                : "Usuario";
+
+            // 2. Generar y registrar el token
             string tokenRecuperacion = TokenGenerator.GenerarTokenRecuperacion();
             await _userRepository.RegistrarPasswordResetTokenAsync(new PasswordResetToken
             {
@@ -231,7 +252,10 @@ namespace ChefMetrics_BackEnd.Services
                 FechaExpiracion = DateTime.UtcNow.AddMinutes(15),
                 Usado = false
             });
-            await _emailService.EnviarCorreoRecuperacionAsync(email, tokenRecuperacion);
+
+            // 3. Enviar el correo pasando el nombre completo obtenido
+            await _emailService.EnviarCorreoRecuperacionAsync(email, nombreCompleto, tokenRecuperacion);
+
             return true;
         }
 

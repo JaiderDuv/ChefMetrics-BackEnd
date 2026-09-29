@@ -9,6 +9,11 @@ public partial class UsuarioEmprendedor
 
     public int CuentaId { get; set; }
 
+    // Columnas agregadas en la tabla UsuarioEmprendedor
+    public string Nombres { get; set; } = null!;
+
+    public string Apellidos { get; set; } = null!;
+
     public string TipoFormalizacion { get; set; } = null!;
 
     public string? Nit { get; set; }

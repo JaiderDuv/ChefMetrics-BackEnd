@@ -65,6 +65,7 @@ namespace ChefMetrics_BackEnd.Controllers
                 return BadRequest(new { mensaje = ex.Message });
             }
         }
+
         [AllowAnonymous]
         [HttpPost("validar-token")]
         public async Task<IActionResult> ValidarToken([FromBody] TokenDto dto)
@@ -81,15 +82,44 @@ namespace ChefMetrics_BackEnd.Controllers
                 return BadRequest(new
                 {
                     exito = false,
-                    mensaje = "El token es inválido, ya fue utilizado o ha expirado."
+                    mensaje = "El enlace de verificación ha expirado o ya fue utilizado. Por favor, solicita uno nuevo o inicia sesión si ya confirmaste tu cuenta."
                 });
             }
 
             return Ok(new
             {
                 exito = true,
-                mensaje = "Correo electrónico verificado correctamente."
+                mensaje = "¡Tu correo electrónico ha sido verificado con éxito!"
             });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("reenviar-verificacion")]
+        public async Task<IActionResult> ReenviarVerificacion([FromBody] ReenviarCorreoDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                await _usuarioService.ReenviarCorreoVerificacionAsync(dto.Correo);
+
+                return Ok(new
+                {
+                    exito = true,
+                    mensaje = "Si el correo está registrado y pendiente de verificación, recibirás un nuevo enlace en breve."
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    exito = false,
+                    mensaje = $"Error al procesar el reenvío: {ex.Message}"
+                });
+            }
         }
     }
 }

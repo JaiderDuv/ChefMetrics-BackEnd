@@ -4,6 +4,14 @@ namespace ChefMetrics_BackEnd.Dtos
 {
     public class EmprendedorFormalizado
     {
+        [Required(ErrorMessage = "El nombre es obligatorio.")]
+        [StringLength(100, ErrorMessage = "Los nombres no pueden superar los 100 caracteres.")]
+        public string Nombres { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El apellido es obligatorio.")]
+        [StringLength(100, ErrorMessage = "Los apellidos no pueden superar los 100 caracteres.")]
+        public string Apellidos { get; set; } = string.Empty;
+
         public bool Formalizado { get; set; }
 
         [Required(ErrorMessage = "El NIT es obligatorio para empresas formalizadas.")]
@@ -53,6 +61,14 @@ namespace ChefMetrics_BackEnd.Dtos
 
     public class Emprendedor
     {
+        [Required(ErrorMessage = "El nombre es obligatorio.")]
+        [StringLength(100, ErrorMessage = "Los nombres no pueden superar los 100 caracteres.")]
+        public string Nombres { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "El apellido es obligatorio.")]
+        [StringLength(100, ErrorMessage = "Los apellidos no pueden superar los 100 caracteres.")]
+        public string Apellidos { get; set; } = string.Empty;
+
         public bool Formalizado { get; set; }
 
         [Required(ErrorMessage = "El correo electrónico es obligatorio.")]
