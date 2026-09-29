@@ -63,6 +63,13 @@ namespace ChefMetrics_BackEnd.Repositories
                 .FirstOrDefaultAsync(c => c.Correo.ToLower() == email.ToLower());
         }
 
+        public async Task<Cuenta?> ObtenerCuentaPorIdAsync(int cuentaId)
+        {
+            return await _context.Cuenta
+                .Include(c => c.UsuarioEmprendedor)
+                .FirstOrDefaultAsync(c => c.Id == cuentaId);
+        }
+
         public async Task<RefreshToken> RegistrarRefreshTokenAsync(RefreshToken refreshToken)
         {
             await _context.RefreshTokens.AddAsync(refreshToken);

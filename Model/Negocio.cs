@@ -17,6 +17,12 @@ public partial class Negocio
 
     public string? Direccion { get; set; }
 
+    public string? Rues { get; set; }
+
+    public string? CorreoEmpresa { get; set; }
+
+    public bool TieneSitioFisico { get; set; }
+
     public DateTime FechaActualizacion { get; set; }
 
     public virtual ICollection<CostoFijo> CostoFijos { get; set; } = new List<CostoFijo>();

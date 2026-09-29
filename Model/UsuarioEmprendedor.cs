@@ -26,6 +26,10 @@ public partial class UsuarioEmprendedor
 
     public string? NombreEmprendimiento { get; set; }
 
+    public string? Nombres { get; set; }
+
+    public string? Apellidos { get; set; }
+
     public bool OnboardingCompletado { get; set; }
 
     public DateTime FechaCreacion { get; set; }
@@ -33,6 +37,8 @@ public partial class UsuarioEmprendedor
     public virtual Cuenta Cuenta { get; set; } = null!;
 
     public virtual ICollection<Empleado> Empleados { get; set; } = new List<Empleado>();
+
+    public virtual ICollection<SocioNegocio> SociosNegocio { get; set; } = new List<SocioNegocio>();
 
     public virtual Negocio? Negocio { get; set; }
 }

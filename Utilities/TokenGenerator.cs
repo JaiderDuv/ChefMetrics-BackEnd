@@ -36,6 +36,11 @@ namespace ChefMetrics_BackEnd.Utilities
             return GenerarTokenVerificacion();
         }
 
+        public static string GenerarTokenEdicionPerfil()
+        {
+            return GenerarTokenVerificacion();
+        }
+
         public static string GenerarAccessToken(Cuenta cuenta, UsuarioEmprendedor? usuario, JwtSettings settings)
         {
             if (string.IsNullOrWhiteSpace(settings.Key) || settings.Key.Length < 32)
