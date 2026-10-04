@@ -26,10 +26,6 @@ public partial class UsuarioEmprendedor
 
     public string? NombreEmprendimiento { get; set; }
 
-    public string? Nombres { get; set; }
-
-    public string? Apellidos { get; set; }
-
     public bool OnboardingCompletado { get; set; }
 
     public DateTime FechaCreacion { get; set; }
