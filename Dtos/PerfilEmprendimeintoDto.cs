@@ -55,7 +55,35 @@ public class PerfilEmprendedorDto
     [StringLength(255)]
     public string Direccion { get; set; } = string.Empty;
 
-    public List<SocioNegocioDto> Socios { get; set; } = new();
+    // Sección 03 del formulario: empleados del negocio (tabla Empleado).
+    // Solo se envían Id (null = nuevo), correo y rol; el resto lo asigna el servidor.
+    public List<EmpleadoDto> Empleados { get; set; } = new();
+}
+
+// Datos prudentes de la tabla Empleado (modelo por invitación:
+// no tiene nombres/apellidos/teléfono, solo correo invitado + rol + estado).
+public class EmpleadoDto
+{
+    // Null o 0 => invitación nueva.
+    public int? Id { get; set; }
+
+    [Required(ErrorMessage = "El correo del empleado es obligatorio.")]
+    [EmailAddress(ErrorMessage = "El correo del empleado no es válido.")]
+    [StringLength(255)]
+    public string CorreoInvitado { get; set; } = string.Empty;
+
+    [Range(1, int.MaxValue, ErrorMessage = "Debes seleccionar el rol del empleado.")]
+    public int RolId { get; set; }
+
+    // Solo lectura (lo devuelve el GET).
+    public string? NombreRol { get; set; }
+    public string? EstadoInvitacion { get; set; }
+}
+
+public class RolDto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = string.Empty;
 }
 
 public class SocioNegocioDto

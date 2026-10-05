@@ -23,4 +23,7 @@ public interface IPerfilEmpreService
     Task<ActualizarPerfilResultadoDto> ActualizarPerfilUsuarioAsync(
         int cuentaId,
         PerfilUsuarioDto dto);
+
+    // Catálogo de roles para el desplegable de empleados (tabla Roles).
+    Task<List<RolDto>> ObtenerRolesAsync();
 }
