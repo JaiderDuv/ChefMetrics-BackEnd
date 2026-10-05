@@ -14,4 +14,9 @@ public interface IInsumoService
     Task<ResultadoInsumoDto> ActualizarParcialAsync(int cuentaId, int insumoId, ActualizarInsumoDto dto);
 
     Task<ResultadoEliminarInsumoDto> EliminarAsync(int cuentaId, int insumoId);
+
+    Task<ResultadoHistorialDto> ObtenerHistorialPreciosAsync(int cuentaId, int insumoId);
+
+    Task<ResultadoHistorialGeneralDto> ObtenerHistorialGeneralAsync(
+        int cuentaId, string? nombre, string? proveedor);
 }

@@ -60,6 +60,20 @@ public sealed class PerfilEmprendimientoController : ControllerBase
         return Ok(roles);
     }
 
+    // Marca como usados los permisos pendientes: el frontend lo llama al salir
+    // del formulario (otra función) o al cerrar sesión.
+    [HttpPost("revocar-permiso")]
+    public async Task<IActionResult> RevocarPermiso()
+    {
+        if (!TryObtenerCuentaId(out var cuentaId))
+        {
+            return Unauthorized();
+        }
+
+        await _perfilService.RevocarPermisoAsync(cuentaId);
+        return Ok(new { mensaje = "Permiso de edición revocado." });
+    }
+
     [HttpPut]
     public async Task<IActionResult> ActualizarPerfil(
         [FromHeader(Name = "X-Profile-Edit-Token")] string? editToken,

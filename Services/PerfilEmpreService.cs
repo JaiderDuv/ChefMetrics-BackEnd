@@ -8,7 +8,13 @@ namespace ChefMetrics_BackEnd.Services;
 
 public sealed class PerfilEmpreService : IPerfilEmpreService
 {
-    private static readonly TimeSpan DuracionPermisoEdicion = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan DuracionPermisoEdicion = TimeSpan.FromMinutes(15);
+
+    // CK_UsuarioEmprendedor_TipoDocumento: solo CC, CE, TI o PA.
+    private static readonly HashSet<string> TiposDocumentoValidos = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CC", "CE", "TI", "PA"
+    };
 
     private readonly IUserRepository _userRepository;
     private readonly IPerfilEmprendimientoRepository _perfilRepository;
@@ -54,6 +60,11 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         };
     }
 
+    public async Task RevocarPermisoAsync(int cuentaId)
+    {
+        await _perfilRepository.RevocarPermisosEdicionAsync(cuentaId);
+    }
+
     public async Task<PerfilEmprendedorDto?> ObtenerPerfilAsync(
         int cuentaId,
         string editToken)
@@ -65,7 +76,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         }
 
         var cuenta = await _perfilRepository.ObtenerPerfilCompletoAsync(cuentaId);
-        return cuenta is null ? null : MapearPerfil(cuenta);
+        return cuenta?.UsuarioEmprendedor is null ? null : MapearPerfil(cuenta);
     }
 
     public async Task<ActualizarPerfilResultadoDto> ActualizarPerfilAsync(
@@ -80,7 +91,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         }
 
         var cuenta = await _perfilRepository.ObtenerPerfilCompletoAsync(cuentaId);
-        if (cuenta?.UsuarioEmprendedor?.Negocio is null)
+        if (cuenta?.UsuarioEmprendedor is null)
         {
             return Error("El perfil del emprendimiento todavía no está completo.");
         }
@@ -115,10 +126,47 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         usuario.Nit = nit;
         usuario.RazonSocial = razonSocial;
 
+        // CK_UsuarioEmprendedor_Formalizacion: formalizado no admite documento;
+        // no formalizado lo exige (además de NIT/razón en null, ya aplicado arriba).
+        if (dto.Formalizado)
+        {
+            usuario.TipoDocumento = null;
+            usuario.NumeroDocumento = null;
+        }
+        else if (usuario.TipoDocumento is null || usuario.NumeroDocumento is null)
+        {
+            return Error("Para el perfil no formalizado debes registrar tu documento en el perfil de usuario.");
+        }
+
         var tipoEmprendimiento = await _userRepository
             .ObtenerOCrearTipoEmprendimientoAsync(dto.CategoriaNegocio.Trim());
 
+        var telefono = dto.TelefonoContacto.Trim();
+        if (telefono.Length < 7 || telefono.Length > 20)
+        {
+            return Error("El teléfono de contacto debe tener entre 7 y 20 caracteres.");
+        }
+
+        if (negocio is null)
+        {
+            // La cuenta aún no tiene negocio (registro sin onboarding):
+            // se crea aquí con los datos del formulario.
+            negocio = await _userRepository.RegistrarNegocioAsync(new Negocio
+            {
+                UsuarioId = usuario.Id,
+                TipoEmprendimientoId = tipoEmprendimiento.Id,
+                TelefonoContacto = telefono,
+                CorreoContacto = dto.CorreoContacto.Trim().ToLowerInvariant(),
+                Direccion = dto.TieneSitioFisico ? NullIfWhiteSpace(dto.Direccion) : null,
+                Rues = rues,
+                CorreoEmpresa = dto.CorreoEmpresa.Trim().ToLowerInvariant(),
+                TieneSitioFisico = dto.TieneSitioFisico,
+                FechaActualizacion = DateTime.UtcNow
+            });
+        }
+
         negocio.TipoEmprendimientoId = tipoEmprendimiento.Id;
+        negocio.TelefonoContacto = telefono;
         negocio.CorreoContacto = dto.CorreoContacto.Trim().ToLowerInvariant();
         negocio.Rues = rues;
         negocio.CorreoEmpresa = dto.CorreoEmpresa.Trim().ToLowerInvariant();
@@ -234,7 +282,9 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         var usuario = cuenta.UsuarioEmprendedor;
         return new PerfilUsuarioDto
         {
-            FotoPerfilUrl = usuario.FotoPerfilUrl,
+            // FotoPerfilUrl no se persiste (la BD no tiene la columna):
+            // solo se usa como vista previa en el cliente.
+            FotoPerfilUrl = null,
             TipoDocumento = usuario.TipoDocumento ?? string.Empty,
             NumeroDocumento = usuario.NumeroDocumento ?? string.Empty,
             TelefonoContacto = usuario.Negocio?.TelefonoContacto ?? string.Empty,
@@ -256,12 +306,34 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         var usuario = cuenta.UsuarioEmprendedor;
         var negocio = usuario.Negocio;
 
-        usuario.TipoDocumento = NullIfWhiteSpace(dto.TipoDocumento)?.ToUpperInvariant();
-        usuario.NumeroDocumento = NullIfWhiteSpace(dto.NumeroDocumento);
+        var esFormalizado = string.Equals(
+            usuario.TipoFormalizacion, "formalizado", StringComparison.OrdinalIgnoreCase);
+        var tipoDoc = NullIfWhiteSpace(dto.TipoDocumento)?.ToUpperInvariant();
+
+        if (!esFormalizado)
+        {
+            if (tipoDoc is null ||
+                !TiposDocumentoValidos.Contains(tipoDoc))
+            {
+                return Error("El tipo de documento no es válido. Valores permitidos: CC, CE, TI, PA.");
+            }
+            if (string.IsNullOrWhiteSpace(dto.NumeroDocumento))
+            {
+                return Error("El número de documento es obligatorio.");
+            }
+        }
+
+        var telefono = NullIfWhiteSpace(dto.TelefonoContacto) ?? string.Empty;
+        if (telefono.Length < 7)
+        {
+            return Error("El teléfono de contacto debe tener al menos 7 dígitos.");
+        }
+
+        usuario.TipoDocumento = esFormalizado ? null : tipoDoc;
+        usuario.NumeroDocumento = esFormalizado ? null : NullIfWhiteSpace(dto.NumeroDocumento);
         usuario.Nombres = NullIfWhiteSpace(dto.Nombres);
         usuario.Apellidos = NullIfWhiteSpace(dto.Apellidos);
-        usuario.FotoPerfilUrl = NullIfWhiteSpace(dto.FotoPerfilUrl);
-        negocio.TelefonoContacto = NullIfWhiteSpace(dto.TelefonoContacto) ?? string.Empty;
+        negocio.TelefonoContacto = telefono;
         negocio.FechaActualizacion = DateTime.UtcNow;
 
         try
@@ -308,7 +380,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             CuentaId = cuenta.Id,
             TokenHash = TokenGenerator.CalcularHash(token),
             Tipo = TokenPurposes.EmailVerification,
-            FechaExpiracion = DateTime.UtcNow.AddHours(24),
+            FechaExpiracion = DateTime.UtcNow.AddMinutes(15),
             Usado = false
         });
         await _emailService.EnviarCorreoVerificacionAsync(cuenta.Correo, token);
@@ -317,8 +389,10 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
     private static PerfilEmprendedorDto MapearPerfil(Cuenta cuenta)
     {
         var usuario = cuenta.UsuarioEmprendedor!;
-        var negocio = usuario.Negocio!;
+        var negocio = usuario.Negocio;
 
+        // Sin negocio (cuenta recién registrada): se devuelven valores por
+        // defecto para que el formulario cargue y el PUT lo cree.
         return new PerfilEmprendedorDto
         {
             CorreoCuenta = cuenta.Correo,
@@ -326,15 +400,16 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
                           string.Equals(usuario.TipoFormalizacion, "si", StringComparison.OrdinalIgnoreCase) ||
                           string.Equals(usuario.TipoFormalizacion, "true", StringComparison.OrdinalIgnoreCase),
             NombreEmprendimiento = usuario.NombreEmprendimiento ?? string.Empty,
-            CategoriaNegocio = negocio.TipoEmprendimiento?.Nombre ?? string.Empty,
-            CorreoContacto = negocio.CorreoContacto,
+            CategoriaNegocio = negocio?.TipoEmprendimiento?.Nombre ?? string.Empty,
+            CorreoContacto = negocio?.CorreoContacto ?? string.Empty,
+            TelefonoContacto = negocio?.TelefonoContacto ?? string.Empty,
             Nit = usuario.Nit ?? string.Empty,
             RazonSocial = usuario.RazonSocial ?? string.Empty,
-            Rues = negocio.Rues ?? string.Empty,
-            CorreoEmpresa = negocio.CorreoEmpresa ?? negocio.CorreoContacto,
-            TieneSitioFisico = negocio.TieneSitioFisico,
-            Direccion = negocio.Direccion ?? string.Empty,
-            Empleados = negocio.Empleados
+            Rues = negocio?.Rues ?? string.Empty,
+            CorreoEmpresa = negocio?.CorreoEmpresa ?? negocio?.CorreoContacto ?? string.Empty,
+            TieneSitioFisico = negocio?.TieneSitioFisico ?? false,
+            Direccion = negocio?.Direccion ?? string.Empty,
+            Empleados = negocio?.Empleados
                 .OrderBy(e => e.CorreoInvitado)
                 .Select(e => new EmpleadoDto
                 {
@@ -343,7 +418,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
                     RolId = e.RolId,
                     NombreRol = e.Rol?.Nombre ?? string.Empty,
                     EstadoInvitacion = e.EstadoInvitacion
-                }).ToList()
+                }).ToList() ?? new()
         };
     }
 

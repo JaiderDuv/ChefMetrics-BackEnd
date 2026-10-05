@@ -63,6 +63,24 @@ public sealed class InsumosController : ControllerBase
             : Ok(lista);
     }
 
+    // GET /api/insumos/historial-precios?nombre=&proveedor= — global del negocio,
+    // del más reciente al más viejo.
+    [HttpGet("historial-precios")]
+    public async Task<IActionResult> ObtenerHistorialGeneral(
+        [FromQuery] string? nombre,
+        [FromQuery] string? proveedor)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId))
+        {
+            return Unauthorized();
+        }
+
+        var resultado = await _insumoService.ObtenerHistorialGeneralAsync(cuentaId, nombre, proveedor);
+        return resultado.NoEncontrado
+            ? NotFound(new { mensaje = resultado.Mensaje })
+            : Ok(resultado.Historial);
+    }
+
     // GET /api/insumos/{id} — detalle de un insumo específico.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> ObtenerPorId([FromRoute] int id)
@@ -76,6 +94,21 @@ public sealed class InsumosController : ControllerBase
         return resultado.NoEncontrado
             ? NotFound(new { mensaje = resultado.Mensaje })
             : Ok(resultado.Insumo);
+    }
+
+    // GET /api/insumos/{id}/historial-precios — del más reciente al más viejo.
+    [HttpGet("{id:int}/historial-precios")]
+    public async Task<IActionResult> ObtenerHistorialPrecios([FromRoute] int id)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId))
+        {
+            return Unauthorized();
+        }
+
+        var resultado = await _insumoService.ObtenerHistorialPreciosAsync(cuentaId, id);
+        return resultado.NoEncontrado
+            ? NotFound(new { mensaje = resultado.Mensaje })
+            : Ok(resultado.Historial);
     }
 
     // PATCH /api/insumos/{id} — edición parcial de un insumo específico.

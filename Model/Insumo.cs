@@ -13,6 +13,8 @@ public partial class Insumo
 
     public string UnidadMedida { get; set; } = null!;
 
+    public string Categoria { get; set; } = null!;
+
     public decimal CostoUnitario { get; set; }
 
     public decimal PorcentajeMerma { get; set; }
@@ -24,6 +26,8 @@ public partial class Insumo
     public DateTime FechaActualizacion { get; set; }
 
     public virtual Negocio Negocio { get; set; } = null!;
+
+    public virtual ICollection<InsumoProveedor> InsumoProveedors { get; set; } = new List<InsumoProveedor>();
 
     public virtual ICollection<RecetaInsumo> RecetaInsumos { get; set; } = new List<RecetaInsumo>();
 }
