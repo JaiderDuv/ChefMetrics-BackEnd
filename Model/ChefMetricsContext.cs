@@ -43,8 +43,6 @@ public partial class ChefMetricsContext : DbContext
 
     public virtual DbSet<UsuarioEmprendedor> UsuarioEmprendedors { get; set; }
 
-    public virtual DbSet<SocioNegocio> SociosNegocio { get; set; }
-
     // NOTA: sin OnConfiguring con cadena hardcodeada.
     // La conexión se configura en Program.cs via
     // AddDbContext + IConfiguration.GetConnectionString("DefaultConnection"),
@@ -364,33 +362,6 @@ public partial class ChefMetricsContext : DbContext
             entity.HasOne(d => d.Cuenta).WithOne(p => p.UsuarioEmprendedor)
                 .HasForeignKey<UsuarioEmprendedor>(d => d.CuentaId)
                 .HasConstraintName("FK_UsuarioEmprendedor_Cuenta");
-        });
-
-        modelBuilder.Entity<SocioNegocio>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-
-            entity.HasIndex(e => new { e.UsuarioEmprendedorId, e.NumeroDocumento },
-                "UQ_SocioNegocio_Usuario_Documento")
-                .IsUnique();
-
-            entity.Property(e => e.Nombres).HasMaxLength(100);
-            entity.Property(e => e.Apellidos).HasMaxLength(100);
-            entity.Property(e => e.TipoDocumento)
-                .HasMaxLength(5)
-                .IsUnicode(false);
-            entity.Property(e => e.NumeroDocumento)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-            entity.Property(e => e.Telefono)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-            entity.Property(e => e.CorreoElectronico).HasMaxLength(255);
-
-            entity.HasOne(e => e.UsuarioEmprendedor)
-                .WithMany(u => u.SociosNegocio)
-                .HasForeignKey(e => e.UsuarioEmprendedorId)
-                .OnDelete(DeleteBehavior.Cascade);
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -112,9 +112,40 @@ namespace ChefMetrics_BackEnd.Services
             _context.UsuarioEmprendedors.Add(emprendedor); // En el DbContext la propiedad se llama "UsuarioEmprendedors"
             await _context.SaveChangesAsync();
 
-            // 3. Generar token y enviar correo de verificación
-            string token = Guid.NewGuid().ToString();
+            // 2b. Crear el Negocio con los datos del negocio capturados en el registro
+            // (TeléfonoContacto, CorreoContacto y CategoriaNegocio viá TipoEmprendimiento)
+            var tipoEmprendimiento = await _usuarioRepository
+                .ObtenerOCrearTipoEmprendimientoAsync(categoriaNegocio);
+
+            var negocio = new Negocio
+            {
+                UsuarioId = emprendedor.Id,
+                TipoEmprendimientoId = tipoEmprendimiento.Id,
+                TelefonoContacto = telefonoContacto ?? string.Empty,
+                CorreoContacto = (correoContacto ?? string.Empty).ToLower().Trim(),
+                Direccion = null,
+                Rues = null,
+                CorreoEmpresa = null,
+                TieneSitioFisico = false,
+                FechaActualizacion = DateTime.UtcNow
+            };
+
+            _context.Negocios.Add(negocio);
+            await _context.SaveChangesAsync();
+
+            // 3. Generar token, persistirlo y enviar correo de verificación
             string nombreCompleto = $"{emprendedor.Nombres} {emprendedor.Apellidos}";
+
+            string token = Guid.NewGuid().ToString();
+            await _usuarioRepository.RegistrarPasswordResetTokenAsync(new PasswordResetToken
+            {
+                CuentaId = cuenta.Id,
+                TokenHash = TokenGenerator.CalcularHash(token),
+                Tipo = TokenPurposes.EmailVerification,
+                Usado = false,
+                FechaCreacion = DateTime.UtcNow,
+                FechaExpiracion = DateTime.UtcNow.AddMinutes(15)
+            });
 
             // Llama al servicio SMTP para enviar el correo
             await _emailService.EnviarCorreoVerificacionAsync(cuenta.Correo, nombreCompleto, token);

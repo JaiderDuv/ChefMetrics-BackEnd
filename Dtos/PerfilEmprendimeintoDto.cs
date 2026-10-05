@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace ChefMetrics_BackEnd.Dtos;
 
@@ -86,37 +86,6 @@ public class RolDto
     public string Nombre { get; set; } = string.Empty;
 }
 
-public class SocioNegocioDto
-{
-    public int? Id { get; set; }
-
-    [Required(ErrorMessage = "Los nombres del socio son obligatorios.")]
-    [StringLength(100)]
-    public string Nombres { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Los apellidos del socio son obligatorios.")]
-    [StringLength(100)]
-    public string Apellidos { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "El tipo de documento del socio es obligatorio.")]
-    [StringLength(5)]
-    public string TipoDocumento { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "El documento del socio es obligatorio.")]
-    [StringLength(20)]
-    public string NumeroDocumento { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "El teléfono del socio es obligatorio.")]
-    [Phone(ErrorMessage = "El teléfono del socio no es válido.")]
-    [StringLength(20)]
-    public string Telefono { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "El correo del socio es obligatorio.")]
-    [EmailAddress(ErrorMessage = "El correo del socio no es válido.")]
-    [StringLength(255)]
-    public string CorreoElectronico { get; set; } = string.Empty;
-}
-
 public class ActualizarPerfilResultadoDto
 {
     public bool Exito { get; set; }
@@ -147,3 +116,4 @@ public class PerfilUsuarioDto
     [StringLength(100)]
     public string Apellidos { get; set; } = string.Empty;
 }
+

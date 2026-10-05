@@ -17,7 +17,7 @@ namespace ChefMetrics_BackEnd.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -550,58 +550,6 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.ToTable("Roles");
                 });
 
-            modelBuilder.Entity("ChefMetrics_BackEnd.Model.SocioNegocio", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Apellidos")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("CorreoElectronico")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("Nombres")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("NumeroDocumento")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<string>("Telefono")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(20)");
-
-                    b.Property<string>("TipoDocumento")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(5)");
-
-                    b.Property<int>("UsuarioEmprendedorId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex(new[] { "UsuarioEmprendedorId", "NumeroDocumento" }, "UQ_SocioNegocio_Usuario_Documento")
-                        .IsUnique();
-
-                    b.ToTable("SociosNegocio");
-                });
-
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.TipoEmprendimiento", b =>
                 {
                     b.Property<int>("Id")
@@ -633,6 +581,7 @@ namespace ChefMetrics_BackEnd.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Apellidos")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
@@ -643,6 +592,9 @@ namespace ChefMetrics_BackEnd.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<string>("FotoPerfilUrl")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Nit")
                         .HasMaxLength(20)
@@ -655,6 +607,7 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("nvarchar(150)");
 
                     b.Property<string>("Nombres")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
@@ -876,17 +829,6 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.Navigation("Cuenta");
                 });
 
-            modelBuilder.Entity("ChefMetrics_BackEnd.Model.SocioNegocio", b =>
-                {
-                    b.HasOne("ChefMetrics_BackEnd.Model.UsuarioEmprendedor", "UsuarioEmprendedor")
-                        .WithMany("SociosNegocio")
-                        .HasForeignKey("UsuarioEmprendedorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("UsuarioEmprendedor");
-                });
-
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.UsuarioEmprendedor", b =>
                 {
                     b.HasOne("ChefMetrics_BackEnd.Model.Cuenta", "Cuenta")
@@ -957,8 +899,6 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.Navigation("Empleados");
 
                     b.Navigation("Negocio");
-
-                    b.Navigation("SociosNegocio");
                 });
 #pragma warning restore 612, 618
         }

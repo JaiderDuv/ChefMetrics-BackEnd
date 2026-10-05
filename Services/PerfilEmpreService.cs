@@ -234,7 +234,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         var usuario = cuenta.UsuarioEmprendedor;
         return new PerfilUsuarioDto
         {
-            FotoPerfilUrl = null,
+            FotoPerfilUrl = usuario.FotoPerfilUrl,
             TipoDocumento = usuario.TipoDocumento ?? string.Empty,
             NumeroDocumento = usuario.NumeroDocumento ?? string.Empty,
             TelefonoContacto = usuario.Negocio?.TelefonoContacto ?? string.Empty,
@@ -260,6 +260,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         usuario.NumeroDocumento = NullIfWhiteSpace(dto.NumeroDocumento);
         usuario.Nombres = NullIfWhiteSpace(dto.Nombres);
         usuario.Apellidos = NullIfWhiteSpace(dto.Apellidos);
+        usuario.FotoPerfilUrl = NullIfWhiteSpace(dto.FotoPerfilUrl);
         negocio.TelefonoContacto = NullIfWhiteSpace(dto.TelefonoContacto) ?? string.Empty;
         negocio.FechaActualizacion = DateTime.UtcNow;
 
