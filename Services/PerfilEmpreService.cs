@@ -128,60 +128,81 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             : null;
         negocio.FechaActualizacion = DateTime.UtcNow;
 
-        var sociosExistentes = usuario.SociosNegocio.ToList();
-        var idsRecibidos = dto.Socios
-            .Where(s => s.Id.HasValue && s.Id.Value > 0)
-            .Select(s => s.Id!.Value)
+        var empleadosExistentes = negocio.Empleados.ToList();
+        var idsRecibidos = dto.Empleados
+            .Where(e => e.Id.HasValue && e.Id.Value > 0)
+            .Select(e => e.Id!.Value)
             .ToHashSet();
 
-        if (idsRecibidos.Count != dto.Socios.Count(s => s.Id.HasValue && s.Id.Value > 0))
+        if (idsRecibidos.Count != dto.Empleados.Count(e => e.Id.HasValue && e.Id.Value > 0))
         {
-            return Error("La lista de socios contiene registros repetidos.");
+            return Error("La lista de empleados contiene registros repetidos.");
         }
 
-        var socioIdsInvalidos = idsRecibidos.Except(sociosExistentes.Select(s => s.Id)).Any();
-        if (socioIdsInvalidos)
+        var empleadoIdsInvalidos = idsRecibidos.Except(empleadosExistentes.Select(e => e.Id)).Any();
+        if (empleadoIdsInvalidos)
         {
-            return Error("Uno de los socios no pertenece a la cuenta actual.");
+            return Error("Uno de los empleados no pertenece a la cuenta actual.");
         }
 
-        var sociosEliminados = sociosExistentes
-            .Where(s => !idsRecibidos.Contains(s.Id))
+        var correosRepetidos = dto.Empleados
+            .Select(e => e.CorreoInvitado.Trim().ToLowerInvariant())
+            .Where(c => c.Length > 0)
             .ToList();
-        var sociosNuevos = new List<SocioNegocio>();
-
-        foreach (var socioDto in dto.Socios)
+        if (correosRepetidos.Count != correosRepetidos.Distinct(StringComparer.OrdinalIgnoreCase).Count())
         {
-            var socio = socioDto.Id.HasValue && socioDto.Id.Value > 0
-                ? sociosExistentes.Single(s => s.Id == socioDto.Id.Value)
-                : new SocioNegocio
-                {
-                    UsuarioEmprendedorId = usuario.Id,
-                };
+            return Error("No puedes registrar dos empleados con el mismo correo.");
+        }
 
-            socio.Nombres = socioDto.Nombres.Trim();
-            socio.Apellidos = socioDto.Apellidos.Trim();
-            socio.TipoDocumento = socioDto.TipoDocumento.Trim().ToUpperInvariant();
-            socio.NumeroDocumento = socioDto.NumeroDocumento.Trim();
-            socio.Telefono = socioDto.Telefono.Trim();
-            socio.CorreoElectronico = socioDto.CorreoElectronico.Trim().ToLowerInvariant();
+        var empleadosEliminados = empleadosExistentes
+            .Where(e => !idsRecibidos.Contains(e.Id))
+            .ToList();
+        var empleadosNuevos = new List<Empleado>();
 
-            if (!socioDto.Id.HasValue || socioDto.Id.Value <= 0)
+        foreach (var empleadoDto in dto.Empleados)
+        {
+            var correoEmpleado = empleadoDto.CorreoInvitado.Trim().ToLowerInvariant();
+
+            if (!await _perfilRepository.ExisteRolAsync(empleadoDto.RolId))
             {
-                sociosNuevos.Add(socio);
+                return Error($"El rol seleccionado para {correoEmpleado} no es válido.");
+            }
+
+            if (empleadoDto.Id.HasValue && empleadoDto.Id.Value > 0)
+            {
+                var existente = empleadosExistentes.Single(e => e.Id == empleadoDto.Id.Value);
+                if (await _perfilRepository.ExisteEmpleadoCorreoAsync(
+                    negocio.Id, correoEmpleado, existente.Id))
+                {
+                    return Error($"El correo {correoEmpleado} ya está registrado en tu negocio.");
+                }
+
+                existente.CorreoInvitado = correoEmpleado;
+                existente.RolId = empleadoDto.RolId;
+            }
+            else
+            {
+                if (await _perfilRepository.ExisteEmpleadoCorreoAsync(negocio.Id, correoEmpleado))
+                {
+                    return Error($"El correo {correoEmpleado} ya está registrado en tu negocio.");
+                }
+
+                empleadosNuevos.Add(new Empleado
+                {
+                    NegocioId = negocio.Id,
+                    RolId = empleadoDto.RolId,
+                    CorreoInvitado = correoEmpleado,
+                    EstadoInvitacion = "pendiente",
+                    InvitadoPor = usuario.Id,
+                    FechaInvitacion = DateTime.UtcNow
+                });
             }
         }
 
-        var socioValidation = ValidarSocios(dto.Socios);
-        if (socioValidation is not null)
-        {
-            return Error(socioValidation);
-        }
-
-        await _perfilRepository.GuardarCambiosAsync(
+        await _perfilRepository.GuardarEmpleadosAsync(
             permiso,
-            sociosNuevos,
-            sociosEliminados);
+            empleadosNuevos,
+            empleadosEliminados);
 
         if (emailCambio)
         {
@@ -312,29 +333,23 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             CorreoEmpresa = negocio.CorreoEmpresa ?? negocio.CorreoContacto,
             TieneSitioFisico = negocio.TieneSitioFisico,
             Direccion = negocio.Direccion ?? string.Empty,
-            Socios = usuario.SociosNegocio.Select(s => new SocioNegocioDto
-            {
-                Id = s.Id,
-                Nombres = s.Nombres,
-                Apellidos = s.Apellidos,
-                TipoDocumento = s.TipoDocumento,
-                NumeroDocumento = s.NumeroDocumento,
-                Telefono = s.Telefono,
-                CorreoElectronico = s.CorreoElectronico
-            }).ToList()
+            Empleados = negocio.Empleados
+                .OrderBy(e => e.CorreoInvitado)
+                .Select(e => new EmpleadoDto
+                {
+                    Id = e.Id,
+                    CorreoInvitado = e.CorreoInvitado,
+                    RolId = e.RolId,
+                    NombreRol = e.Rol?.Nombre ?? string.Empty,
+                    EstadoInvitacion = e.EstadoInvitacion
+                }).ToList()
         };
     }
 
-    private static string? ValidarSocios(IEnumerable<SocioNegocioDto> socios)
+    public async Task<List<RolDto>> ObtenerRolesAsync()
     {
-        var documentos = socios
-            .Select(s => s.NumeroDocumento.Trim())
-            .Where(d => d.Length > 0)
-            .ToList();
-
-        return documentos.Count != documentos.Distinct(StringComparer.OrdinalIgnoreCase).Count()
-            ? "No puedes registrar dos socios con el mismo documento."
-            : null;
+        var roles = await _perfilRepository.ObtenerRolesAsync();
+        return roles.Select(r => new RolDto { Id = r.Id, Nombre = r.Nombre }).ToList();
     }
 
     private static string? NullIfWhiteSpace(string? value)
