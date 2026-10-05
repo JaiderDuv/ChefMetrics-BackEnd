@@ -19,7 +19,11 @@ public partial class ChefMetricsContext : DbContext
 
     public virtual DbSet<Empleado> Empleados { get; set; }
 
+    public virtual DbSet<HistorialPrecioInsumo> HistorialPrecioInsumos { get; set; }
+
     public virtual DbSet<Insumo> Insumos { get; set; }
+
+    public virtual DbSet<InsumoProveedor> InsumoProveedors { get; set; }
 
     public virtual DbSet<Negocio> Negocios { get; set; }
 
@@ -30,6 +34,8 @@ public partial class ChefMetricsContext : DbContext
     public virtual DbSet<ProductoMenu> ProductoMenus { get; set; }
 
     public virtual DbSet<ProductoMenuRecetum> ProductoMenuReceta { get; set; }
+
+    public virtual DbSet<Proveedor> Proveedors { get; set; }
 
     public virtual DbSet<RecetaInsumo> RecetaInsumos { get; set; }
 
@@ -148,6 +154,22 @@ public partial class ChefMetricsContext : DbContext
                 .HasConstraintName("FK_Empleado_Rol");
         });
 
+        modelBuilder.Entity<HistorialPrecioInsumo>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Historia__3214EC07AA1990A3");
+
+            entity.ToTable("HistorialPrecioInsumo");
+
+            entity.Property(e => e.CostoAnterior).HasColumnType("decimal(12, 2)");
+            entity.Property(e => e.CostoNuevo).HasColumnType("decimal(12, 2)");
+            entity.Property(e => e.FechaCambio).HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.InsumoProveedor).WithMany(p => p.HistorialPrecioInsumos)
+                .HasForeignKey(d => d.InsumoProveedorId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_HistorialPrecioInsumo_InsumoProveedor");
+        });
+
         modelBuilder.Entity<Insumo>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Insumo__3214EC077D4ECF38");
@@ -157,6 +179,10 @@ public partial class ChefMetricsContext : DbContext
             entity.HasIndex(e => new { e.NegocioId, e.Nombre }, "UQ_Insumo_NegocioNombre").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.Categoria)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("otro");
             entity.Property(e => e.CostoUnitario).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.FechaActualizacion).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.Nombre).HasMaxLength(150);
@@ -169,6 +195,52 @@ public partial class ChefMetricsContext : DbContext
             entity.HasOne(d => d.Negocio).WithMany(p => p.Insumos)
                 .HasForeignKey(d => d.NegocioId)
                 .HasConstraintName("FK_Insumo_Negocio");
+        });
+
+        modelBuilder.Entity<InsumoProveedor>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__InsumoPr__3214EC07BAA8F3C6");
+
+            entity.ToTable("InsumoProveedor");
+
+            entity.HasIndex(e => new { e.InsumoId, e.ProveedorId }, "UQ_InsumoProveedor").IsUnique();
+
+            entity.HasIndex(e => e.InsumoId, "UQ_InsumoProveedor_Principal")
+                .IsUnique()
+                .HasFilter("([EsPrincipal]=(1))");
+
+            entity.Property(e => e.Costo).HasColumnType("decimal(12, 2)");
+            entity.Property(e => e.EsPrincipal).HasDefaultValue(false);
+            entity.Property(e => e.FechaActualizacion).HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.Insumo).WithMany(p => p.InsumoProveedors)
+                .HasForeignKey(d => d.InsumoId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_InsumoProveedor_Insumo");
+
+            entity.HasOne(d => d.Proveedor).WithMany(p => p.InsumoProveedors)
+                .HasForeignKey(d => d.ProveedorId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_InsumoProveedor_Proveedor");
+        });
+
+        modelBuilder.Entity<Proveedor>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Proveedo__3214EC072B116B88");
+
+            entity.ToTable("Proveedor");
+
+            entity.Property(e => e.Nombre).HasMaxLength(150);
+            entity.Property(e => e.Telefono)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.Correo).HasMaxLength(255);
+            entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.Negocio).WithMany(p => p.Proveedors)
+                .HasForeignKey(d => d.NegocioId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Proveedor_Negocio");
         });
 
         modelBuilder.Entity<Negocio>(entity =>

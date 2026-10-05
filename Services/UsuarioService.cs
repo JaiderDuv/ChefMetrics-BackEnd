@@ -14,6 +14,12 @@ namespace ChefMetrics_BackEnd.Services
         private readonly IEmailService _emailService;
         private readonly ChefMetricsContext _context; // Nombre exacto del DbContext
 
+        // CK_UsuarioEmprendedor_TipoDocumento: solo CC, CE, TI o PA.
+        private static readonly HashSet<string> TiposDocumentoValidos = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "CC", "CE", "TI", "PA"
+        };
+
         public UsuarioService(
             ChefMetricsContext context,
             IUserRepository usuarioRepository,
@@ -79,10 +85,67 @@ namespace ChefMetrics_BackEnd.Services
             string telefonoContacto,
             string correoContacto)
         {
+            var correoNormalizado = correoElectronico.ToLower().Trim();
+
+            // Evita exponer el error crudo de BD (DbUpdateException) cuando el
+            // correo ya existe por un intento anterior.
+            if (await _usuarioRepository.ExisteCorreoAsync(correoNormalizado))
+            {
+                throw new InvalidOperationException(
+                    "Este correo electrónico ya está registrado. Revisa tu bandeja de entrada " +
+                    "o solicita el reenvío del correo de verificación.");
+            }
+
+            // CK_UsuarioEmprendedor_Formalizacion: formalizado exige NIT y razón
+            // social SIN documento; no formalizado exige documento SIN NIT/razón.
+            var esFormalizado = string.Equals(
+                tipoFormalizacion, "formalizado", StringComparison.OrdinalIgnoreCase);
+
+            if (esFormalizado &&
+                (string.IsNullOrWhiteSpace(nit) || string.IsNullOrWhiteSpace(razonSocial)))
+            {
+                throw new InvalidOperationException(
+                    "El NIT y la razón social son obligatorios para el registro formalizado.");
+            }
+
+            string? tipoDocFinal = esFormalizado ? null : tipoDocumento;
+            string? numeroDocFinal = esFormalizado ? null : numeroDocumento;
+
+            if (!esFormalizado)
+            {
+                if (string.IsNullOrWhiteSpace(tipoDocFinal) ||
+                    !TiposDocumentoValidos.Contains(tipoDocFinal.Trim()))
+                {
+                    throw new InvalidOperationException(
+                        "El tipo de documento no es válido. Valores permitidos: CC, CE, TI, PA.");
+                }
+                if (string.IsNullOrWhiteSpace(numeroDocFinal))
+                {
+                    throw new InvalidOperationException("El número de documento es obligatorio.");
+                }
+
+                tipoDocFinal = tipoDocFinal.Trim().ToUpperInvariant();
+                numeroDocFinal = numeroDocFinal.Trim();
+            }
+
+            var telefonoLimpio = telefonoContacto.Trim();
+            if (telefonoLimpio.Length < 7 || telefonoLimpio.Length > 20)
+            {
+                throw new InvalidOperationException(
+                    "El teléfono de contacto debe tener entre 7 y 20 caracteres.");
+            }
+
+            var correoContactoLimpio = correoContacto.Trim().ToLowerInvariant();
+
+            // Todo el registro va en una transacción: si algo falla no quedan
+            // Cuenta/Usuario/Negocio huérfanos. El correo se envía tras el commit.
+            await using var transaccion = await _context.Database.BeginTransactionAsync();
+            try
+            {
             // 1. Crear la Cuenta (Autenticación)
             var cuenta = new Cuenta
             {
-                Correo = correoElectronico.ToLower().Trim(),
+                Correo = correoNormalizado,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(contrasena),
                 TipoCuenta = "Emprendedor",
                 EmailVerificado = false,
@@ -102,41 +165,37 @@ namespace ChefMetrics_BackEnd.Services
                 TipoFormalizacion = tipoFormalizacion,
                 Nit = nit,
                 RazonSocial = razonSocial,
-                TipoDocumento = tipoDocumento,
-                NumeroDocumento = numeroDocumento,
+                TipoDocumento = tipoDocFinal,
+                NumeroDocumento = numeroDocFinal,
                 NombreEmprendimiento = string.IsNullOrWhiteSpace(nombreEmprendimiento) ? null : nombreEmprendimiento,
                 OnboardingCompletado = false,
                 FechaCreacion = DateTime.UtcNow
             };
 
-            _context.UsuarioEmprendedors.Add(emprendedor); // En el DbContext la propiedad se llama "UsuarioEmprendedors"
-            await _context.SaveChangesAsync();
+                _context.UsuarioEmprendedors.Add(emprendedor); // En el DbContext la propiedad se llama "UsuarioEmprendedors"
+                await _context.SaveChangesAsync();
 
-            // 2b. Crear el Negocio con los datos del negocio capturados en el registro
-            // (TeléfonoContacto, CorreoContacto y CategoriaNegocio viá TipoEmprendimiento)
-            var tipoEmprendimiento = await _usuarioRepository
-                .ObtenerOCrearTipoEmprendimientoAsync(categoriaNegocio);
+                // 2b. Crear el Negocio con los datos del negocio capturados en el registro
+                // (TelefonoContacto, CorreoContacto y CategoriaNegocio via TipoEmprendimiento)
+                var tipoEmprendimiento = await _usuarioRepository
+                    .ObtenerOCrearTipoEmprendimientoAsync(categoriaNegocio);
 
-            var negocio = new Negocio
-            {
-                UsuarioId = emprendedor.Id,
-                TipoEmprendimientoId = tipoEmprendimiento.Id,
-                TelefonoContacto = telefonoContacto ?? string.Empty,
-                CorreoContacto = (correoContacto ?? string.Empty).ToLower().Trim(),
-                Direccion = null,
-                Rues = null,
-                CorreoEmpresa = null,
-                TieneSitioFisico = false,
-                FechaActualizacion = DateTime.UtcNow
-            };
+                await _usuarioRepository.RegistrarNegocioAsync(new Negocio
+                {
+                    UsuarioId = emprendedor.Id,
+                    TipoEmprendimientoId = tipoEmprendimiento.Id,
+                    TelefonoContacto = telefonoLimpio,
+                    CorreoContacto = correoContactoLimpio,
+                    FechaActualizacion = DateTime.UtcNow
+                });
 
-            _context.Negocios.Add(negocio);
-            await _context.SaveChangesAsync();
+                await transaccion.CommitAsync();
 
-            // 3. Generar token, persistirlo y enviar correo de verificación
+                // 3. Generar token, persistirlo y enviar correo de verificación
+                // (fuera de la transacción; sin esta fila el enlace nunca validaría)
             string nombreCompleto = $"{emprendedor.Nombres} {emprendedor.Apellidos}";
 
-            string token = Guid.NewGuid().ToString();
+            string token = TokenGenerator.GenerarTokenVerificacion();
             await _usuarioRepository.RegistrarPasswordResetTokenAsync(new PasswordResetToken
             {
                 CuentaId = cuenta.Id,
@@ -149,6 +208,12 @@ namespace ChefMetrics_BackEnd.Services
 
             // Llama al servicio SMTP para enviar el correo
             await _emailService.EnviarCorreoVerificacionAsync(cuenta.Correo, nombreCompleto, token);
+            }
+            catch
+            {
+                await transaccion.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<bool> ReenviarCorreoVerificacionAsync(string correo)
@@ -168,7 +233,7 @@ namespace ChefMetrics_BackEnd.Services
                 ? $"{usuario.Nombres} {usuario.Apellidos}".Trim()
                 : "Usuario";
 
-            string nuevoToken = Guid.NewGuid().ToString();
+            string nuevoToken = TokenGenerator.GenerarTokenVerificacion();
 
             var tokenModel = new PasswordResetToken
             {
@@ -205,7 +270,7 @@ namespace ChefMetrics_BackEnd.Services
                 : "Usuario";
 
             // 3. Generar token de recuperación con 15 minutos de expiración
-            string tokenRecuperacion = Guid.NewGuid().ToString();
+            string tokenRecuperacion = TokenGenerator.GenerarTokenRecuperacion();
 
             var tokenModel = new PasswordResetToken
             {

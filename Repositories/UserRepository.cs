@@ -95,8 +95,14 @@ namespace ChefMetrics_BackEnd.Repositories
 
         public async Task<PasswordResetToken> RegistrarPasswordResetTokenAsync(PasswordResetToken token)
         {
-            // Ojeconfigura ko'ápe 15 minutos aravo oguereko hag جهa opaty hagua pe token
+            // Vigencia única de 15 minutos para todos los tokens por correo.
             token.FechaExpiracion = DateTime.UtcNow.AddMinutes(15);
+
+            // Al emitir uno nuevo, los anteriores sin usar del mismo tipo
+            // quedan invalidados: solo el último enlace es válido.
+            await _context.PasswordResetTokens
+                .Where(t => t.CuentaId == token.CuentaId && t.Tipo == token.Tipo && !t.Usado)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.Usado, true));
 
             await _context.PasswordResetTokens.AddAsync(token);
             await _context.SaveChangesAsync();

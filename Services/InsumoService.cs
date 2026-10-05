@@ -7,17 +7,17 @@ namespace ChefMetrics_BackEnd.Services;
 
 public sealed class InsumoService : IInsumoService
 {
-    // Lista cerrada de unidades válidas (se compara sin distinción de
-    // mayúsculas y se guarda en minúsculas). Limitada por el varchar(10) de la BD.
+    // Valores permitidos por CK_Insumo_UnidadMedida (comparación sin
+    // distinción de mayúsculas; se guarda en minúsculas).
     private static readonly HashSet<string> UnidadesValidas = new(StringComparer.OrdinalIgnoreCase)
     {
-        "mg", "g", "gr", "kg",
-        "ml", "l", "lt",
-        "oz", "lb",
-        "u", "und", "unidad", "unidades",
-        "taza", "tazas", "cda", "cdta",
-        "pza", "pieza", "piezas",
-        "paquete", "caja", "lata", "botella", "bolsa", "docena", "atado"
+        "g", "kg", "l", "ml", "oz", "lb", "unidad", "taza"
+    };
+
+    // Valores permitidos por CK_Insumo_Categoria. Vacío => "otro".
+    private static readonly HashSet<string> CategoriasValidas = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "materia_prima", "empaque", "otro"
     };
 
     private const int TamanoPaginaMaximo = 100;
@@ -39,6 +39,13 @@ public sealed class InsumoService : IInsumoService
         }
 
         var nombre = dto.Nombre.Trim();
+        var categoria = NormalizarCategoria(dto.Categoria);
+        if (categoria is null)
+        {
+            return ResultadoInsumoDto.Error(
+                "La categoría no es válida. Valores permitidos: materia_prima, empaque, otro.");
+        }
+
         var validacion = ValidarCampos(
             nombre,
             dto.UnidadMedida,
@@ -64,12 +71,29 @@ public sealed class InsumoService : IInsumoService
                 NegocioId = negocioId.Value,
                 Nombre = nombre,
                 UnidadMedida = unidadNormalizada!,
+                Categoria = categoria,
                 CostoUnitario = dto.CostoUnitario,
                 PorcentajeMerma = dto.PorcentajeMerma,
                 Proveedor = proveedorNormalizado,
-                Activo = true,
+                Activo = dto.Activo ?? true,
                 FechaActualizacion = DateTime.UtcNow
             });
+
+            // Si trae proveedor, se registra la asociación principal para que el
+            // precio quede atado a ese proveedor desde el inicio.
+            if (proveedorNormalizado is not null)
+            {
+                var proveedor = await _insumoRepository.ObtenerOCrearProveedorAsync(
+                    negocioId.Value, proveedorNormalizado);
+                await _insumoRepository.CrearInsumoProveedorAsync(new InsumoProveedor
+                {
+                    InsumoId = insumo.Id,
+                    ProveedorId = proveedor.Id,
+                    Costo = dto.CostoUnitario,
+                    EsPrincipal = true,
+                    FechaActualizacion = DateTime.UtcNow
+                });
+            }
 
             return ResultadoInsumoDto.Ok(Mapear(insumo, 0), "El insumo fue creado correctamente.");
         }
@@ -89,7 +113,7 @@ public sealed class InsumoService : IInsumoService
         }
 
         var ordenarPor = (filtros.OrdenarPor ?? "nombre").Trim().ToLowerInvariant();
-        if (ordenarPor is not ("nombre" or "costo" or "merma" or "fecha"))
+        if (ordenarPor is not ("nombre" or "costo" or "merma"))
         {
             ordenarPor = "nombre";
         }
@@ -105,6 +129,7 @@ public sealed class InsumoService : IInsumoService
         var (items, total) = await _insumoRepository.ListarAsync(
             negocioId.Value,
             filtros.Busqueda,
+            filtros.Categoria,
             filtros.IncluirInactivos,
             ordenarPor,
             descendente,
@@ -190,6 +215,18 @@ public sealed class InsumoService : IInsumoService
             hayCambios = true;
         }
 
+        if (dto.Categoria is not null)
+        {
+            var categoria = NormalizarCategoria(dto.Categoria);
+            if (categoria is null)
+            {
+                return ResultadoInsumoDto.Error(
+                    "La categoría no es válida. Valores permitidos: materia_prima, empaque, otro.");
+            }
+            insumo.Categoria = categoria;
+            hayCambios = true;
+        }
+
         if (dto.PorcentajeMerma.HasValue)
         {
             if (dto.PorcentajeMerma.Value < 0 || dto.PorcentajeMerma.Value > 100)
@@ -202,22 +239,68 @@ public sealed class InsumoService : IInsumoService
 
         if (dto.CostoUnitario.HasValue)
         {
-            if (dto.CostoUnitario.Value < 0)
+            if (dto.CostoUnitario.Value <= 0)
             {
-                return ResultadoInsumoDto.Error("El costo unitario no puede ser negativo.");
+                return ResultadoInsumoDto.Error("El costo unitario debe ser mayor a 0.");
             }
 
-            // AJUSTE PARCIAL (sin tabla de proveedores): para cambiar el precio es
-            // obligatorio seleccionar el proveedor en la misma petición, y el precio
-            // se guarda en el único campo CostoUnitario de la tabla Insumo.
+            // El precio vive atado a un proveedor (tablas Proveedor/InsumoProveedor):
+            // para cambiar el precio es obligatorio seleccionar el proveedor
+            // en la misma petición, y el cambio queda registrado en el historial.
             if (string.IsNullOrWhiteSpace(dto.Proveedor))
             {
                 return ResultadoInsumoDto.Error(
                     "Para cambiar el precio debes seleccionar el proveedor del insumo en la misma solicitud.");
             }
 
+            var nombreProveedor = dto.Proveedor.Trim();
+            if (nombreProveedor.Length > 150)
+            {
+                return ResultadoInsumoDto.Error("El proveedor no puede superar los 150 caracteres.");
+            }
+
+            var proveedor = await _insumoRepository.ObtenerOCrearProveedorAsync(
+                negocioId.Value, nombreProveedor);
+            var asociacion = await _insumoRepository.ObtenerInsumoProveedorAsync(
+                insumo.Id, proveedor.Id);
+
+            if (asociacion is null)
+            {
+                asociacion = await _insumoRepository.CrearInsumoProveedorAsync(new InsumoProveedor
+                {
+                    InsumoId = insumo.Id,
+                    ProveedorId = proveedor.Id,
+                    Costo = dto.CostoUnitario.Value,
+                    EsPrincipal = false,
+                    FechaActualizacion = DateTime.UtcNow
+                });
+            }
+
+            if (asociacion.Costo != dto.CostoUnitario.Value)
+            {
+                await _insumoRepository.RegistrarCambioPrecioAsync(new HistorialPrecioInsumo
+                {
+                    InsumoProveedorId = asociacion.Id,
+                    CostoAnterior = asociacion.Costo,
+                    CostoNuevo = dto.CostoUnitario.Value,
+                    FechaCambio = DateTime.UtcNow
+                });
+                asociacion.Costo = dto.CostoUnitario.Value;
+            }
+
+            asociacion.FechaActualizacion = DateTime.UtcNow;
+
+            // El proveedor del cambio pasa a ser el principal: el precio visible
+            // del insumo siempre refleja el precio de su proveedor principal.
+            if (!asociacion.EsPrincipal)
+            {
+                asociacion.EsPrincipal = true;
+            }
+            await _insumoRepository.DesmarcarPrincipalesAsync(insumo.Id, asociacion.Id);
+            await _insumoRepository.GuardarCambiosAsync();
+
             insumo.CostoUnitario = dto.CostoUnitario.Value;
-            insumo.Proveedor = dto.Proveedor.Trim();
+            insumo.Proveedor = nombreProveedor;
             hayCambios = true;
         }
         else if (dto.Proveedor is not null)
@@ -296,12 +379,127 @@ public sealed class InsumoService : IInsumoService
         }
 
         _insumoRepository.Eliminar(insumo);
+        await _insumoRepository.EliminarPreciosAsync(insumo.Id);
         await _insumoRepository.GuardarCambiosAsync();
 
         return new ResultadoEliminarInsumoDto
         {
             Exito = true,
             Mensaje = "El insumo fue eliminado correctamente."
+        };
+    }
+
+    public async Task<ResultadoHistorialDto> ObtenerHistorialPreciosAsync(int cuentaId, int insumoId)
+    {
+        var negocioId = await _insumoRepository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (!negocioId.HasValue)
+        {
+            return new ResultadoHistorialDto
+            {
+                Exito = false,
+                NoEncontrado = true,
+                Mensaje = "Aún no tienes un negocio registrado para administrar insumos."
+            };
+        }
+
+        var insumo = await _insumoRepository.ObtenerPorIdAsync(negocioId.Value, insumoId);
+        if (insumo is null)
+        {
+            return new ResultadoHistorialDto
+            {
+                Exito = false,
+                NoEncontrado = true,
+                Mensaje = "No se encontró el insumo solicitado."
+            };
+        }
+
+        // Historial real: tabla HistorialPrecioInsumo (un registro por cambio
+        // de precio, atado al proveedor). Reciente primero.
+        var movimientos = await _insumoRepository.ListarHistorialPorInsumoAsync(insumo.Id);
+
+        var entradas = movimientos.Select(h => MapearHistorial(
+            h.FechaCambio,
+            h.CostoNuevo,
+            h.InsumoProveedor.Proveedor.Nombre,
+            h.CostoAnterior)).ToList();
+
+        return new ResultadoHistorialDto
+        {
+            Exito = true,
+            Mensaje = "Historial de precios del insumo.",
+            Historial = new HistorialPreciosInsumoDto
+            {
+                InsumoId = insumo.Id,
+                Nombre = insumo.Nombre,
+                ProveedorActual = insumo.Proveedor,
+                PrecioActual = insumo.CostoUnitario,
+                HistorialCompletoDisponible = true,
+                Precios = entradas
+            }
+        };
+    }
+
+    private static HistorialPrecioDto MapearHistorial(
+        DateTime fecha, decimal precio, string? proveedor, decimal costoAnterior)
+    {
+        decimal? variacion = costoAnterior == 0
+            ? null
+            : Math.Round((precio - costoAnterior) / costoAnterior * 100, 2);
+
+        return new HistorialPrecioDto
+        {
+            Fecha = fecha,
+            Precio = precio,
+            Proveedor = proveedor,
+            VariacionPorcentual = variacion,
+            EsSubida = variacion is null || variacion == 0
+                ? null
+                : variacion > 0
+        };
+    }
+
+    public async Task<ResultadoHistorialGeneralDto> ObtenerHistorialGeneralAsync(
+        int cuentaId, string? nombre, string? proveedor)
+    {
+        var negocioId = await _insumoRepository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (!negocioId.HasValue)
+        {
+            return new ResultadoHistorialGeneralDto
+            {
+                Exito = false,
+                NoEncontrado = true,
+                Mensaje = "Aún no tienes un negocio registrado para administrar insumos."
+            };
+        }
+
+        // Historial real: tabla HistorialPrecioInsumo. Reciente primero.
+        var movimientos = await _insumoRepository.ListarHistorialGeneralAsync(
+            negocioId.Value, nombre, proveedor);
+
+        var entradas = movimientos.Select(h => new HistorialPrecioGeneralDto
+        {
+            InsumoId = h.InsumoProveedor.InsumoId,
+            NombreInsumo = h.InsumoProveedor.Insumo.Nombre,
+            Fecha = h.FechaCambio,
+            Precio = h.CostoNuevo,
+            Proveedor = h.InsumoProveedor.Proveedor.Nombre,
+            VariacionPorcentual = h.CostoAnterior == 0
+                ? null
+                : Math.Round((h.CostoNuevo - h.CostoAnterior) / h.CostoAnterior * 100, 2),
+            EsSubida = h.CostoAnterior == 0 || h.CostoNuevo == h.CostoAnterior
+                ? null
+                : h.CostoNuevo > h.CostoAnterior
+        }).ToList();
+
+        return new ResultadoHistorialGeneralDto
+        {
+            Exito = true,
+            Mensaje = "Historial general de precios.",
+            Historial = new HistorialGeneralDto
+            {
+                HistorialCompletoDisponible = true,
+                Precios = entradas
+            }
         };
     }
 
@@ -330,9 +528,9 @@ public sealed class InsumoService : IInsumoService
         {
             return $"La unidad de medida no es válida. Valores permitidos: {string.Join(", ", UnidadesValidas.OrderBy(u => u))}.";
         }
-        if (costoUnitario < 0)
+        if (costoUnitario <= 0)
         {
-            return "El costo unitario no puede ser negativo.";
+            return "El costo unitario debe ser mayor a 0.";
         }
         if (porcentajeMerma < 0 || porcentajeMerma > 100)
         {
@@ -344,6 +542,17 @@ public sealed class InsumoService : IInsumoService
         }
 
         return null;
+    }
+
+    private static string? NormalizarCategoria(string? valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+        {
+            return "otro";
+        }
+
+        var candidato = valor.Trim().ToLowerInvariant();
+        return CategoriasValidas.Contains(candidato) ? candidato : null;
     }
 
     private static bool TryNormalizarUnidad(string? valor, out string? normalizada)
@@ -371,6 +580,7 @@ public sealed class InsumoService : IInsumoService
             Id = insumo.Id,
             Nombre = insumo.Nombre,
             UnidadMedida = insumo.UnidadMedida,
+            Categoria = insumo.Categoria,
             CostoUnitario = insumo.CostoUnitario,
             PorcentajeMerma = insumo.PorcentajeMerma,
             Proveedor = insumo.Proveedor,

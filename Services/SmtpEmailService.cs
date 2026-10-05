@@ -48,7 +48,9 @@ namespace ChefMetrics_BackEnd.Services
                 token,
                 baseUrl,
                 "Restablece tu contraseña - ChefMetrics",
-                (email, link) => ConstruirCorreoRecuperacion(email, nombreCompleto, link));
+                (email, link) => ConstruirCorreoRecuperacion(email, nombreCompleto, link),
+                // La página /nueva-contrasena exige token + correoElectronico en la URL.
+                new Dictionary<string, string> { ["correoElectronico"] = destinatario });
         }
 
         private async Task EnviarCorreoAsync(
@@ -56,7 +58,8 @@ namespace ChefMetrics_BackEnd.Services
             string token,
             string baseUrl,
             string subject,
-            Func<string, string, string> construirCuerpo)
+            Func<string, string, string> construirCuerpo,
+            Dictionary<string, string>? queryExtra = null)
         {
             if (string.IsNullOrWhiteSpace(_settings.Password))
             {
@@ -72,6 +75,13 @@ namespace ChefMetrics_BackEnd.Services
             }
 
             var link = QueryHelpers.AddQueryString(baseUrl, "token", token);
+            if (queryExtra is not null)
+            {
+                foreach (var (clave, valor) in queryExtra)
+                {
+                    link = QueryHelpers.AddQueryString(link, clave, valor);
+                }
+            }
 
             using var message = new MailMessage
             {
@@ -89,7 +99,8 @@ namespace ChefMetrics_BackEnd.Services
                 EnableSsl = _settings.EnableSsl,
                 UseDefaultCredentials = false,
                 DeliveryMethod = SmtpDeliveryMethod.Network,
-                Credentials = new NetworkCredential(_settings.Username, _settings.Password)
+                Credentials = new NetworkCredential(_settings.Username, _settings.Password),
+                Timeout = 30000
             };
 
             await client.SendMailAsync(message);

@@ -34,6 +34,10 @@ public class PerfilEmprendedorDto
     [StringLength(255)]
     public string CorreoContacto { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "El teléfono de contacto es obligatorio.")]
+    [StringLength(20, ErrorMessage = "El teléfono no puede superar los 20 caracteres.")]
+    public string TelefonoContacto { get; set; } = string.Empty;
+
     [StringLength(20)]
     public string Nit { get; set; } = string.Empty;
 
