@@ -49,10 +49,10 @@ public partial class ChefMetricsContext : DbContext
 
     public virtual DbSet<UsuarioEmprendedor> UsuarioEmprendedors { get; set; }
 
-    // NOTA: sin OnConfiguring con cadena hardcodeada.
-    // La conexión se configura en Program.cs via
-    // AddDbContext + IConfiguration.GetConnectionString("DefaultConnection"),
-    // de modo que este archivo no contiene secretos y SÍ debe versionarse en git.
+
+   
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+     => optionsBuilder.UseSqlServer("Server=.\\SQLEXPRESS;Database=ChefMetrics;Trusted_Connection=true;TrustServerCertificate=true;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
