@@ -147,6 +147,10 @@ public class HistorialPrecioDto
     // Null en el registro más antiguo de cada proveedor (no hay con qué comparar).
     public decimal? VariacionPorcentual { get; set; }
 
+    // Diferencia en dinero frente al precio anterior (CostoNuevo - CostoAnterior).
+    // Null si no hay precio anterior.
+    public decimal? Diferencia { get; set; }
+
     // true = subió (rojo), false = bajó (verde), null = sin variación o sin previo.
     public bool? EsSubida { get; set; }
 }
@@ -184,6 +188,9 @@ public class HistorialPrecioGeneralDto
 
     // % de variación frente al precio anterior del MISMO insumo y proveedor.
     public decimal? VariacionPorcentual { get; set; }
+
+    // Diferencia en dinero frente al precio anterior (CostoNuevo - CostoAnterior).
+    public decimal? Diferencia { get; set; }
 
     // true = subió (rojo), false = bajó (verde), null = sin variación o sin previo.
     public bool? EsSubida { get; set; }

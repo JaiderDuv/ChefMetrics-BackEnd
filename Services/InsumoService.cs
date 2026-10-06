@@ -80,18 +80,26 @@ public sealed class InsumoService : IInsumoService
             });
 
             // Si trae proveedor, se registra la asociación principal para que el
-            // precio quede atado a ese proveedor desde el inicio.
+            // precio quede atado a ese proveedor desde el inicio, junto con
+            // la primera fila del historial (valor inicial, sin variación).
             if (proveedorNormalizado is not null)
             {
                 var proveedor = await _insumoRepository.ObtenerOCrearProveedorAsync(
                     negocioId.Value, proveedorNormalizado);
-                await _insumoRepository.CrearInsumoProveedorAsync(new InsumoProveedor
+                var asociacion = await _insumoRepository.CrearInsumoProveedorAsync(new InsumoProveedor
                 {
                     InsumoId = insumo.Id,
                     ProveedorId = proveedor.Id,
                     Costo = dto.CostoUnitario,
                     EsPrincipal = true,
                     FechaActualizacion = DateTime.UtcNow
+                });
+                await _insumoRepository.RegistrarCambioPrecioAsync(new HistorialPrecioInsumo
+                {
+                    InsumoProveedorId = asociacion.Id,
+                    CostoAnterior = dto.CostoUnitario,
+                    CostoNuevo = dto.CostoUnitario,
+                    FechaCambio = DateTime.UtcNow
                 });
             }
 
@@ -274,6 +282,15 @@ public sealed class InsumoService : IInsumoService
                     EsPrincipal = false,
                     FechaActualizacion = DateTime.UtcNow
                 });
+
+                // Primera vez con este proveedor: se registra el valor inicial.
+                await _insumoRepository.RegistrarCambioPrecioAsync(new HistorialPrecioInsumo
+                {
+                    InsumoProveedorId = asociacion.Id,
+                    CostoAnterior = dto.CostoUnitario.Value,
+                    CostoNuevo = dto.CostoUnitario.Value,
+                    FechaCambio = DateTime.UtcNow
+                });
             }
 
             if (asociacion.Costo != dto.CostoUnitario.Value)
@@ -452,6 +469,7 @@ public sealed class InsumoService : IInsumoService
             Precio = precio,
             Proveedor = proveedor,
             VariacionPorcentual = variacion,
+            Diferencia = variacion is null ? null : precio - costoAnterior,
             EsSubida = variacion is null || variacion == 0
                 ? null
                 : variacion > 0
@@ -486,6 +504,9 @@ public sealed class InsumoService : IInsumoService
             VariacionPorcentual = h.CostoAnterior == 0
                 ? null
                 : Math.Round((h.CostoNuevo - h.CostoAnterior) / h.CostoAnterior * 100, 2),
+            Diferencia = h.CostoAnterior == 0
+                ? null
+                : h.CostoNuevo - h.CostoAnterior,
             EsSubida = h.CostoAnterior == 0 || h.CostoNuevo == h.CostoAnterior
                 ? null
                 : h.CostoNuevo > h.CostoAnterior
