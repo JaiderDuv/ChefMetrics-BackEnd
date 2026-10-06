@@ -34,8 +34,7 @@ public sealed class PerfilEmprendimientoController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> ObtenerPerfil(
-        [FromHeader(Name = "X-Profile-Edit-Token")] string? editToken)
+    public async Task<IActionResult> ObtenerPerfil(        [FromHeader(Name = "X-Profile-Edit-Token")] string? editToken)
     {
         if (!TryObtenerCuentaId(out var cuentaId))
         {
@@ -46,6 +45,33 @@ public sealed class PerfilEmprendimientoController : ControllerBase
         return perfil is null
             ? Unauthorized(new { mensaje = "La autorización de edición es inválida o ha expirado." })
             : Ok(perfil);
+    }
+
+    // Catálogo de roles para el desplegable de empleados. Solo requiere JWT.
+    [HttpGet("roles")]
+    public async Task<IActionResult> ObtenerRoles()
+    {
+        if (!TryObtenerCuentaId(out _))
+        {
+            return Unauthorized();
+        }
+
+        var roles = await _perfilService.ObtenerRolesAsync();
+        return Ok(roles);
+    }
+
+    // Marca como usados los permisos pendientes: el frontend lo llama al salir
+    // del formulario (otra función) o al cerrar sesión.
+    [HttpPost("revocar-permiso")]
+    public async Task<IActionResult> RevocarPermiso()
+    {
+        if (!TryObtenerCuentaId(out var cuentaId))
+        {
+            return Unauthorized();
+        }
+
+        await _perfilService.RevocarPermisoAsync(cuentaId);
+        return Ok(new { mensaje = "Permiso de edición revocado." });
     }
 
     [HttpPut]

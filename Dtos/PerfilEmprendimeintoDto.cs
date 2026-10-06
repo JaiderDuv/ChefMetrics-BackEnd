@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace ChefMetrics_BackEnd.Dtos;
 
@@ -34,6 +34,10 @@ public class PerfilEmprendedorDto
     [StringLength(255)]
     public string CorreoContacto { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "El teléfono de contacto es obligatorio.")]
+    [StringLength(20, ErrorMessage = "El teléfono no puede superar los 20 caracteres.")]
+    public string TelefonoContacto { get; set; } = string.Empty;
+
     [StringLength(20)]
     public string Nit { get; set; } = string.Empty;
 
@@ -55,38 +59,35 @@ public class PerfilEmprendedorDto
     [StringLength(255)]
     public string Direccion { get; set; } = string.Empty;
 
-    public List<SocioNegocioDto> Socios { get; set; } = new();
+    // Sección 03 del formulario: empleados del negocio (tabla Empleado).
+    // Solo se envían Id (null = nuevo), correo y rol; el resto lo asigna el servidor.
+    public List<EmpleadoDto> Empleados { get; set; } = new();
 }
 
-public class SocioNegocioDto
+// Datos prudentes de la tabla Empleado (modelo por invitación:
+// no tiene nombres/apellidos/teléfono, solo correo invitado + rol + estado).
+public class EmpleadoDto
 {
+    // Null o 0 => invitación nueva.
     public int? Id { get; set; }
 
-    [Required(ErrorMessage = "Los nombres del socio son obligatorios.")]
-    [StringLength(100)]
-    public string Nombres { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Los apellidos del socio son obligatorios.")]
-    [StringLength(100)]
-    public string Apellidos { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "El tipo de documento del socio es obligatorio.")]
-    [StringLength(5)]
-    public string TipoDocumento { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "El documento del socio es obligatorio.")]
-    [StringLength(20)]
-    public string NumeroDocumento { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "El teléfono del socio es obligatorio.")]
-    [Phone(ErrorMessage = "El teléfono del socio no es válido.")]
-    [StringLength(20)]
-    public string Telefono { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "El correo del socio es obligatorio.")]
-    [EmailAddress(ErrorMessage = "El correo del socio no es válido.")]
+    [Required(ErrorMessage = "El correo del empleado es obligatorio.")]
+    [EmailAddress(ErrorMessage = "El correo del empleado no es válido.")]
     [StringLength(255)]
-    public string CorreoElectronico { get; set; } = string.Empty;
+    public string CorreoInvitado { get; set; } = string.Empty;
+
+    [Range(1, int.MaxValue, ErrorMessage = "Debes seleccionar el rol del empleado.")]
+    public int RolId { get; set; }
+
+    // Solo lectura (lo devuelve el GET).
+    public string? NombreRol { get; set; }
+    public string? EstadoInvitacion { get; set; }
+}
+
+public class RolDto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = string.Empty;
 }
 
 public class ActualizarPerfilResultadoDto
@@ -119,3 +120,4 @@ public class PerfilUsuarioDto
     [StringLength(100)]
     public string Apellidos { get; set; } = string.Empty;
 }
+

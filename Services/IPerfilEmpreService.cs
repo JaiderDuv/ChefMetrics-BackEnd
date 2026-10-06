@@ -8,6 +8,9 @@ public interface IPerfilEmpreService
         int cuentaId,
         ConfirmarEdicionPerfilDto dto);
 
+    // Marca como usados los permisos pendientes (al salir del formulario o cerrar sesión).
+    Task RevocarPermisoAsync(int cuentaId);
+
     Task<PerfilEmprendedorDto?> ObtenerPerfilAsync(
         int cuentaId,
         string editToken);
@@ -23,4 +26,7 @@ public interface IPerfilEmpreService
     Task<ActualizarPerfilResultadoDto> ActualizarPerfilUsuarioAsync(
         int cuentaId,
         PerfilUsuarioDto dto);
+
+    // Catálogo de roles para el desplegable de empleados (tabla Roles).
+    Task<List<RolDto>> ObtenerRolesAsync();
 }

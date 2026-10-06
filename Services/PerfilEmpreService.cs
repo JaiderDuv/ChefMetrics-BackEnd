@@ -8,7 +8,13 @@ namespace ChefMetrics_BackEnd.Services;
 
 public sealed class PerfilEmpreService : IPerfilEmpreService
 {
-    private static readonly TimeSpan DuracionPermisoEdicion = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan DuracionPermisoEdicion = TimeSpan.FromMinutes(15);
+
+    // CK_UsuarioEmprendedor_TipoDocumento: solo CC, CE, TI o PA.
+    private static readonly HashSet<string> TiposDocumentoValidos = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CC", "CE", "TI", "PA"
+    };
 
     private readonly IUserRepository _userRepository;
     private readonly IPerfilEmprendimientoRepository _perfilRepository;
@@ -54,6 +60,11 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         };
     }
 
+    public async Task RevocarPermisoAsync(int cuentaId)
+    {
+        await _perfilRepository.RevocarPermisosEdicionAsync(cuentaId);
+    }
+
     public async Task<PerfilEmprendedorDto?> ObtenerPerfilAsync(
         int cuentaId,
         string editToken)
@@ -65,7 +76,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         }
 
         var cuenta = await _perfilRepository.ObtenerPerfilCompletoAsync(cuentaId);
-        return cuenta is null ? null : MapearPerfil(cuenta);
+        return cuenta?.UsuarioEmprendedor is null ? null : MapearPerfil(cuenta);
     }
 
     public async Task<ActualizarPerfilResultadoDto> ActualizarPerfilAsync(
@@ -80,7 +91,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         }
 
         var cuenta = await _perfilRepository.ObtenerPerfilCompletoAsync(cuentaId);
-        if (cuenta?.UsuarioEmprendedor?.Negocio is null)
+        if (cuenta?.UsuarioEmprendedor is null)
         {
             return Error("El perfil del emprendimiento todavía no está completo.");
         }
@@ -115,10 +126,47 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         usuario.Nit = nit;
         usuario.RazonSocial = razonSocial;
 
+        // CK_UsuarioEmprendedor_Formalizacion: formalizado no admite documento;
+        // no formalizado lo exige (además de NIT/razón en null, ya aplicado arriba).
+        if (dto.Formalizado)
+        {
+            usuario.TipoDocumento = null;
+            usuario.NumeroDocumento = null;
+        }
+        else if (usuario.TipoDocumento is null || usuario.NumeroDocumento is null)
+        {
+            return Error("Para el perfil no formalizado debes registrar tu documento en el perfil de usuario.");
+        }
+
         var tipoEmprendimiento = await _userRepository
             .ObtenerOCrearTipoEmprendimientoAsync(dto.CategoriaNegocio.Trim());
 
+        var telefono = dto.TelefonoContacto.Trim();
+        if (telefono.Length < 7 || telefono.Length > 20)
+        {
+            return Error("El teléfono de contacto debe tener entre 7 y 20 caracteres.");
+        }
+
+        if (negocio is null)
+        {
+            // La cuenta aún no tiene negocio (registro sin onboarding):
+            // se crea aquí con los datos del formulario.
+            negocio = await _userRepository.RegistrarNegocioAsync(new Negocio
+            {
+                UsuarioId = usuario.Id,
+                TipoEmprendimientoId = tipoEmprendimiento.Id,
+                TelefonoContacto = telefono,
+                CorreoContacto = dto.CorreoContacto.Trim().ToLowerInvariant(),
+                Direccion = dto.TieneSitioFisico ? NullIfWhiteSpace(dto.Direccion) : null,
+                Rues = rues,
+                CorreoEmpresa = dto.CorreoEmpresa.Trim().ToLowerInvariant(),
+                TieneSitioFisico = dto.TieneSitioFisico,
+                FechaActualizacion = DateTime.UtcNow
+            });
+        }
+
         negocio.TipoEmprendimientoId = tipoEmprendimiento.Id;
+        negocio.TelefonoContacto = telefono;
         negocio.CorreoContacto = dto.CorreoContacto.Trim().ToLowerInvariant();
         negocio.Rues = rues;
         negocio.CorreoEmpresa = dto.CorreoEmpresa.Trim().ToLowerInvariant();
@@ -128,60 +176,81 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             : null;
         negocio.FechaActualizacion = DateTime.UtcNow;
 
-        var sociosExistentes = usuario.SociosNegocio.ToList();
-        var idsRecibidos = dto.Socios
-            .Where(s => s.Id.HasValue && s.Id.Value > 0)
-            .Select(s => s.Id!.Value)
+        var empleadosExistentes = negocio.Empleados.ToList();
+        var idsRecibidos = dto.Empleados
+            .Where(e => e.Id.HasValue && e.Id.Value > 0)
+            .Select(e => e.Id!.Value)
             .ToHashSet();
 
-        if (idsRecibidos.Count != dto.Socios.Count(s => s.Id.HasValue && s.Id.Value > 0))
+        if (idsRecibidos.Count != dto.Empleados.Count(e => e.Id.HasValue && e.Id.Value > 0))
         {
-            return Error("La lista de socios contiene registros repetidos.");
+            return Error("La lista de empleados contiene registros repetidos.");
         }
 
-        var socioIdsInvalidos = idsRecibidos.Except(sociosExistentes.Select(s => s.Id)).Any();
-        if (socioIdsInvalidos)
+        var empleadoIdsInvalidos = idsRecibidos.Except(empleadosExistentes.Select(e => e.Id)).Any();
+        if (empleadoIdsInvalidos)
         {
-            return Error("Uno de los socios no pertenece a la cuenta actual.");
+            return Error("Uno de los empleados no pertenece a la cuenta actual.");
         }
 
-        var sociosEliminados = sociosExistentes
-            .Where(s => !idsRecibidos.Contains(s.Id))
+        var correosRepetidos = dto.Empleados
+            .Select(e => e.CorreoInvitado.Trim().ToLowerInvariant())
+            .Where(c => c.Length > 0)
             .ToList();
-        var sociosNuevos = new List<SocioNegocio>();
-
-        foreach (var socioDto in dto.Socios)
+        if (correosRepetidos.Count != correosRepetidos.Distinct(StringComparer.OrdinalIgnoreCase).Count())
         {
-            var socio = socioDto.Id.HasValue && socioDto.Id.Value > 0
-                ? sociosExistentes.Single(s => s.Id == socioDto.Id.Value)
-                : new SocioNegocio
-                {
-                    UsuarioEmprendedorId = usuario.Id,
-                };
+            return Error("No puedes registrar dos empleados con el mismo correo.");
+        }
 
-            socio.Nombres = socioDto.Nombres.Trim();
-            socio.Apellidos = socioDto.Apellidos.Trim();
-            socio.TipoDocumento = socioDto.TipoDocumento.Trim().ToUpperInvariant();
-            socio.NumeroDocumento = socioDto.NumeroDocumento.Trim();
-            socio.Telefono = socioDto.Telefono.Trim();
-            socio.CorreoElectronico = socioDto.CorreoElectronico.Trim().ToLowerInvariant();
+        var empleadosEliminados = empleadosExistentes
+            .Where(e => !idsRecibidos.Contains(e.Id))
+            .ToList();
+        var empleadosNuevos = new List<Empleado>();
 
-            if (!socioDto.Id.HasValue || socioDto.Id.Value <= 0)
+        foreach (var empleadoDto in dto.Empleados)
+        {
+            var correoEmpleado = empleadoDto.CorreoInvitado.Trim().ToLowerInvariant();
+
+            if (!await _perfilRepository.ExisteRolAsync(empleadoDto.RolId))
             {
-                sociosNuevos.Add(socio);
+                return Error($"El rol seleccionado para {correoEmpleado} no es válido.");
+            }
+
+            if (empleadoDto.Id.HasValue && empleadoDto.Id.Value > 0)
+            {
+                var existente = empleadosExistentes.Single(e => e.Id == empleadoDto.Id.Value);
+                if (await _perfilRepository.ExisteEmpleadoCorreoAsync(
+                    negocio.Id, correoEmpleado, existente.Id))
+                {
+                    return Error($"El correo {correoEmpleado} ya está registrado en tu negocio.");
+                }
+
+                existente.CorreoInvitado = correoEmpleado;
+                existente.RolId = empleadoDto.RolId;
+            }
+            else
+            {
+                if (await _perfilRepository.ExisteEmpleadoCorreoAsync(negocio.Id, correoEmpleado))
+                {
+                    return Error($"El correo {correoEmpleado} ya está registrado en tu negocio.");
+                }
+
+                empleadosNuevos.Add(new Empleado
+                {
+                    NegocioId = negocio.Id,
+                    RolId = empleadoDto.RolId,
+                    CorreoInvitado = correoEmpleado,
+                    EstadoInvitacion = "pendiente",
+                    InvitadoPor = usuario.Id,
+                    FechaInvitacion = DateTime.UtcNow
+                });
             }
         }
 
-        var socioValidation = ValidarSocios(dto.Socios);
-        if (socioValidation is not null)
-        {
-            return Error(socioValidation);
-        }
-
-        await _perfilRepository.GuardarCambiosAsync(
+        await _perfilRepository.GuardarEmpleadosAsync(
             permiso,
-            sociosNuevos,
-            sociosEliminados);
+            empleadosNuevos,
+            empleadosEliminados);
 
         if (emailCambio)
         {
@@ -213,6 +282,8 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         var usuario = cuenta.UsuarioEmprendedor;
         return new PerfilUsuarioDto
         {
+            // FotoPerfilUrl no se persiste (la BD no tiene la columna):
+            // solo se usa como vista previa en el cliente.
             FotoPerfilUrl = null,
             TipoDocumento = usuario.TipoDocumento ?? string.Empty,
             NumeroDocumento = usuario.NumeroDocumento ?? string.Empty,
@@ -235,11 +306,34 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         var usuario = cuenta.UsuarioEmprendedor;
         var negocio = usuario.Negocio;
 
-        usuario.TipoDocumento = NullIfWhiteSpace(dto.TipoDocumento)?.ToUpperInvariant();
-        usuario.NumeroDocumento = NullIfWhiteSpace(dto.NumeroDocumento);
+        var esFormalizado = string.Equals(
+            usuario.TipoFormalizacion, "formalizado", StringComparison.OrdinalIgnoreCase);
+        var tipoDoc = NullIfWhiteSpace(dto.TipoDocumento)?.ToUpperInvariant();
+
+        if (!esFormalizado)
+        {
+            if (tipoDoc is null ||
+                !TiposDocumentoValidos.Contains(tipoDoc))
+            {
+                return Error("El tipo de documento no es válido. Valores permitidos: CC, CE, TI, PA.");
+            }
+            if (string.IsNullOrWhiteSpace(dto.NumeroDocumento))
+            {
+                return Error("El número de documento es obligatorio.");
+            }
+        }
+
+        var telefono = NullIfWhiteSpace(dto.TelefonoContacto) ?? string.Empty;
+        if (telefono.Length < 7)
+        {
+            return Error("El teléfono de contacto debe tener al menos 7 dígitos.");
+        }
+
+        usuario.TipoDocumento = esFormalizado ? null : tipoDoc;
+        usuario.NumeroDocumento = esFormalizado ? null : NullIfWhiteSpace(dto.NumeroDocumento);
         usuario.Nombres = NullIfWhiteSpace(dto.Nombres);
         usuario.Apellidos = NullIfWhiteSpace(dto.Apellidos);
-        negocio.TelefonoContacto = NullIfWhiteSpace(dto.TelefonoContacto) ?? string.Empty;
+        negocio.TelefonoContacto = telefono;
         negocio.FechaActualizacion = DateTime.UtcNow;
 
         try
@@ -286,7 +380,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             CuentaId = cuenta.Id,
             TokenHash = TokenGenerator.CalcularHash(token),
             Tipo = TokenPurposes.EmailVerification,
-            FechaExpiracion = DateTime.UtcNow.AddHours(24),
+            FechaExpiracion = DateTime.UtcNow.AddMinutes(15),
             Usado = false
         });
         await _emailService.EnviarCorreoVerificacionAsync(cuenta.Correo, token);
@@ -295,8 +389,10 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
     private static PerfilEmprendedorDto MapearPerfil(Cuenta cuenta)
     {
         var usuario = cuenta.UsuarioEmprendedor!;
-        var negocio = usuario.Negocio!;
+        var negocio = usuario.Negocio;
 
+        // Sin negocio (cuenta recién registrada): se devuelven valores por
+        // defecto para que el formulario cargue y el PUT lo cree.
         return new PerfilEmprendedorDto
         {
             CorreoCuenta = cuenta.Correo,
@@ -304,37 +400,32 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
                           string.Equals(usuario.TipoFormalizacion, "si", StringComparison.OrdinalIgnoreCase) ||
                           string.Equals(usuario.TipoFormalizacion, "true", StringComparison.OrdinalIgnoreCase),
             NombreEmprendimiento = usuario.NombreEmprendimiento ?? string.Empty,
-            CategoriaNegocio = negocio.TipoEmprendimiento?.Nombre ?? string.Empty,
-            CorreoContacto = negocio.CorreoContacto,
+            CategoriaNegocio = negocio?.TipoEmprendimiento?.Nombre ?? string.Empty,
+            CorreoContacto = negocio?.CorreoContacto ?? string.Empty,
+            TelefonoContacto = negocio?.TelefonoContacto ?? string.Empty,
             Nit = usuario.Nit ?? string.Empty,
             RazonSocial = usuario.RazonSocial ?? string.Empty,
-            Rues = negocio.Rues ?? string.Empty,
-            CorreoEmpresa = negocio.CorreoEmpresa ?? negocio.CorreoContacto,
-            TieneSitioFisico = negocio.TieneSitioFisico,
-            Direccion = negocio.Direccion ?? string.Empty,
-            Socios = usuario.SociosNegocio.Select(s => new SocioNegocioDto
-            {
-                Id = s.Id,
-                Nombres = s.Nombres,
-                Apellidos = s.Apellidos,
-                TipoDocumento = s.TipoDocumento,
-                NumeroDocumento = s.NumeroDocumento,
-                Telefono = s.Telefono,
-                CorreoElectronico = s.CorreoElectronico
-            }).ToList()
+            Rues = negocio?.Rues ?? string.Empty,
+            CorreoEmpresa = negocio?.CorreoEmpresa ?? negocio?.CorreoContacto ?? string.Empty,
+            TieneSitioFisico = negocio?.TieneSitioFisico ?? false,
+            Direccion = negocio?.Direccion ?? string.Empty,
+            Empleados = negocio?.Empleados
+                .OrderBy(e => e.CorreoInvitado)
+                .Select(e => new EmpleadoDto
+                {
+                    Id = e.Id,
+                    CorreoInvitado = e.CorreoInvitado,
+                    RolId = e.RolId,
+                    NombreRol = e.Rol?.Nombre ?? string.Empty,
+                    EstadoInvitacion = e.EstadoInvitacion
+                }).ToList() ?? new()
         };
     }
 
-    private static string? ValidarSocios(IEnumerable<SocioNegocioDto> socios)
+    public async Task<List<RolDto>> ObtenerRolesAsync()
     {
-        var documentos = socios
-            .Select(s => s.NumeroDocumento.Trim())
-            .Where(d => d.Length > 0)
-            .ToList();
-
-        return documentos.Count != documentos.Distinct(StringComparer.OrdinalIgnoreCase).Count()
-            ? "No puedes registrar dos socios con el mismo documento."
-            : null;
+        var roles = await _perfilRepository.ObtenerRolesAsync();
+        return roles.Select(r => new RolDto { Id = r.Id, Nombre = r.Nombre }).ToList();
     }
 
     private static string? NullIfWhiteSpace(string? value)

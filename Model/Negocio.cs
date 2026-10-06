@@ -33,6 +33,8 @@ public partial class Negocio
 
     public virtual ICollection<ProductoMenu> ProductoMenus { get; set; } = new List<ProductoMenu>();
 
+    public virtual ICollection<Proveedor> Proveedors { get; set; } = new List<Proveedor>();
+
     public virtual ICollection<Receta> Receta { get; set; } = new List<Receta>();
 
     public virtual TipoEmprendimiento TipoEmprendimiento { get; set; } = null!;

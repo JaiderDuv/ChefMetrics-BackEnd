@@ -432,5 +432,3 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
-
-ChefMetricsContext.cs 

@@ -10,9 +10,12 @@ public interface IPerfilEmprendimientoRepository
     Task RevocarPermisosEdicionAsync(int cuentaId);
     Task<bool> ExisteCorreoAsync(string correo, int cuentaId);
     Task<bool> ExisteNitAsync(string nit, int cuentaId);
-    Task GuardarCambiosAsync(
+    Task<List<Role>> ObtenerRolesAsync();
+    Task<bool> ExisteRolAsync(int rolId);
+    Task<bool> ExisteEmpleadoCorreoAsync(int negocioId, string correo, int? excluirId = null);
+    Task GuardarEmpleadosAsync(
         PerfilEditGrant permiso,
-        IEnumerable<SocioNegocio> sociosNuevos,
-        IEnumerable<SocioNegocio> sociosEliminados);
+        IEnumerable<Empleado> empleadosNuevos,
+        IEnumerable<Empleado> empleadosEliminados);
     Task GuardarCambiosUsuarioAsync();
 }

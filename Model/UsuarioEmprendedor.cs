@@ -10,9 +10,9 @@ public partial class UsuarioEmprendedor
     public int CuentaId { get; set; }
 
     // Columnas agregadas en la tabla UsuarioEmprendedor
-    public string Nombres { get; set; } = null!;
+    public string? Nombres { get; set; }
 
-    public string Apellidos { get; set; } = null!;
+    public string? Apellidos { get; set; }
 
     public string TipoFormalizacion { get; set; } = null!;
 
@@ -33,8 +33,6 @@ public partial class UsuarioEmprendedor
     public virtual Cuenta Cuenta { get; set; } = null!;
 
     public virtual ICollection<Empleado> Empleados { get; set; } = new List<Empleado>();
-
-    public virtual ICollection<SocioNegocio> SociosNegocio { get; set; } = new List<SocioNegocio>();
 
     public virtual Negocio? Negocio { get; set; }
 }
