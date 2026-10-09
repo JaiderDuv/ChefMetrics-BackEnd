@@ -17,15 +17,19 @@ public partial class Cuenta
 
     public bool Activo { get; set; }
 
+    public string? NombreCompleto { get; set; }
+
+    public string? Telefono { get; set; }
+
     public DateTime FechaCreacion { get; set; }
 
     public virtual Empleado? Empleado { get; set; }
 
     public virtual ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
 
-    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
-
     public virtual ICollection<PerfilEditGrant> PerfilEditGrants { get; set; } = new List<PerfilEditGrant>();
+
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 
     public virtual UsuarioEmprendedor? UsuarioEmprendedor { get; set; }
 }

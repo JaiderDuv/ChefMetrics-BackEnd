@@ -1,3 +1,6 @@
+﻿using System;
+using System.Collections.Generic;
+
 namespace ChefMetrics_BackEnd.Model;
 
 public partial class PerfilEditGrant

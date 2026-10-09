@@ -9,10 +9,9 @@ public partial class UsuarioEmprendedor
 
     public int CuentaId { get; set; }
 
-    // Columnas agregadas en la tabla UsuarioEmprendedor
-    public string? Nombres { get; set; }
+    public string Nombres { get; set; } = null!;
 
-    public string? Apellidos { get; set; }
+    public string Apellidos { get; set; } = null!;
 
     public string TipoFormalizacion { get; set; } = null!;
 
@@ -29,6 +28,8 @@ public partial class UsuarioEmprendedor
     public bool OnboardingCompletado { get; set; }
 
     public DateTime FechaCreacion { get; set; }
+
+    public string? FotoPerfilUrl { get; set; }
 
     public virtual Cuenta Cuenta { get; set; } = null!;
 

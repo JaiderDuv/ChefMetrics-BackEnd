@@ -1,13 +1,11 @@
+﻿using System;
+using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChefMetrics_BackEnd.Model;
 
 public partial class ChefMetricsContext : DbContext
 {
-    public ChefMetricsContext()
-    {
-    }
-
     public ChefMetricsContext(DbContextOptions<ChefMetricsContext> options)
         : base(options)
     {
@@ -27,9 +25,9 @@ public partial class ChefMetricsContext : DbContext
 
     public virtual DbSet<Negocio> Negocios { get; set; }
 
-    public virtual DbSet<PerfilEditGrant> PerfilEditGrants { get; set; }
-
     public virtual DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+
+    public virtual DbSet<PerfilEditGrant> PerfilEditGrants { get; set; }
 
     public virtual DbSet<ProductoMenu> ProductoMenus { get; set; }
 
@@ -49,8 +47,6 @@ public partial class ChefMetricsContext : DbContext
 
     public virtual DbSet<UsuarioEmprendedor> UsuarioEmprendedors { get; set; }
 
-
-   
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         if (!optionsBuilder.IsConfigured)
@@ -63,15 +59,21 @@ public partial class ChefMetricsContext : DbContext
     {
         modelBuilder.Entity<CostoFijo>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__CostoFij__3214EC072F85996B");
+            entity.HasKey(e => e.Id).HasName("PK__CostoFij__3214EC0770A7B8C6");
 
             entity.ToTable("CostoFijo");
 
+            entity.HasIndex(e => e.NegocioId, "IX_CostoFijo_NegocioId");
+
+            entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.MontoMensual).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.Nombre).HasMaxLength(150);
             entity.Property(e => e.UnidadProrrateo)
                 .HasMaxLength(30)
                 .IsUnicode(false);
+            entity.Property(e => e.ValorDivisor)
+                .HasDefaultValue(100m)
+                .HasColumnType("decimal(12, 2)");
 
             entity.HasOne(d => d.Negocio).WithMany(p => p.CostoFijos)
                 .HasForeignKey(d => d.NegocioId)
@@ -80,45 +82,34 @@ public partial class ChefMetricsContext : DbContext
 
         modelBuilder.Entity<Cuenta>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Cuenta__3214EC077F390334");
+            entity.HasKey(e => e.Id).HasName("PK__Cuenta__3214EC079E423EF8");
 
             entity.HasIndex(e => e.Correo, "UQ_Cuenta_Correo").IsUnique();
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.Correo).HasMaxLength(255);
             entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.NombreCompleto).HasMaxLength(150);
             entity.Property(e => e.PasswordHash)
                 .HasMaxLength(255)
+                .IsUnicode(false);
+            entity.Property(e => e.Telefono)
+                .HasMaxLength(20)
                 .IsUnicode(false);
             entity.Property(e => e.TipoCuenta)
                 .HasMaxLength(20)
                 .IsUnicode(false);
         });
 
-        modelBuilder.Entity<PerfilEditGrant>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-
-            entity.HasIndex(e => e.TokenHash, "UQ_PerfilEditGrant_TokenHash")
-                .IsUnique();
-
-            entity.Property(e => e.TokenHash)
-                .HasMaxLength(255)
-                .IsUnicode(false);
-            entity.Property(e => e.FechaCreacion)
-                .HasDefaultValueSql("(sysutcdatetime())");
-
-            entity.HasOne(e => e.Cuenta)
-                .WithMany(c => c.PerfilEditGrants)
-                .HasForeignKey(e => e.CuentaId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
         modelBuilder.Entity<Empleado>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Empleado__3214EC07FB53A3CF");
+            entity.HasKey(e => e.Id).HasName("PK__Empleado__3214EC07B989D586");
 
             entity.ToTable("Empleado");
+
+            entity.HasIndex(e => e.InvitadoPor, "IX_Empleado_InvitadoPor");
+
+            entity.HasIndex(e => e.RolId, "IX_Empleado_RolId");
 
             entity.HasIndex(e => new { e.NegocioId, e.CorreoInvitado }, "UQ_Empleado_CorreoNegocio").IsUnique();
 
@@ -165,19 +156,20 @@ public partial class ChefMetricsContext : DbContext
 
             entity.ToTable("HistorialPrecioInsumo");
 
+            entity.HasIndex(e => e.InsumoProveedorId, "IX_HistorialPrecioInsumo_InsumoProveedorId");
+
             entity.Property(e => e.CostoAnterior).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.CostoNuevo).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.FechaCambio).HasDefaultValueSql("(sysutcdatetime())");
 
             entity.HasOne(d => d.InsumoProveedor).WithMany(p => p.HistorialPrecioInsumos)
                 .HasForeignKey(d => d.InsumoProveedorId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_HistorialPrecioInsumo_InsumoProveedor");
         });
 
         modelBuilder.Entity<Insumo>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Insumo__3214EC077D4ECF38");
+            entity.HasKey(e => e.Id).HasName("PK__Insumo__3214EC079C35B1C5");
 
             entity.ToTable("Insumo");
 
@@ -208,6 +200,8 @@ public partial class ChefMetricsContext : DbContext
 
             entity.ToTable("InsumoProveedor");
 
+            entity.HasIndex(e => e.ProveedorId, "IX_InsumoProveedor_ProveedorId");
+
             entity.HasIndex(e => new { e.InsumoId, e.ProveedorId }, "UQ_InsumoProveedor").IsUnique();
 
             entity.HasIndex(e => e.InsumoId, "UQ_InsumoProveedor_Principal")
@@ -215,7 +209,6 @@ public partial class ChefMetricsContext : DbContext
                 .HasFilter("([EsPrincipal]=(1))");
 
             entity.Property(e => e.Costo).HasColumnType("decimal(12, 2)");
-            entity.Property(e => e.EsPrincipal).HasDefaultValue(false);
             entity.Property(e => e.FechaActualizacion).HasDefaultValueSql("(sysutcdatetime())");
 
             entity.HasOne(d => d.Insumo).WithMany(p => p.InsumoProveedors)
@@ -229,30 +222,13 @@ public partial class ChefMetricsContext : DbContext
                 .HasConstraintName("FK_InsumoProveedor_Proveedor");
         });
 
-        modelBuilder.Entity<Proveedor>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Proveedo__3214EC072B116B88");
-
-            entity.ToTable("Proveedor");
-
-            entity.Property(e => e.Nombre).HasMaxLength(150);
-            entity.Property(e => e.Telefono)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-            entity.Property(e => e.Correo).HasMaxLength(255);
-            entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
-
-            entity.HasOne(d => d.Negocio).WithMany(p => p.Proveedors)
-                .HasForeignKey(d => d.NegocioId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Proveedor_Negocio");
-        });
-
         modelBuilder.Entity<Negocio>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Negocio__3214EC078E9A5500");
+            entity.HasKey(e => e.Id).HasName("PK__Negocio__3214EC07CF68471B");
 
             entity.ToTable("Negocio");
+
+            entity.HasIndex(e => e.TipoEmprendimientoId, "IX_Negocio_TipoEmprendimientoId");
 
             entity.HasIndex(e => e.UsuarioId, "UQ_Negocio_Usuario").IsUnique();
 
@@ -279,14 +255,14 @@ public partial class ChefMetricsContext : DbContext
 
         modelBuilder.Entity<PasswordResetToken>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Password__3214EC07F910C144");
+            entity.HasKey(e => e.Id).HasName("PK__Password__3214EC07AD9074A4");
+
+            entity.HasIndex(e => e.CuentaId, "IX_PasswordResetTokens_CuentaId");
 
             entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.Tipo).HasMaxLength(50);
             entity.Property(e => e.TokenHash)
                 .HasMaxLength(255)
-                .IsUnicode(false);
-            entity.Property(e => e.Tipo)
-                .HasMaxLength(30)
                 .IsUnicode(false);
 
             entity.HasOne(d => d.Cuenta).WithMany(p => p.PasswordResetTokens)
@@ -294,9 +270,25 @@ public partial class ChefMetricsContext : DbContext
                 .HasConstraintName("FK_PasswordResetTokens_Cuenta");
         });
 
+        modelBuilder.Entity<PerfilEditGrant>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__PerfilEd__3214EC0755CC1067");
+
+            entity.HasIndex(e => e.CuentaId, "IX_PerfilEditGrants_CuentaId");
+
+            entity.HasIndex(e => e.TokenHash, "UQ_PerfilEditGrant_TokenHash").IsUnique();
+
+            entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.TokenHash)
+                .HasMaxLength(255)
+                .IsUnicode(false);
+
+            entity.HasOne(d => d.Cuenta).WithMany(p => p.PerfilEditGrants).HasForeignKey(d => d.CuentaId);
+        });
+
         modelBuilder.Entity<ProductoMenu>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Producto__3214EC0782EE917A");
+            entity.HasKey(e => e.Id).HasName("PK__Producto__3214EC070EF49875");
 
             entity.ToTable("ProductoMenu");
 
@@ -314,7 +306,9 @@ public partial class ChefMetricsContext : DbContext
 
         modelBuilder.Entity<ProductoMenuRecetum>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Producto__3214EC07832CE19B");
+            entity.HasKey(e => e.Id).HasName("PK__Producto__3214EC073CF0454B");
+
+            entity.HasIndex(e => e.RecetaId, "IX_ProductoMenuReceta_RecetaId");
 
             entity.HasIndex(e => new { e.ProductoMenuId, e.RecetaId }, "UQ_ProductoMenuReceta").IsUnique();
 
@@ -330,11 +324,33 @@ public partial class ChefMetricsContext : DbContext
                 .HasConstraintName("FK_ProductoMenuReceta_Receta");
         });
 
+        modelBuilder.Entity<Proveedor>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK__Proveedo__3214EC072B116B88");
+
+            entity.ToTable("Proveedor");
+
+            entity.HasIndex(e => e.NegocioId, "IX_Proveedor_NegocioId");
+
+            entity.Property(e => e.Correo).HasMaxLength(255);
+            entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.Nombre).HasMaxLength(150);
+            entity.Property(e => e.Telefono)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+
+            entity.HasOne(d => d.Negocio).WithMany(p => p.Proveedors)
+                .HasForeignKey(d => d.NegocioId)
+                .HasConstraintName("FK_Proveedor_Negocio");
+        });
+
         modelBuilder.Entity<RecetaInsumo>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__RecetaIn__3214EC07E9666E15");
+            entity.HasKey(e => e.Id).HasName("PK__RecetaIn__3214EC07FBC68EB1");
 
             entity.ToTable("RecetaInsumo");
+
+            entity.HasIndex(e => e.InsumoId, "IX_RecetaInsumo_InsumoId");
 
             entity.HasIndex(e => new { e.RecetaId, e.InsumoId }, "UQ_RecetaInsumo").IsUnique();
 
@@ -355,7 +371,7 @@ public partial class ChefMetricsContext : DbContext
 
         modelBuilder.Entity<Receta>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Receta__3214EC073424F899");
+            entity.HasKey(e => e.Id).HasName("PK__Receta__3214EC078EB3406B");
 
             entity.HasIndex(e => new { e.NegocioId, e.Nombre }, "UQ_Receta_NegocioNombre").IsUnique();
 
@@ -369,7 +385,9 @@ public partial class ChefMetricsContext : DbContext
 
         modelBuilder.Entity<RefreshToken>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__RefreshT__3214EC07AFA0CE9A");
+            entity.HasKey(e => e.Id).HasName("PK__RefreshT__3214EC07527DA724");
+
+            entity.HasIndex(e => e.CuentaId, "IX_RefreshTokens_CuentaId");
 
             entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.TokenHash)
@@ -383,7 +401,7 @@ public partial class ChefMetricsContext : DbContext
 
         modelBuilder.Entity<Role>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Roles__3214EC0722B9A582");
+            entity.HasKey(e => e.Id).HasName("PK__Roles__3214EC07D8B07346");
 
             entity.HasIndex(e => e.Nombre, "UQ_Roles_Nombre").IsUnique();
 
@@ -392,7 +410,7 @@ public partial class ChefMetricsContext : DbContext
 
         modelBuilder.Entity<TipoEmprendimiento>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__TipoEmpr__3214EC07F05B8645");
+            entity.HasKey(e => e.Id).HasName("PK__TipoEmpr__3214EC07966BAD77");
 
             entity.ToTable("TipoEmprendimiento");
 
@@ -403,7 +421,7 @@ public partial class ChefMetricsContext : DbContext
 
         modelBuilder.Entity<UsuarioEmprendedor>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__UsuarioE__3214EC072683BE2F");
+            entity.HasKey(e => e.Id).HasName("PK__UsuarioE__3214EC076185DF2C");
 
             entity.ToTable("UsuarioEmprendedor");
 
@@ -417,14 +435,18 @@ public partial class ChefMetricsContext : DbContext
                 .IsUnique()
                 .HasFilter("([NumeroDocumento] IS NOT NULL)");
 
+            entity.Property(e => e.Apellidos)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
             entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.Nit)
                 .HasMaxLength(20)
                 .IsUnicode(false)
                 .HasColumnName("NIT");
-            entity.Property(e => e.Nombres).HasMaxLength(100);
-            entity.Property(e => e.Apellidos).HasMaxLength(100);
             entity.Property(e => e.NombreEmprendimiento).HasMaxLength(150);
+            entity.Property(e => e.Nombres)
+                .HasMaxLength(100)
+                .HasDefaultValue("");
             entity.Property(e => e.NumeroDocumento)
                 .HasMaxLength(20)
                 .IsUnicode(false);

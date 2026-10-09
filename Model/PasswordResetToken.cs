@@ -11,13 +11,13 @@ public partial class PasswordResetToken
 
     public string TokenHash { get; set; } = null!;
 
-    public string? Tipo { get; set; }
-
     public DateTime FechaCreacion { get; set; }
 
     public DateTime FechaExpiracion { get; set; }
 
     public bool Usado { get; set; }
+
+    public string? Tipo { get; set; }
 
     public virtual Cuenta Cuenta { get; set; } = null!;
 }
