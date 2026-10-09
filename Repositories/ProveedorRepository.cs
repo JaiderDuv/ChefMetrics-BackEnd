@@ -42,6 +42,19 @@ public sealed class ProveedorRepository : IProveedorRepository
             .ToListAsync();
     }
 
+    public async Task<List<Proveedor>> BuscarPorNombreAsync(int negocioId, string termino, int limite)
+    {
+        var prefijo = termino.Trim().ToLower();
+        var top = limite < 1 ? 8 : Math.Min(limite, 20);
+
+        return await _context.Proveedors
+            .AsNoTracking()
+            .Where(p => p.NegocioId == negocioId && p.Nombre.ToLower().StartsWith(prefijo))
+            .OrderBy(p => p.Nombre)
+            .Take(top)
+            .ToListAsync();
+    }
+
     public async Task<Proveedor?> ObtenerPorIdAsync(int proveedorId)
     {
         return await _context.Proveedors.FirstOrDefaultAsync(p => p.Id == proveedorId);
@@ -184,6 +197,21 @@ public sealed class ProveedorRepository : IProveedorRepository
     public async Task<int> ContarAsociacionesAsync(int proveedorId)
     {
         return await _context.InsumoProveedors.CountAsync(ip => ip.ProveedorId == proveedorId);
+    }
+
+    public async Task<int> PropagarNombreAInsumosAsync(int negocioId, int proveedorId, string nombreNuevo)
+    {
+        var nuevo = nombreNuevo.Trim();
+
+        return await _context.Insumos
+            .Where(i => i.NegocioId == negocioId
+                && _context.InsumoProveedors.Any(ip =>
+                    ip.InsumoId == i.Id
+                    && ip.ProveedorId == proveedorId
+                    && ip.EsPrincipal))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(i => i.Proveedor, nuevo)
+                .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
     }
 
     public async Task<bool> ExisteNombreAsync(int negocioId, string nombre, int? excluirId = null)

@@ -19,9 +19,15 @@ public sealed class ProveedoresController : ControllerBase
     }
 
     [HttpGet("negocios/mio/proveedores")]
-    public async Task<IActionResult> ListarDelNegocio()
+    public async Task<IActionResult> ListarDelNegocio([FromQuery] string? busqueda, [FromQuery] int limite = 50)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+
+        if (!string.IsNullOrWhiteSpace(busqueda))
+        {
+            var resultadoBusqueda = await _proveedorService.BuscarProveedoresAsync(cuentaId, busqueda, limite);
+            return Responder(resultadoBusqueda);
+        }
 
         var resultado = await _proveedorService.ListarProveedoresDelNegocioAsync(cuentaId);
         return Responder(resultado);

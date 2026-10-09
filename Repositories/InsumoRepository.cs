@@ -51,7 +51,8 @@ public sealed class InsumoRepository : IInsumoRepository
             var termino = busqueda.Trim().ToLower();
             query = query.Where(i =>
                 i.Nombre.ToLower().Contains(termino) ||
-                (i.Proveedor != null && i.Proveedor.ToLower().Contains(termino)));
+                _context.InsumoProveedors.Any(ip =>
+                    ip.InsumoId == i.Id && ip.Proveedor.Nombre.ToLower().Contains(termino)));
         }
 
         if (!string.IsNullOrWhiteSpace(categoria))
@@ -156,6 +157,30 @@ public sealed class InsumoRepository : IInsumoRepository
             .FirstOrDefaultAsync(ip => ip.InsumoId == insumoId && ip.EsPrincipal)!;
     }
 
+    public async Task<string?> ObtenerNombreProveedorPrincipalAsync(int insumoId)
+    {
+        return await _context.InsumoProveedors
+            .AsNoTracking()
+            .Where(ip => ip.InsumoId == insumoId && ip.EsPrincipal)
+            .Select(ip => ip.Proveedor.Nombre)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<Dictionary<int, string>> ObtenerNombresProveedoresPrincipalesAsync(IEnumerable<int> insumoIds)
+    {
+        var ids = insumoIds.ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<int, string>();
+        }
+
+        return await _context.InsumoProveedors
+            .AsNoTracking()
+            .Where(ip => ids.Contains(ip.InsumoId) && ip.EsPrincipal)
+            .Select(ip => new { ip.InsumoId, ip.Proveedor.Nombre })
+            .ToDictionaryAsync(x => x.InsumoId, x => x.Nombre);
+    }
+
     public async Task<InsumoProveedor> CrearInsumoProveedorAsync(InsumoProveedor asociacion)
     {
         await _context.InsumoProveedors.AddAsync(asociacion);
@@ -254,7 +279,8 @@ public sealed class InsumoRepository : IInsumoRepository
         if (!string.IsNullOrWhiteSpace(proveedor))
         {
             var termino = proveedor.Trim().ToLower();
-            query = query.Where(i => i.Proveedor != null && i.Proveedor.ToLower().Contains(termino));
+            query = query.Where(i => _context.InsumoProveedors.Any(ip =>
+                ip.InsumoId == i.Id && ip.Proveedor.Nombre.ToLower().Contains(termino)));
         }
 
         return await query
@@ -264,14 +290,12 @@ public sealed class InsumoRepository : IInsumoRepository
 
     public async Task ActualizarAsync(Insumo insumo)
     {
-        // Las lecturas usan AsNoTracking: se adjunta y se marca modificada.
         _context.Insumos.Update(insumo);
         await _context.SaveChangesAsync();
     }
 
     public void Eliminar(Insumo insumo)
     {
-        // Se adjunta por Id: las lecturas usan AsNoTracking.
         _context.Insumos.Remove(insumo);
     }
 

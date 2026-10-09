@@ -25,6 +25,24 @@ public sealed class ProveedorService : IProveedorService
         return ResultadoProveedorDto.Ok(proveedores.Select(MapearProveedor).ToList(), "Proveedores del negocio.");
     }
 
+    public async Task<ResultadoProveedorDto> BuscarProveedoresAsync(int cuentaId, string termino, int limite)
+    {
+        var negocioId = await _repository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (negocioId is null)
+        {
+            return ResultadoProveedorDto.NoHallado("Aún no tienes un negocio registrado.");
+        }
+
+        if (string.IsNullOrWhiteSpace(termino))
+        {
+            return ResultadoProveedorDto.Ok(new List<ProveedorDto>(), "Sin término de búsqueda.");
+        }
+
+        var top = limite < 1 ? 8 : Math.Min(limite, 20);
+        var proveedores = await _repository.BuscarPorNombreAsync(negocioId.Value, termino, top);
+        return ResultadoProveedorDto.Ok(proveedores.Select(MapearProveedor).ToList(), "Sugerencias de proveedores.");
+    }
+
     public async Task<ResultadoProveedorDto> CrearProveedorAsync(int cuentaId, CrearProveedorDto dto)
     {
         var negocioId = await _repository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
@@ -226,12 +244,31 @@ public sealed class ProveedorService : IProveedorService
             return ResultadoProveedorDto.NoHallado("El proveedor no existe.");
         }
 
-        proveedor.Nombre = dto.Nombre.Trim();
+        var nombreAnterior = proveedor.Nombre;
+        var nombreNuevo = dto.Nombre.Trim();
+        var cambioNombre = !string.Equals(nombreAnterior, nombreNuevo, StringComparison.OrdinalIgnoreCase);
+
+        proveedor.Nombre = nombreNuevo;
         proveedor.Telefono = string.IsNullOrWhiteSpace(dto.Telefono) ? null : dto.Telefono.Trim();
         proveedor.Correo = string.IsNullOrWhiteSpace(dto.Correo) ? null : dto.Correo.Trim();
 
         await _repository.ActualizarAsync(proveedor);
-        return ResultadoProveedorDto.Ok(MapearProveedor(proveedor), "Proveedor actualizado correctamente.");
+
+        // Relación Proveedor -> Insumos: si cambió el nombre, se propaga al
+        // campo Insumo.Proveedor (desnormalizado) de los insumos donde este
+        // proveedor es el principal. Por Id, no por texto, para corregir
+        // desincronizados previos.
+        var mensaje = "Proveedor actualizado correctamente.";
+        if (cambioNombre)
+        {
+            var afectados = await _repository.PropagarNombreAInsumosAsync(negocioId.Value, proveedorId, nombreNuevo);
+            if (afectados > 0)
+            {
+                mensaje = $"Proveedor actualizado correctamente. Se actualizó el nombre en {afectados} insumo(s).";
+            }
+        }
+
+        return ResultadoProveedorDto.Ok(MapearProveedor(proveedor), mensaje);
     }
 
     public async Task<ResultadoProveedorDto> EliminarProveedorAsync(int cuentaId, int proveedorId)

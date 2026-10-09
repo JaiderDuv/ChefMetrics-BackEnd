@@ -4,13 +4,13 @@ namespace ChefMetrics_BackEnd.Repositories;
 
 public interface IProveedorRepository
 {
-    // Mismo patrón que InsumoRepository.ObtenerNegocioIdPorCuentaAsync
     Task<int?> ObtenerNegocioIdPorCuentaAsync(int cuentaId);
 
     Task<int?> ObtenerNegocioIdDeInsumoAsync(int insumoId);
     Task<bool> ExisteInsumoEnNegocioAsync(int negocioId, int insumoId);
 
     Task<List<Proveedor>> ListarPorNegocioAsync(int negocioId);
+    Task<List<Proveedor>> BuscarPorNombreAsync(int negocioId, string termino, int limite);
     Task<Proveedor?> ObtenerPorIdAsync(int proveedorId);
     Task<Proveedor> CrearAsync(Proveedor proveedor);
 
@@ -24,6 +24,7 @@ public interface IProveedorRepository
 
     Task<Proveedor?> ObtenerPorIdDelNegocioAsync(int negocioId, int proveedorId);
     Task<int> ContarAsociacionesAsync(int proveedorId);
+    Task<int> PropagarNombreAInsumosAsync(int negocioId, int proveedorId, string nombreNuevo);
     Task ActualizarAsync(Proveedor proveedor);
     void Eliminar(Proveedor proveedor);
     Task GuardarCambiosAsync();

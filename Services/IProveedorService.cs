@@ -5,6 +5,7 @@ namespace ChefMetrics_BackEnd.Services;
 public interface IProveedorService
 {
     Task<ResultadoProveedorDto> ListarProveedoresDelNegocioAsync(int cuentaId);
+    Task<ResultadoProveedorDto> BuscarProveedoresAsync(int cuentaId, string termino, int limite);
     Task<ResultadoProveedorDto> CrearProveedorAsync(int cuentaId, CrearProveedorDto dto);
 
     Task<ResultadoProveedorDto> ListarPorInsumoAsync(int cuentaId, int insumoId);
