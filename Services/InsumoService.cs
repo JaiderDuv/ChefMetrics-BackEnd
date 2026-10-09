@@ -7,14 +7,11 @@ namespace ChefMetrics_BackEnd.Services;
 
 public sealed class InsumoService : IInsumoService
 {
-    // Valores permitidos por CK_Insumo_UnidadMedida (comparación sin
-    // distinción de mayúsculas; se guarda en minúsculas).
     private static readonly HashSet<string> UnidadesValidas = new(StringComparer.OrdinalIgnoreCase)
     {
         "g", "kg", "l", "ml", "oz", "lb", "unidad", "taza"
     };
 
-    // Valores permitidos por CK_Insumo_Categoria. Vacío => "otro".
     private static readonly HashSet<string> CategoriasValidas = new(StringComparer.OrdinalIgnoreCase)
     {
         "materia_prima", "empaque", "otro"
@@ -79,9 +76,6 @@ public sealed class InsumoService : IInsumoService
                 FechaActualizacion = DateTime.UtcNow
             });
 
-            // Si trae proveedor, se registra la asociación principal para que el
-            // precio quede atado a ese proveedor desde el inicio, junto con
-            // la primera fila del historial (valor inicial, sin variación).
             if (proveedorNormalizado is not null)
             {
                 var proveedor = await _insumoRepository.ObtenerOCrearProveedorAsync(
@@ -103,11 +97,10 @@ public sealed class InsumoService : IInsumoService
                 });
             }
 
-            return ResultadoInsumoDto.Ok(Mapear(insumo, 0), "El insumo fue creado correctamente.");
+            return ResultadoInsumoDto.Ok(Mapear(insumo, 0, proveedorNormalizado), "El insumo fue creado correctamente.");
         }
         catch (DbUpdateException)
         {
-            // Carrera contra la restricción UQ_Insumo_NegocioNombre.
             return ResultadoInsumoDto.Error("Ya existe un insumo con ese nombre en tu negocio.");
         }
     }
@@ -145,13 +138,14 @@ public sealed class InsumoService : IInsumoService
             tamano);
 
         var conteos = await _insumoRepository.ContarRecetasPorInsumosAsync(items.Select(i => i.Id));
+        var principales = await _insumoRepository.ObtenerNombresProveedoresPrincipalesAsync(items.Select(i => i.Id));
 
         return new ListaPaginadaDto<InsumoDto>
         {
             Total = total,
             Pagina = pagina,
             TamanoPagina = tamano,
-            Datos = items.Select(i => Mapear(i, conteos.GetValueOrDefault(i.Id))).ToList()
+            Datos = items.Select(i => Mapear(i, conteos.GetValueOrDefault(i.Id), principales.GetValueOrDefault(i.Id))).ToList()
         };
     }
 
@@ -171,7 +165,8 @@ public sealed class InsumoService : IInsumoService
         }
 
         var numeroRecetas = await _insumoRepository.ContarRecetasAsociadasAsync(insumo.Id);
-        return ResultadoInsumoDto.Ok(Mapear(insumo, numeroRecetas), "Detalle del insumo.");
+        var principal = await _insumoRepository.ObtenerNombreProveedorPrincipalAsync(insumo.Id);
+        return ResultadoInsumoDto.Ok(Mapear(insumo, numeroRecetas, principal), "Detalle del insumo.");
     }
 
     public async Task<ResultadoInsumoDto> ActualizarParcialAsync(
@@ -252,9 +247,6 @@ public sealed class InsumoService : IInsumoService
                 return ResultadoInsumoDto.Error("El costo unitario debe ser mayor a 0.");
             }
 
-            // El precio vive atado a un proveedor (tablas Proveedor/InsumoProveedor):
-            // para cambiar el precio es obligatorio seleccionar el proveedor
-            // en la misma petición, y el cambio queda registrado en el historial.
             if (string.IsNullOrWhiteSpace(dto.Proveedor))
             {
                 return ResultadoInsumoDto.Error(
@@ -283,7 +275,6 @@ public sealed class InsumoService : IInsumoService
                     FechaActualizacion = DateTime.UtcNow
                 });
 
-                // Primera vez con este proveedor: se registra el valor inicial.
                 await _insumoRepository.RegistrarCambioPrecioAsync(new HistorialPrecioInsumo
                 {
                     InsumoProveedorId = asociacion.Id,
@@ -307,8 +298,6 @@ public sealed class InsumoService : IInsumoService
 
             asociacion.FechaActualizacion = DateTime.UtcNow;
 
-            // El proveedor del cambio pasa a ser el principal: el precio visible
-            // del insumo siempre refleja el precio de su proveedor principal.
             if (!asociacion.EsPrincipal)
             {
                 asociacion.EsPrincipal = true;
@@ -322,14 +311,56 @@ public sealed class InsumoService : IInsumoService
         }
         else if (dto.Proveedor is not null)
         {
-            // Cambio de proveedor sin cambio de precio: se permite libremente.
-            var proveedor = string.IsNullOrWhiteSpace(dto.Proveedor) ? null : dto.Proveedor.Trim();
-            if (proveedor is not null && proveedor.Length > 150)
+            var texto = string.IsNullOrWhiteSpace(dto.Proveedor) ? null : dto.Proveedor.Trim();
+            if (texto is not null && texto.Length > 150)
             {
                 return ResultadoInsumoDto.Error("El proveedor no puede superar los 150 caracteres.");
             }
-            insumo.Proveedor = proveedor;
-            hayCambios = true;
+
+            var principalActual = await _insumoRepository.ObtenerInsumoProveedorPrincipalAsync(insumo.Id);
+            var nombrePrincipalActual = principalActual?.Proveedor.Nombre;
+
+            if (!string.Equals(nombrePrincipalActual ?? insumo.Proveedor, texto, StringComparison.OrdinalIgnoreCase))
+            {
+                if (texto is null)
+                {
+                    await _insumoRepository.DesmarcarPrincipalesAsync(insumo.Id, -1);
+                }
+                else
+                {
+                    var proveedorEnt = await _insumoRepository.ObtenerOCrearProveedorAsync(negocioId.Value, texto);
+                    var asociacion = await _insumoRepository.ObtenerInsumoProveedorAsync(insumo.Id, proveedorEnt.Id);
+                    if (asociacion is null)
+                    {
+                        asociacion = await _insumoRepository.CrearInsumoProveedorAsync(new InsumoProveedor
+                        {
+                            InsumoId = insumo.Id,
+                            ProveedorId = proveedorEnt.Id,
+                            Costo = insumo.CostoUnitario,
+                            EsPrincipal = false,
+                            FechaActualizacion = DateTime.UtcNow
+                        });
+                        await _insumoRepository.RegistrarCambioPrecioAsync(new HistorialPrecioInsumo
+                        {
+                            InsumoProveedorId = asociacion.Id,
+                            CostoAnterior = insumo.CostoUnitario,
+                            CostoNuevo = insumo.CostoUnitario,
+                            FechaCambio = DateTime.UtcNow
+                        });
+                    }
+
+                    if (!asociacion.EsPrincipal)
+                    {
+                        asociacion.EsPrincipal = true;
+                    }
+                    asociacion.FechaActualizacion = DateTime.UtcNow;
+                    await _insumoRepository.DesmarcarPrincipalesAsync(insumo.Id, asociacion.Id);
+                    await _insumoRepository.GuardarCambiosAsync();
+                }
+
+                insumo.Proveedor = texto;
+                hayCambios = true;
+            }
         }
 
         if (dto.Activo.HasValue)
@@ -347,7 +378,6 @@ public sealed class InsumoService : IInsumoService
 
         try
         {
-            // La entidad viene de una lectura AsNoTracking: se adjunta por Id.
             await _insumoRepository.ActualizarAsync(insumo);
         }
         catch (DbUpdateException)
@@ -356,7 +386,8 @@ public sealed class InsumoService : IInsumoService
         }
 
         var numeroRecetas = await _insumoRepository.ContarRecetasAsociadasAsync(insumo.Id);
-        return ResultadoInsumoDto.Ok(Mapear(insumo, numeroRecetas), "El insumo fue actualizado correctamente.");
+        var nombrePrincipal = await _insumoRepository.ObtenerNombreProveedorPrincipalAsync(insumo.Id);
+        return ResultadoInsumoDto.Ok(Mapear(insumo, numeroRecetas, nombrePrincipal), "El insumo fue actualizado correctamente.");
     }
 
     public async Task<ResultadoEliminarInsumoDto> EliminarAsync(int cuentaId, int insumoId)
@@ -430,8 +461,6 @@ public sealed class InsumoService : IInsumoService
             };
         }
 
-        // Historial real: tabla HistorialPrecioInsumo (un registro por cambio
-        // de precio, atado al proveedor). Reciente primero.
         var movimientos = await _insumoRepository.ListarHistorialPorInsumoAsync(insumo.Id);
 
         var entradas = movimientos.Select(h => MapearHistorial(
@@ -439,6 +468,8 @@ public sealed class InsumoService : IInsumoService
             h.CostoNuevo,
             h.InsumoProveedor.Proveedor.Nombre,
             h.CostoAnterior)).ToList();
+
+        var proveedorActual = await _insumoRepository.ObtenerNombreProveedorPrincipalAsync(insumo.Id);
 
         return new ResultadoHistorialDto
         {
@@ -448,7 +479,7 @@ public sealed class InsumoService : IInsumoService
             {
                 InsumoId = insumo.Id,
                 Nombre = insumo.Nombre,
-                ProveedorActual = insumo.Proveedor,
+                ProveedorActual = proveedorActual,
                 PrecioActual = insumo.CostoUnitario,
                 HistorialCompletoDisponible = true,
                 Precios = entradas
@@ -490,7 +521,6 @@ public sealed class InsumoService : IInsumoService
             };
         }
 
-        // Historial real: tabla HistorialPrecioInsumo. Reciente primero.
         var movimientos = await _insumoRepository.ListarHistorialGeneralAsync(
             negocioId.Value, nombre, proveedor);
 
@@ -524,7 +554,6 @@ public sealed class InsumoService : IInsumoService
         };
     }
 
-    // Validación compartida del POST. Null => válido.
     private static string? ValidarCampos(
         string nombre,
         string unidadMedida,
@@ -594,7 +623,7 @@ public sealed class InsumoService : IInsumoService
         return true;
     }
 
-    private static InsumoDto Mapear(Insumo insumo, int numeroRecetas)
+    private static InsumoDto Mapear(Insumo insumo, int numeroRecetas, string? proveedorPrincipal = null)
     {
         return new InsumoDto
         {
@@ -604,7 +633,7 @@ public sealed class InsumoService : IInsumoService
             Categoria = insumo.Categoria,
             CostoUnitario = insumo.CostoUnitario,
             PorcentajeMerma = insumo.PorcentajeMerma,
-            Proveedor = insumo.Proveedor,
+            Proveedor = proveedorPrincipal,
             Activo = insumo.Activo,
             FechaActualizacion = insumo.FechaActualizacion,
             NumeroRecetas = numeroRecetas
