@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace ChefMetrics_BackEnd.Model;
@@ -17,7 +17,7 @@ public partial class Proveedor
 
     public DateTime FechaCreacion { get; set; }
 
-    public virtual Negocio Negocio { get; set; } = null!;
-
     public virtual ICollection<InsumoProveedor> InsumoProveedors { get; set; } = new List<InsumoProveedor>();
+
+    public virtual Negocio Negocio { get; set; } = null!;
 }
