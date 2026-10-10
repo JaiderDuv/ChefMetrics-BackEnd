@@ -29,8 +29,33 @@ public sealed class RecetasController : ControllerBase
 
     // GET /api/recetas/{id}
     [HttpGet("{id:int}")]
+
+    // POST /api/recetas/{id}/imagen  (multipart/form-data, campo "archivo")
+    [HttpPost("{id:int}/imagen")]
+    [RequestSizeLimit(3_000_000)]
+    public async Task<IActionResult> SubirImagen([FromRoute] int id, IFormFile archivo)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+
+        var r = await _recetaService.GuardarImagenAsync(cuentaId, id, archivo);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
+        return Ok(r.Receta);
+    }
+
+    // DELETE /api/recetas/{id}/imagen
+    [HttpDelete("{id:int}/imagen")]
+    public async Task<IActionResult> QuitarImagen([FromRoute] int id)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+
+        var r = await _recetaService.QuitarImagenAsync(cuentaId, id);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        return Ok(r.Receta);
+    }
     public async Task<IActionResult> ObtenerPorId([FromRoute] int id)
     {
+
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
 
         var r = await _recetaService.ObtenerPorIdAsync(cuentaId, id);
