@@ -3,8 +3,11 @@ using System.Collections.Generic;
 
 namespace ChefMetrics_BackEnd.Model;
 
+
 public partial class Receta
 {
+    public string? ImagenUrl { get; set; }
+
     public int Id { get; set; }
 
     public int NegocioId { get; set; }
