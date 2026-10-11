@@ -33,8 +33,12 @@ public class AsociarProveedorDto
     [Range(0.01, double.MaxValue, ErrorMessage = "El costo debe ser mayor a 0.")]
     public decimal Costo { get; set; }
 
-    [Range(0.01, double.MaxValue, ErrorMessage = "La cantidad debe ser mayor a 0.")]
-    public decimal? Cantidad { get; set; }
+    [Range(0.001, double.MaxValue, ErrorMessage = "La cantidad debe ser mayor a 0.")]
+    public decimal Cantidad { get; set; }
+
+    [Required(ErrorMessage = "La unidad es obligatoria.")]
+    [StringLength(10)]
+    public string UnidadMedida { get; set; } = string.Empty;
 }
 
 public class CrearYAsociarProveedorDto
@@ -54,7 +58,11 @@ public class CrearYAsociarProveedorDto
     public decimal Costo { get; set; }
 
     [Range(0.01, double.MaxValue, ErrorMessage = "La cantidad debe ser mayor a 0.")]
-    public decimal? Cantidad { get; set; }
+    public decimal Cantidad { get; set; }
+
+    [Required(ErrorMessage = "La unidad es obligatoria.")]
+    [StringLength(10)]
+    public string UnidadMedida { get; set; } = string.Empty;
 }
 
 public class ActualizarCostoProveedorDto
@@ -65,6 +73,9 @@ public class ActualizarCostoProveedorDto
 
     [Range(0.01, double.MaxValue, ErrorMessage = "La cantidad debe ser mayor a 0.")]
     public decimal? Cantidad { get; set; }
+
+    [StringLength(10)]
+    public string? UnidadMedida { get; set; }
 }
 
 public class InsumoProveedorDto
@@ -74,6 +85,9 @@ public class InsumoProveedorDto
     public string? Telefono { get; set; }
     public string? Correo { get; set; }
     public decimal Costo { get; set; }
+    public decimal Cantidad { get; set; }
+    public string UnidadMedida { get; set; } = string.Empty;
+    public decimal? PrecioUnitario { get; set; }
     public bool EsPrincipal { get; set; }
     public bool EsMasBarato { get; set; }
 }

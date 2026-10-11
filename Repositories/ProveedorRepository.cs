@@ -46,7 +46,6 @@ public sealed class ProveedorRepository : IProveedorRepository
     {
         var prefijo = termino.Trim().ToLower();
         var top = limite < 1 ? 8 : Math.Min(limite, 20);
-
         return await _context.Proveedors
             .AsNoTracking()
             .Where(p => p.NegocioId == negocioId && p.Nombre.ToLower().StartsWith(prefijo))
@@ -97,24 +96,25 @@ public sealed class ProveedorRepository : IProveedorRepository
             .FirstOrDefaultAsync();
     }
 
-    public async Task<InsumoProveedor> AsociarAsync(int insumoId, int proveedorId, decimal costo, decimal? cantidad = null)
+    public async Task<InsumoProveedor> AsociarAsync(
+        int insumoId, int proveedorId, decimal costo, decimal cantidad, string unidadMedida)
     {
         var esElPrimero = !await _context.InsumoProveedors.AnyAsync(ip => ip.InsumoId == insumoId);
-        cantidad ??= await ObtenerCantidadInsumoAsync(insumoId);
 
         var nueva = new InsumoProveedor
         {
             InsumoId = insumoId,
             ProveedorId = proveedorId,
             Costo = costo,
-            EsPrincipal = esElPrimero, // criterio 1: el primero queda principal automáticamente
+            Cantidad = cantidad,
+            UnidadMedida = unidadMedida,
+            EsPrincipal = esElPrimero,
             FechaActualizacion = DateTime.UtcNow
         };
 
         await _context.InsumoProveedors.AddAsync(nueva);
         await _context.SaveChangesAsync();
 
-        // Primer registro del historial para esta asociación (valor inicial, sin variación)
         await _context.HistorialPrecioInsumos.AddAsync(new HistorialPrecioInsumo
         {
             InsumoProveedorId = nueva.Id,
@@ -124,6 +124,16 @@ public sealed class ProveedorRepository : IProveedorRepository
             FechaCambio = DateTime.UtcNow
         });
         await _context.SaveChangesAsync();
+
+        // Si es el primero (principal), sincroniza Insumo.Cantidad
+        if (esElPrimero)
+        {
+            await _context.Insumos
+                .Where(i => i.Id == insumoId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(i => i.Cantidad, cantidad)
+                    .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
+        }
 
         return nueva;
     }
@@ -148,6 +158,13 @@ public sealed class ProveedorRepository : IProveedorRepository
             {
                 siguiente.EsPrincipal = true;
                 await _context.SaveChangesAsync();
+
+                // Sincroniza Insumo.Cantidad con el nuevo principal
+                await _context.Insumos
+                    .Where(i => i.Id == insumoId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(i => i.Cantidad, siguiente.Cantidad)
+                        .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
             }
         }
 
@@ -162,38 +179,60 @@ public sealed class ProveedorRepository : IProveedorRepository
 
         var objetivo = asociaciones.FirstOrDefault(ip => ip.ProveedorId == proveedorId);
         if (objetivo == null) return false;
+        if (objetivo.EsPrincipal) return true;
 
-        // criterio 2: nunca dos principales a la vez
-        foreach (var asociacion in asociaciones)
-        {
-            asociacion.EsPrincipal = asociacion.ProveedorId == proveedorId;
-        }
-
+        // Primero se quita el principal actual y luego se pone el nuevo,
+        // para no violar el índice único UQ_InsumoProveedor_Principal.
+        foreach (var a in asociaciones.Where(a => a.EsPrincipal))
+            a.EsPrincipal = false;
         await _context.SaveChangesAsync();
+
+        objetivo.EsPrincipal = true;
+        await _context.SaveChangesAsync();
+
+        // Insumo.Cantidad, costo, unidad y proveedor los copia SincronizarInsumoConPrincipalAsync.
         return true;
     }
 
-    public async Task<bool> ActualizarCostoAsync(int insumoId, int proveedorId, decimal nuevoCosto, decimal? cantidad = null)
+    public async Task<bool> ActualizarCostoAsync(
+        int insumoId, int proveedorId, decimal nuevoCosto, decimal? cantidad = null, string? unidadMedida = null)
     {
         var asociacion = await ObtenerAsociacionAsync(insumoId, proveedorId);
         if (asociacion == null) return false;
 
-        if (asociacion.Costo != nuevoCosto)
-        {
-            cantidad ??= await ObtenerCantidadInsumoAsync(insumoId);
-            // criterio 4: se registra en el historial sin acción adicional del usuario
-            await _context.HistorialPrecioInsumos.AddAsync(new HistorialPrecioInsumo
-            {
-                InsumoProveedorId = asociacion.Id,
-                CostoAnterior = asociacion.Costo,
-                CostoNuevo = nuevoCosto,
-                Cantidad = cantidad,
-                FechaCambio = DateTime.UtcNow
-            });
+        var cantidadFinal = cantidad ?? asociacion.Cantidad;
+        var unidadFinal = string.IsNullOrWhiteSpace(unidadMedida)
+            ? asociacion.UnidadMedida
+        : unidadMedida.Trim().ToLowerInvariant();
+        var hayCambio = asociacion.Costo != nuevoCosto ||
+                        (cantidad.HasValue && asociacion.Cantidad != cantidad.Value) ||
+                        (unidadMedida != null && asociacion.UnidadMedida != unidadFinal);
 
-            asociacion.Costo = nuevoCosto;
-            asociacion.FechaActualizacion = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+        if (!hayCambio) return true;
+
+        await _context.HistorialPrecioInsumos.AddAsync(new HistorialPrecioInsumo
+        {
+            InsumoProveedorId = asociacion.Id,
+            CostoAnterior = asociacion.Costo,
+            CostoNuevo = nuevoCosto,
+            Cantidad = cantidadFinal,
+            FechaCambio = DateTime.UtcNow
+        });
+
+        asociacion.Costo = nuevoCosto;
+        asociacion.Cantidad = cantidadFinal;
+        asociacion.UnidadMedida = unidadFinal;
+        asociacion.FechaActualizacion = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        // Si es principal, sincroniza Insumo.Cantidad
+        if (asociacion.EsPrincipal)
+        {
+            await _context.Insumos
+                .Where(i => i.Id == insumoId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(i => i.Cantidad, cantidadFinal)
+                    .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
         }
 
         return true;
@@ -214,13 +253,10 @@ public sealed class ProveedorRepository : IProveedorRepository
     public async Task<int> PropagarNombreAInsumosAsync(int negocioId, int proveedorId, string nombreNuevo)
     {
         var nuevo = nombreNuevo.Trim();
-
         return await _context.Insumos
             .Where(i => i.NegocioId == negocioId
                 && _context.InsumoProveedors.Any(ip =>
-                    ip.InsumoId == i.Id
-                    && ip.ProveedorId == proveedorId
-                    && ip.EsPrincipal))
+                    ip.InsumoId == i.Id && ip.ProveedorId == proveedorId && ip.EsPrincipal))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(i => i.Proveedor, nuevo)
                 .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
@@ -234,9 +270,7 @@ public sealed class ProveedorRepository : IProveedorRepository
             .Where(p => p.NegocioId == negocioId && p.Nombre.ToLower() == normalizado);
 
         if (excluirId.HasValue)
-        {
             query = query.Where(p => p.Id != excluirId.Value);
-        }
 
         return await query.AnyAsync();
     }
@@ -247,13 +281,78 @@ public sealed class ProveedorRepository : IProveedorRepository
         await _context.SaveChangesAsync();
     }
 
-    public void Eliminar(Proveedor proveedor)
+    public void Eliminar(Proveedor proveedor) => _context.Proveedors.Remove(proveedor);
+
+    public async Task GuardarCambiosAsync() => await _context.SaveChangesAsync();
+
+    private static readonly HashSet<string> UnidadesValidas = new(StringComparer.OrdinalIgnoreCase)
+{
+    "g", "kg", "l", "ml", "oz", "lb", "unidad", "taza"
+};
+
+    public async Task SincronizarInsumoConPrincipalAsync(int insumoId)
     {
-        _context.Proveedors.Remove(proveedor);
+        var unidadActual = await _context.Insumos
+            .Where(i => i.Id == insumoId)
+            .Select(i => i.UnidadMedida)
+            .FirstOrDefaultAsync();
+        if (unidadActual is null) return; // el insumo no existe
+
+        var asociaciones = await _context.InsumoProveedors
+            .AsNoTracking()
+            .Where(a => a.InsumoId == insumoId)
+            .Select(a => new
+            {
+                a.Id,
+                a.Costo,
+                a.Cantidad,
+                a.UnidadMedida,
+                a.EsPrincipal,
+                Nombre = a.Proveedor.Nombre
+            })
+            .ToListAsync();
+
+        if (asociaciones.Count == 0)
+        {
+            await _context.Insumos
+                .Where(i => i.Id == insumoId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(i => i.Proveedor, (string?)null)
+                    .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
+            return;
+        }
+
+        var principal = asociaciones.FirstOrDefault(a => a.EsPrincipal);
+        if (principal is null)
+        {
+            principal = asociaciones
+                .OrderBy(a => a.Cantidad > 0 ? a.Costo / a.Cantidad : decimal.MaxValue)
+                .First();
+
+            var idPrincipal = principal.Id;
+            await _context.InsumoProveedors
+                .Where(a => a.Id == idPrincipal)
+                .ExecuteUpdateAsync(s => s.SetProperty(a => a.EsPrincipal, true));
+        }
+
+        // Solo se copia la unidad si es una de las permitidas por CK_Insumo_UnidadMedida.
+        var unidadPrincipal = principal.UnidadMedida?.Trim() ?? string.Empty;
+        var unidad = UnidadesValidas.Contains(unidadPrincipal)
+            ? unidadPrincipal.ToLowerInvariant()
+            : unidadActual;
+
+        var costo = principal.Costo;
+        var cantidad = (decimal?)principal.Cantidad;
+        var nombre = principal.Nombre;
+
+        await _context.Insumos
+            .Where(i => i.Id == insumoId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.CostoUnitario, costo)
+                .SetProperty(i => i.Cantidad, cantidad)
+                .SetProperty(i => i.UnidadMedida, unidad)
+                .SetProperty(i => i.Proveedor, nombre)
+                .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
     }
 
-    public async Task GuardarCambiosAsync()
-    {
-        await _context.SaveChangesAsync();
-    }
 }
