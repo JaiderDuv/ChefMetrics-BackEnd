@@ -10,6 +10,7 @@ public interface IPerfilEmprendimientoRepository
     Task RevocarPermisosEdicionAsync(int cuentaId);
     Task<bool> ExisteCorreoAsync(string correo, int cuentaId);
     Task<bool> ExisteNitAsync(string nit, int cuentaId);
+    Task<bool> ExisteDocumentoAsync(string numeroDocumento, int cuentaId);
     Task<List<Role>> ObtenerRolesAsync();
     Task<bool> ExisteRolAsync(int rolId);
     Task<bool> ExisteEmpleadoCorreoAsync(int negocioId, string correo, int? excluirId = null);

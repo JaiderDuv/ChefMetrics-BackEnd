@@ -59,6 +59,13 @@ public sealed class PerfilEmprendimientoRepository : IPerfilEmprendimientoReposi
             u.CuentaId != cuentaId && u.Nit != null && u.Nit == normalizado);
     }
 
+    public Task<bool> ExisteDocumentoAsync(string numeroDocumento, int cuentaId)
+    {
+        var normalizado = numeroDocumento.Trim();
+        return _context.UsuarioEmprendedors.AnyAsync(u =>
+            u.CuentaId != cuentaId && u.NumeroDocumento != null && u.NumeroDocumento == normalizado);
+    }
+
     public async Task<List<Role>> ObtenerRolesAsync()
     {
         return await _context.Roles

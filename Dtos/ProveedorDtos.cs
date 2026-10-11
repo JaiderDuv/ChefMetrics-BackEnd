@@ -24,7 +24,6 @@ public class ProveedorDto
     public string? Correo { get; set; }
 }
 
-// POST /api/insumos/{id}/proveedores — asociar un proveedor ya existente
 public class AsociarProveedorDto
 {
     [Required(ErrorMessage = "Debe indicar el proveedor a asociar.")]
@@ -33,9 +32,11 @@ public class AsociarProveedorDto
     [Required(ErrorMessage = "El costo es obligatorio.")]
     [Range(0.01, double.MaxValue, ErrorMessage = "El costo debe ser mayor a 0.")]
     public decimal Costo { get; set; }
+
+    [Range(0.01, double.MaxValue, ErrorMessage = "La cantidad debe ser mayor a 0.")]
+    public decimal? Cantidad { get; set; }
 }
 
-// POST /api/insumos/{id}/proveedores/nuevo — crear y asociar en un solo paso
 public class CrearYAsociarProveedorDto
 {
     [Required(ErrorMessage = "El nombre del proveedor es obligatorio.")]
@@ -51,17 +52,21 @@ public class CrearYAsociarProveedorDto
     [Required(ErrorMessage = "El costo es obligatorio.")]
     [Range(0.01, double.MaxValue, ErrorMessage = "El costo debe ser mayor a 0.")]
     public decimal Costo { get; set; }
+
+    [Range(0.01, double.MaxValue, ErrorMessage = "La cantidad debe ser mayor a 0.")]
+    public decimal? Cantidad { get; set; }
 }
 
-// PATCH /api/insumos/{insumoId}/proveedores/{proveedorId}/costo
 public class ActualizarCostoProveedorDto
 {
     [Required(ErrorMessage = "El costo es obligatorio.")]
     [Range(0.01, double.MaxValue, ErrorMessage = "El costo debe ser mayor a 0.")]
     public decimal Costo { get; set; }
+
+    [Range(0.01, double.MaxValue, ErrorMessage = "La cantidad debe ser mayor a 0.")]
+    public decimal? Cantidad { get; set; }
 }
 
-// Fila de la tabla "Proveedores de este insumo"
 public class InsumoProveedorDto
 {
     public int ProveedorId { get; set; }

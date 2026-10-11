@@ -47,6 +47,12 @@ public class PerfilEmprendedorDto
     [StringLength(50)]
     public string Rues { get; set; } = string.Empty;
 
+    [StringLength(5)]
+    public string? TipoDocumento { get; set; }
+
+    [StringLength(20)]
+    public string? NumeroDocumento { get; set; }
+
     [Required(ErrorMessage = "El correo de la empresa es obligatorio.")]
     [EmailAddress(ErrorMessage = "El correo de la empresa no es válido.")]
     [StringLength(255)]
@@ -59,16 +65,11 @@ public class PerfilEmprendedorDto
     [StringLength(255)]
     public string Direccion { get; set; } = string.Empty;
 
-    // Sección 03 del formulario: empleados del negocio (tabla Empleado).
-    // Solo se envían Id (null = nuevo), correo y rol; el resto lo asigna el servidor.
     public List<EmpleadoDto> Empleados { get; set; } = new();
 }
 
-// Datos prudentes de la tabla Empleado (modelo por invitación:
-// no tiene nombres/apellidos/teléfono, solo correo invitado + rol + estado).
 public class EmpleadoDto
 {
-    // Null o 0 => invitación nueva.
     public int? Id { get; set; }
 
     [Required(ErrorMessage = "El correo del empleado es obligatorio.")]
@@ -79,7 +80,6 @@ public class EmpleadoDto
     [Range(1, int.MaxValue, ErrorMessage = "Debes seleccionar el rol del empleado.")]
     public int RolId { get; set; }
 
-    // Solo lectura (lo devuelve el GET).
     public string? NombreRol { get; set; }
     public string? EstadoInvitacion { get; set; }
 }
@@ -98,11 +98,8 @@ public class ActualizarPerfilResultadoDto
     public string Mensaje { get; set; } = string.Empty;
 }
 
-// Perfil de usuario: edición libre, sin validaciones de seguridad.
-// Todos los campos son opcionales; el frontend los autocompleta al abrir.
 public class PerfilUsuarioDto
 {
-    // No persistido: la BD no tiene columna de foto. Se edita/previsualiza en cliente.
     public string? FotoPerfilUrl { get; set; }
 
     [StringLength(5)]

@@ -25,6 +25,8 @@ public partial class Insumo
 
     public DateTime FechaActualizacion { get; set; }
 
+    public decimal? Cantidad { get; set; }
+
     public virtual Negocio Negocio { get; set; } = null!;
 
     public virtual ICollection<InsumoProveedor> InsumoProveedors { get; set; } = new List<InsumoProveedor>();
