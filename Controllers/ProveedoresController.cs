@@ -105,7 +105,7 @@ public sealed class ProveedoresController : ControllerBase
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        var resultado = await _proveedorService.ActualizarCostoAsync(cuentaId, insumoId, proveedorId, dto.Costo);
+        var resultado = await _proveedorService.ActualizarCostoAsync(cuentaId, insumoId, proveedorId, dto.Costo, dto.Cantidad);
         return Responder(resultado);
     }
 

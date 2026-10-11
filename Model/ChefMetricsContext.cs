@@ -160,6 +160,7 @@ public partial class ChefMetricsContext : DbContext
 
             entity.Property(e => e.CostoAnterior).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.CostoNuevo).HasColumnType("decimal(12, 2)");
+            entity.Property(e => e.Cantidad).HasColumnType("decimal(38, 2)");
             entity.Property(e => e.FechaCambio).HasDefaultValueSql("(sysutcdatetime())");
 
             entity.HasOne(d => d.InsumoProveedor).WithMany(p => p.HistorialPrecioInsumos)
@@ -181,6 +182,7 @@ public partial class ChefMetricsContext : DbContext
                 .IsUnicode(false)
                 .HasDefaultValue("otro");
             entity.Property(e => e.CostoUnitario).HasColumnType("decimal(12, 2)");
+            entity.Property(e => e.Cantidad).HasColumnType("decimal(38, 2)");
             entity.Property(e => e.FechaActualizacion).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.Nombre).HasMaxLength(150);
             entity.Property(e => e.PorcentajeMerma).HasColumnType("decimal(5, 2)");

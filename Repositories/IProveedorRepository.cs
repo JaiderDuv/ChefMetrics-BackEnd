@@ -17,10 +17,11 @@ public interface IProveedorRepository
     Task<List<InsumoProveedor>> ListarPorInsumoAsync(int insumoId);
     Task<InsumoProveedor?> ObtenerAsociacionAsync(int insumoId, int proveedorId);
     Task<bool> ExisteAsociacionAsync(int insumoId, int proveedorId);
-    Task<InsumoProveedor> AsociarAsync(int insumoId, int proveedorId, decimal costo);
+    Task<decimal?> ObtenerCantidadInsumoAsync(int insumoId);
+    Task<InsumoProveedor> AsociarAsync(int insumoId, int proveedorId, decimal costo, decimal? cantidad = null);
     Task<bool> DesasociarAsync(int insumoId, int proveedorId);
     Task<bool> MarcarPrincipalAsync(int insumoId, int proveedorId);
-    Task<bool> ActualizarCostoAsync(int insumoId, int proveedorId, decimal nuevoCosto);
+    Task<bool> ActualizarCostoAsync(int insumoId, int proveedorId, decimal nuevoCosto, decimal? cantidad = null);
 
     Task<Proveedor?> ObtenerPorIdDelNegocioAsync(int negocioId, int proveedorId);
     Task<int> ContarAsociacionesAsync(int proveedorId);

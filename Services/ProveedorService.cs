@@ -115,7 +115,7 @@ public sealed class ProveedorService : IProveedorService
             return ResultadoProveedorDto.Error("Este proveedor ya está asociado a este insumo.");
         }
 
-        var asociacion = await _repository.AsociarAsync(insumoId, dto.ProveedorId, dto.Costo);
+        var asociacion = await _repository.AsociarAsync(insumoId, dto.ProveedorId, dto.Costo, dto.Cantidad);
         return ResultadoProveedorDto.Ok(MapearFilaConProveedor(asociacion, proveedor, asociacion.ProveedorId), "Proveedor asociado correctamente.");
     }
 
@@ -144,7 +144,7 @@ public sealed class ProveedorService : IProveedorService
             FechaCreacion = DateTime.UtcNow
         });
 
-        var asociacion = await _repository.AsociarAsync(insumoId, proveedor.Id, dto.Costo);
+        var asociacion = await _repository.AsociarAsync(insumoId, proveedor.Id, dto.Costo, dto.Cantidad);
         return ResultadoProveedorDto.Ok(MapearFilaConProveedor(asociacion, proveedor, proveedor.Id), "Proveedor creado y asociado correctamente.");
     }
 
@@ -170,12 +170,12 @@ public sealed class ProveedorService : IProveedorService
             : ResultadoProveedorDto.NoHallado("Esa asociación no existe.");
     }
 
-    public async Task<ResultadoProveedorDto> ActualizarCostoAsync(int cuentaId, int insumoId, int proveedorId, decimal costo)
+    public async Task<ResultadoProveedorDto> ActualizarCostoAsync(int cuentaId, int insumoId, int proveedorId, decimal costo, decimal? cantidad = null)
     {
         var validacion = await ValidarInsumoDelNegocioAsync(cuentaId, insumoId);
         if (validacion != null) return validacion;
 
-        var resultado = await _repository.ActualizarCostoAsync(insumoId, proveedorId, costo);
+        var resultado = await _repository.ActualizarCostoAsync(insumoId, proveedorId, costo, cantidad);
         return resultado
             ? ResultadoProveedorDto.Ok(true, "Precio actualizado correctamente.")
             : ResultadoProveedorDto.NoHallado("Esa asociación no existe.");

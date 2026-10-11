@@ -69,6 +69,8 @@ public sealed class InsumoRepository : IInsumoRepository
             ("costo", true) => query.OrderByDescending(i => i.CostoUnitario),
             ("merma", false) => query.OrderBy(i => i.PorcentajeMerma),
             ("merma", true) => query.OrderByDescending(i => i.PorcentajeMerma),
+            ("cantidad", false) => query.OrderBy(i => i.Cantidad),
+            ("cantidad", true) => query.OrderByDescending(i => i.Cantidad),
             (_, true) => query.OrderByDescending(i => i.Nombre),
             _ => query.OrderBy(i => i.Nombre),
         };

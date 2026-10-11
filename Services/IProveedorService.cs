@@ -16,7 +16,7 @@ public interface IProveedorService
 
     Task<ResultadoProveedorDto> DesasociarAsync(int cuentaId, int insumoId, int proveedorId);
     Task<ResultadoProveedorDto> MarcarPrincipalAsync(int cuentaId, int insumoId, int proveedorId);
-    Task<ResultadoProveedorDto> ActualizarCostoAsync(int cuentaId, int insumoId, int proveedorId, decimal costo);
+    Task<ResultadoProveedorDto> ActualizarCostoAsync(int cuentaId, int insumoId, int proveedorId, decimal costo, decimal? cantidad = null);
     Task<ResultadoProveedorDto> ActualizarProveedorAsync(int cuentaId, int proveedorId, ActualizarProveedorDto dto);
     Task<ResultadoProveedorDto> EliminarProveedorAsync(int cuentaId, int proveedorId);
 }

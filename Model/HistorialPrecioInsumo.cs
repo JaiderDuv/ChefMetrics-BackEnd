@@ -13,6 +13,8 @@ public partial class HistorialPrecioInsumo
 
     public decimal CostoNuevo { get; set; }
 
+    public decimal? Cantidad { get; set; }
+
     public DateTime FechaCambio { get; set; }
 
     public virtual InsumoProveedor InsumoProveedor { get; set; } = null!;

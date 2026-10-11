@@ -56,6 +56,11 @@ public sealed class InsumoService : IInsumoService
             return ResultadoInsumoDto.Error(validacion);
         }
 
+        if (dto.Cantidad.HasValue && dto.Cantidad.Value < 0)
+        {
+            return ResultadoInsumoDto.Error("La cantidad no puede ser negativa.");
+        }
+
         if (await _insumoRepository.ExisteNombreAsync(negocioId.Value, nombre))
         {
             return ResultadoInsumoDto.Error("Ya existe un insumo con ese nombre en tu negocio.");
@@ -72,6 +77,7 @@ public sealed class InsumoService : IInsumoService
                 CostoUnitario = dto.CostoUnitario,
                 PorcentajeMerma = dto.PorcentajeMerma,
                 Proveedor = proveedorNormalizado,
+                Cantidad = dto.Cantidad,
                 Activo = dto.Activo ?? true,
                 FechaActualizacion = DateTime.UtcNow
             });
@@ -93,6 +99,7 @@ public sealed class InsumoService : IInsumoService
                     InsumoProveedorId = asociacion.Id,
                     CostoAnterior = dto.CostoUnitario,
                     CostoNuevo = dto.CostoUnitario,
+                    Cantidad = dto.Cantidad,
                     FechaCambio = DateTime.UtcNow
                 });
             }
@@ -114,7 +121,7 @@ public sealed class InsumoService : IInsumoService
         }
 
         var ordenarPor = (filtros.OrdenarPor ?? "nombre").Trim().ToLowerInvariant();
-        if (ordenarPor is not ("nombre" or "costo" or "merma"))
+        if (ordenarPor is not ("nombre" or "costo" or "merma" or "cantidad"))
         {
             ordenarPor = "nombre";
         }
@@ -240,6 +247,16 @@ public sealed class InsumoService : IInsumoService
             hayCambios = true;
         }
 
+        if (dto.Cantidad.HasValue)
+        {
+            if (dto.Cantidad.Value < 0)
+            {
+                return ResultadoInsumoDto.Error("La cantidad no puede ser negativa.");
+            }
+            insumo.Cantidad = dto.Cantidad.Value;
+            hayCambios = true;
+        }
+
         if (dto.CostoUnitario.HasValue)
         {
             if (dto.CostoUnitario.Value <= 0)
@@ -280,6 +297,7 @@ public sealed class InsumoService : IInsumoService
                     InsumoProveedorId = asociacion.Id,
                     CostoAnterior = dto.CostoUnitario.Value,
                     CostoNuevo = dto.CostoUnitario.Value,
+                    Cantidad = dto.Cantidad ?? insumo.Cantidad,
                     FechaCambio = DateTime.UtcNow
                 });
             }
@@ -291,6 +309,7 @@ public sealed class InsumoService : IInsumoService
                     InsumoProveedorId = asociacion.Id,
                     CostoAnterior = asociacion.Costo,
                     CostoNuevo = dto.CostoUnitario.Value,
+                    Cantidad = dto.Cantidad ?? insumo.Cantidad,
                     FechaCambio = DateTime.UtcNow
                 });
                 asociacion.Costo = dto.CostoUnitario.Value;
@@ -345,6 +364,7 @@ public sealed class InsumoService : IInsumoService
                             InsumoProveedorId = asociacion.Id,
                             CostoAnterior = insumo.CostoUnitario,
                             CostoNuevo = insumo.CostoUnitario,
+                            Cantidad = insumo.Cantidad,
                             FechaCambio = DateTime.UtcNow
                         });
                     }
@@ -462,12 +482,15 @@ public sealed class InsumoService : IInsumoService
         }
 
         var movimientos = await _insumoRepository.ListarHistorialPorInsumoAsync(insumo.Id);
+        var anteriores = EmparejarAnteriores(movimientos);
 
         var entradas = movimientos.Select(h => MapearHistorial(
             h.FechaCambio,
             h.CostoNuevo,
             h.InsumoProveedor.Proveedor.Nombre,
-            h.CostoAnterior)).ToList();
+            h.CostoAnterior,
+            h.Cantidad,
+            anteriores.GetValueOrDefault(h.Id))).ToList();
 
         var proveedorActual = await _insumoRepository.ObtenerNombreProveedorPrincipalAsync(insumo.Id);
 
@@ -487,20 +510,59 @@ public sealed class InsumoService : IInsumoService
         };
     }
 
-    private static HistorialPrecioDto MapearHistorial(
-        DateTime fecha, decimal precio, string? proveedor, decimal costoAnterior)
+    private static Dictionary<int, HistorialPrecioInsumo> EmparejarAnteriores(
+        List<HistorialPrecioInsumo> movimientosRecientesPrimero)
     {
-        decimal? variacion = costoAnterior == 0
+        var ultimoPorAsociacion = new Dictionary<int, HistorialPrecioInsumo>();
+        var resultado = new Dictionary<int, HistorialPrecioInsumo>();
+        for (var i = movimientosRecientesPrimero.Count - 1; i >= 0; i--)
+        {
+            var actual = movimientosRecientesPrimero[i];
+            if (ultimoPorAsociacion.TryGetValue(actual.InsumoProveedorId, out var anterior))
+            {
+                resultado[actual.Id] = anterior;
+            }
+            ultimoPorAsociacion[actual.InsumoProveedorId] = actual;
+        }
+        return resultado;
+    }
+
+    private static decimal? PrecioUnitario(decimal costo, decimal? cantidad) =>
+        cantidad is > 0 ? Math.Round(costo / cantidad.Value, 2) : null;
+
+    private static HistorialPrecioDto MapearHistorial(
+        DateTime fecha, decimal precio, string? proveedor, decimal costoAnterior,
+        decimal? cantidad, HistorialPrecioInsumo? anterior)
+    {
+        var unitarioNuevo = PrecioUnitario(precio, cantidad);
+        var unitarioAnterior = anterior is null
             ? null
-            : Math.Round((precio - costoAnterior) / costoAnterior * 100, 2);
+            : PrecioUnitario(anterior.CostoNuevo, anterior.Cantidad);
+
+        decimal? variacion;
+        decimal? diferencia;
+        if (unitarioNuevo.HasValue && unitarioAnterior.HasValue && unitarioAnterior.Value != 0)
+        {
+            variacion = Math.Round((unitarioNuevo.Value - unitarioAnterior.Value) / unitarioAnterior.Value * 100, 2);
+            diferencia = unitarioNuevo.Value - unitarioAnterior.Value;
+        }
+        else
+        {
+            variacion = costoAnterior == 0
+                ? null
+                : Math.Round((precio - costoAnterior) / costoAnterior * 100, 2);
+            diferencia = variacion is null ? null : precio - costoAnterior;
+        }
 
         return new HistorialPrecioDto
         {
             Fecha = fecha,
             Precio = precio,
             Proveedor = proveedor,
+            Cantidad = cantidad,
+            PrecioUnitario = unitarioNuevo,
             VariacionPorcentual = variacion,
-            Diferencia = variacion is null ? null : precio - costoAnterior,
+            Diferencia = diferencia,
             EsSubida = variacion is null || variacion == 0
                 ? null
                 : variacion > 0
@@ -523,23 +585,52 @@ public sealed class InsumoService : IInsumoService
 
         var movimientos = await _insumoRepository.ListarHistorialGeneralAsync(
             negocioId.Value, nombre, proveedor);
+        var anteriores = EmparejarAnteriores(movimientos);
 
-        var entradas = movimientos.Select(h => new HistorialPrecioGeneralDto
+        var entradas = movimientos.Select(h =>
         {
-            InsumoId = h.InsumoProveedor.InsumoId,
-            NombreInsumo = h.InsumoProveedor.Insumo.Nombre,
-            Fecha = h.FechaCambio,
-            Precio = h.CostoNuevo,
-            Proveedor = h.InsumoProveedor.Proveedor.Nombre,
-            VariacionPorcentual = h.CostoAnterior == 0
+            var unitarioNuevo = PrecioUnitario(h.CostoNuevo, h.Cantidad);
+            var anterior = anteriores.GetValueOrDefault(h.Id);
+            var unitarioAnterior = anterior is null
                 ? null
-                : Math.Round((h.CostoNuevo - h.CostoAnterior) / h.CostoAnterior * 100, 2),
-            Diferencia = h.CostoAnterior == 0
-                ? null
-                : h.CostoNuevo - h.CostoAnterior,
-            EsSubida = h.CostoAnterior == 0 || h.CostoNuevo == h.CostoAnterior
-                ? null
-                : h.CostoNuevo > h.CostoAnterior
+                : PrecioUnitario(anterior.CostoNuevo, anterior.Cantidad);
+
+            decimal? variacion;
+            decimal? diferencia;
+            if (unitarioNuevo.HasValue && unitarioAnterior.HasValue && unitarioAnterior.Value != 0)
+            {
+                variacion = Math.Round((unitarioNuevo.Value - unitarioAnterior.Value) / unitarioAnterior.Value * 100, 2);
+                diferencia = unitarioNuevo.Value - unitarioAnterior.Value;
+            }
+            else
+            {
+                variacion = h.CostoAnterior == 0
+                    ? null
+                    : Math.Round((h.CostoNuevo - h.CostoAnterior) / h.CostoAnterior * 100, 2);
+                diferencia = h.CostoAnterior == 0
+                    ? null
+                    : h.CostoNuevo - h.CostoAnterior;
+            }
+
+            var esSubida = unitarioNuevo.HasValue && unitarioAnterior.HasValue
+                ? (unitarioNuevo.Value == unitarioAnterior.Value ? null : (bool?)(unitarioNuevo.Value > unitarioAnterior.Value))
+                : (h.CostoAnterior == 0 || h.CostoNuevo == h.CostoAnterior
+                    ? null
+                    : (bool?)(h.CostoNuevo > h.CostoAnterior));
+
+            return new HistorialPrecioGeneralDto
+            {
+                InsumoId = h.InsumoProveedor.InsumoId,
+                NombreInsumo = h.InsumoProveedor.Insumo.Nombre,
+                Fecha = h.FechaCambio,
+                Precio = h.CostoNuevo,
+                Proveedor = h.InsumoProveedor.Proveedor.Nombre,
+                Cantidad = h.Cantidad,
+                PrecioUnitario = unitarioNuevo,
+                VariacionPorcentual = variacion,
+                Diferencia = diferencia,
+                EsSubida = esSubida
+            };
         }).ToList();
 
         return new ResultadoHistorialGeneralDto
@@ -634,6 +725,7 @@ public sealed class InsumoService : IInsumoService
             CostoUnitario = insumo.CostoUnitario,
             PorcentajeMerma = insumo.PorcentajeMerma,
             Proveedor = proveedorPrincipal,
+            Cantidad = insumo.Cantidad,
             Activo = insumo.Activo,
             FechaActualizacion = insumo.FechaActualizacion,
             NumeroRecetas = numeroRecetas

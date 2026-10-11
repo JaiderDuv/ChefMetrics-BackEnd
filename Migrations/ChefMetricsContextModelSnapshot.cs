@@ -30,6 +30,11 @@ namespace ChefMetrics_BackEnd.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("Activo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<decimal>("MontoMensual")
                         .HasColumnType("decimal(12, 2)");
 
@@ -47,10 +52,15 @@ namespace ChefMetrics_BackEnd.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(30)");
 
-                    b.HasKey("Id")
-                        .HasName("PK__CostoFij__3214EC072F85996B");
+                    b.Property<decimal>("ValorDivisor")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(12, 2)")
+                        .HasDefaultValue(100m);
 
-                    b.HasIndex("NegocioId");
+                    b.HasKey("Id")
+                        .HasName("PK__CostoFij__3214EC0770A7B8C6");
+
+                    b.HasIndex(new[] { "NegocioId" }, "IX_CostoFijo_NegocioId");
 
                     b.ToTable("CostoFijo", (string)null);
                 });
@@ -81,11 +91,20 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("(sysutcdatetime())");
 
+                    b.Property<string>("NombreCompleto")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(255)
                         .IsUnicode(false)
                         .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Telefono")
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
 
                     b.Property<string>("TipoCuenta")
                         .IsRequired()
@@ -94,7 +113,7 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("varchar(20)");
 
                     b.HasKey("Id")
-                        .HasName("PK__Cuenta__3214EC077F390334");
+                        .HasName("PK__Cuenta__3214EC079E423EF8");
 
                     b.HasIndex(new[] { "Correo" }, "UQ_Cuenta_Correo")
                         .IsUnique();
@@ -149,11 +168,11 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("varchar(255)");
 
                     b.HasKey("Id")
-                        .HasName("PK__Empleado__3214EC07FB53A3CF");
+                        .HasName("PK__Empleado__3214EC07B989D586");
 
-                    b.HasIndex("InvitadoPor");
+                    b.HasIndex(new[] { "InvitadoPor" }, "IX_Empleado_InvitadoPor");
 
-                    b.HasIndex("RolId");
+                    b.HasIndex(new[] { "RolId" }, "IX_Empleado_RolId");
 
                     b.HasIndex(new[] { "NegocioId", "CorreoInvitado" }, "UQ_Empleado_CorreoNegocio")
                         .IsUnique();
@@ -169,6 +188,39 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.ToTable("Empleado", (string)null);
                 });
 
+            modelBuilder.Entity("ChefMetrics_BackEnd.Model.HistorialPrecioInsumo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("Cantidad")
+                        .HasColumnType("decimal(38, 2)");
+
+                    b.Property<decimal>("CostoAnterior")
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<decimal>("CostoNuevo")
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<DateTime>("FechaCambio")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<int>("InsumoProveedorId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id")
+                        .HasName("PK__Historia__3214EC07AA1990A3");
+
+                    b.HasIndex(new[] { "InsumoProveedorId" }, "IX_HistorialPrecioInsumo_InsumoProveedorId");
+
+                    b.ToTable("HistorialPrecioInsumo", (string)null);
+                });
+
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Insumo", b =>
                 {
                     b.Property<int>("Id")
@@ -181,6 +233,17 @@ namespace ChefMetrics_BackEnd.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
+
+                    b.Property<decimal?>("Cantidad")
+                        .HasColumnType("decimal(38, 2)");
+
+                    b.Property<string>("Categoria")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)")
+                        .HasDefaultValue("otro");
 
                     b.Property<decimal>("CostoUnitario")
                         .HasColumnType("decimal(12, 2)");
@@ -212,12 +275,52 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("varchar(10)");
 
                     b.HasKey("Id")
-                        .HasName("PK__Insumo__3214EC077D4ECF38");
+                        .HasName("PK__Insumo__3214EC079C35B1C5");
 
                     b.HasIndex(new[] { "NegocioId", "Nombre" }, "UQ_Insumo_NegocioNombre")
                         .IsUnique();
 
                     b.ToTable("Insumo", (string)null);
+                });
+
+            modelBuilder.Entity("ChefMetrics_BackEnd.Model.InsumoProveedor", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Costo")
+                        .HasColumnType("decimal(12, 2)");
+
+                    b.Property<bool>("EsPrincipal")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("FechaActualizacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<int>("InsumoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProveedorId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id")
+                        .HasName("PK__InsumoPr__3214EC07BAA8F3C6");
+
+                    b.HasIndex(new[] { "ProveedorId" }, "IX_InsumoProveedor_ProveedorId");
+
+                    b.HasIndex(new[] { "InsumoId", "ProveedorId" }, "UQ_InsumoProveedor")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "InsumoId" }, "UQ_InsumoProveedor_Principal")
+                        .IsUnique()
+                        .HasFilter("([EsPrincipal]=(1))");
+
+                    b.ToTable("InsumoProveedor", (string)null);
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Negocio", b =>
@@ -267,9 +370,9 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id")
-                        .HasName("PK__Negocio__3214EC078E9A5500");
+                        .HasName("PK__Negocio__3214EC07CF68471B");
 
-                    b.HasIndex("TipoEmprendimientoId");
+                    b.HasIndex(new[] { "TipoEmprendimientoId" }, "IX_Negocio_TipoEmprendimientoId");
 
                     b.HasIndex(new[] { "UsuarioId" }, "UQ_Negocio_Usuario")
                         .IsUnique();
@@ -297,9 +400,8 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Tipo")
-                        .HasMaxLength(30)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(30)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -311,9 +413,9 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("bit");
 
                     b.HasKey("Id")
-                        .HasName("PK__Password__3214EC07F910C144");
+                        .HasName("PK__Password__3214EC07AD9074A4");
 
-                    b.HasIndex("CuentaId");
+                    b.HasIndex(new[] { "CuentaId" }, "IX_PasswordResetTokens_CuentaId");
 
                     b.ToTable("PasswordResetTokens");
                 });
@@ -346,9 +448,10 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.Property<bool>("Usado")
                         .HasColumnType("bit");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("PK__PerfilEd__3214EC0755CC1067");
 
-                    b.HasIndex("CuentaId");
+                    b.HasIndex(new[] { "CuentaId" }, "IX_PerfilEditGrants_CuentaId");
 
                     b.HasIndex(new[] { "TokenHash" }, "UQ_PerfilEditGrant_TokenHash")
                         .IsUnique();
@@ -386,7 +489,7 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("decimal(12, 2)");
 
                     b.HasKey("Id")
-                        .HasName("PK__Producto__3214EC0782EE917A");
+                        .HasName("PK__Producto__3214EC070EF49875");
 
                     b.HasIndex(new[] { "NegocioId", "Nombre" }, "UQ_ProductoMenu_NegocioNombre")
                         .IsUnique();
@@ -412,14 +515,52 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id")
-                        .HasName("PK__Producto__3214EC07832CE19B");
+                        .HasName("PK__Producto__3214EC073CF0454B");
 
-                    b.HasIndex("RecetaId");
+                    b.HasIndex(new[] { "RecetaId" }, "IX_ProductoMenuReceta_RecetaId");
 
                     b.HasIndex(new[] { "ProductoMenuId", "RecetaId" }, "UQ_ProductoMenuReceta")
                         .IsUnique();
 
                     b.ToTable("ProductoMenuReceta");
+                });
+
+            modelBuilder.Entity("ChefMetrics_BackEnd.Model.Proveedor", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Correo")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<int>("NegocioId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Telefono")
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("Id")
+                        .HasName("PK__Proveedo__3214EC072B116B88");
+
+                    b.HasIndex(new[] { "NegocioId" }, "IX_Proveedor_NegocioId");
+
+                    b.ToTable("Proveedor", (string)null);
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Receta", b =>
@@ -450,7 +591,7 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id")
-                        .HasName("PK__Receta__3214EC073424F899");
+                        .HasName("PK__Receta__3214EC078EB3406B");
 
                     b.HasIndex(new[] { "NegocioId", "Nombre" }, "UQ_Receta_NegocioNombre")
                         .IsUnique();
@@ -482,9 +623,9 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("varchar(10)");
 
                     b.HasKey("Id")
-                        .HasName("PK__RecetaIn__3214EC07E9666E15");
+                        .HasName("PK__RecetaIn__3214EC07FBC68EB1");
 
-                    b.HasIndex("InsumoId");
+                    b.HasIndex(new[] { "InsumoId" }, "IX_RecetaInsumo_InsumoId");
 
                     b.HasIndex(new[] { "RecetaId", "InsumoId" }, "UQ_RecetaInsumo")
                         .IsUnique();
@@ -521,9 +662,9 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("varchar(255)");
 
                     b.HasKey("Id")
-                        .HasName("PK__RefreshT__3214EC07AFA0CE9A");
+                        .HasName("PK__RefreshT__3214EC07527DA724");
 
-                    b.HasIndex("CuentaId");
+                    b.HasIndex(new[] { "CuentaId" }, "IX_RefreshTokens_CuentaId");
 
                     b.ToTable("RefreshTokens");
                 });
@@ -542,7 +683,7 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id")
-                        .HasName("PK__Roles__3214EC0722B9A582");
+                        .HasName("PK__Roles__3214EC07D8B07346");
 
                     b.HasIndex(new[] { "Nombre" }, "UQ_Roles_Nombre")
                         .IsUnique();
@@ -564,7 +705,7 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id")
-                        .HasName("PK__TipoEmpr__3214EC07F05B8645");
+                        .HasName("PK__TipoEmpr__3214EC07966BAD77");
 
                     b.HasIndex(new[] { "Nombre" }, "UQ_TipoEmprendimiento_Nombre")
                         .IsUnique();
@@ -582,8 +723,10 @@ namespace ChefMetrics_BackEnd.Migrations
 
                     b.Property<string>("Apellidos")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(100)")
+                        .HasDefaultValue("");
 
                     b.Property<int>("CuentaId")
                         .HasColumnType("int");
@@ -608,8 +751,10 @@ namespace ChefMetrics_BackEnd.Migrations
 
                     b.Property<string>("Nombres")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(100)")
+                        .HasDefaultValue("");
 
                     b.Property<string>("NumeroDocumento")
                         .HasMaxLength(20)
@@ -635,7 +780,7 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("varchar(20)");
 
                     b.HasKey("Id")
-                        .HasName("PK__UsuarioE__3214EC072683BE2F");
+                        .HasName("PK__UsuarioE__3214EC076185DF2C");
 
                     b.HasIndex(new[] { "CuentaId" }, "UQ_UsuarioEmprendedor_Cuenta")
                         .IsUnique();
@@ -698,6 +843,18 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.Navigation("Rol");
                 });
 
+            modelBuilder.Entity("ChefMetrics_BackEnd.Model.HistorialPrecioInsumo", b =>
+                {
+                    b.HasOne("ChefMetrics_BackEnd.Model.InsumoProveedor", "InsumoProveedor")
+                        .WithMany("HistorialPrecioInsumos")
+                        .HasForeignKey("InsumoProveedorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_HistorialPrecioInsumo_InsumoProveedor");
+
+                    b.Navigation("InsumoProveedor");
+                });
+
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Insumo", b =>
                 {
                     b.HasOne("ChefMetrics_BackEnd.Model.Negocio", "Negocio")
@@ -708,6 +865,25 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasConstraintName("FK_Insumo_Negocio");
 
                     b.Navigation("Negocio");
+                });
+
+            modelBuilder.Entity("ChefMetrics_BackEnd.Model.InsumoProveedor", b =>
+                {
+                    b.HasOne("ChefMetrics_BackEnd.Model.Insumo", "Insumo")
+                        .WithMany("InsumoProveedors")
+                        .HasForeignKey("InsumoId")
+                        .IsRequired()
+                        .HasConstraintName("FK_InsumoProveedor_Insumo");
+
+                    b.HasOne("ChefMetrics_BackEnd.Model.Proveedor", "Proveedor")
+                        .WithMany("InsumoProveedors")
+                        .HasForeignKey("ProveedorId")
+                        .IsRequired()
+                        .HasConstraintName("FK_InsumoProveedor_Proveedor");
+
+                    b.Navigation("Insumo");
+
+                    b.Navigation("Proveedor");
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Negocio", b =>
@@ -785,6 +961,18 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.Navigation("Receta");
                 });
 
+            modelBuilder.Entity("ChefMetrics_BackEnd.Model.Proveedor", b =>
+                {
+                    b.HasOne("ChefMetrics_BackEnd.Model.Negocio", "Negocio")
+                        .WithMany("Proveedors")
+                        .HasForeignKey("NegocioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_Proveedor_Negocio");
+
+                    b.Navigation("Negocio");
+                });
+
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Receta", b =>
                 {
                     b.HasOne("ChefMetrics_BackEnd.Model.Negocio", "Negocio")
@@ -856,7 +1044,14 @@ namespace ChefMetrics_BackEnd.Migrations
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Insumo", b =>
                 {
+                    b.Navigation("InsumoProveedors");
+
                     b.Navigation("RecetaInsumos");
+                });
+
+            modelBuilder.Entity("ChefMetrics_BackEnd.Model.InsumoProveedor", b =>
+                {
+                    b.Navigation("HistorialPrecioInsumos");
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Negocio", b =>
@@ -869,12 +1064,19 @@ namespace ChefMetrics_BackEnd.Migrations
 
                     b.Navigation("ProductoMenus");
 
+                    b.Navigation("Proveedors");
+
                     b.Navigation("Receta");
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.ProductoMenu", b =>
                 {
                     b.Navigation("ProductoMenuReceta");
+                });
+
+            modelBuilder.Entity("ChefMetrics_BackEnd.Model.Proveedor", b =>
+                {
+                    b.Navigation("InsumoProveedors");
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Receta", b =>

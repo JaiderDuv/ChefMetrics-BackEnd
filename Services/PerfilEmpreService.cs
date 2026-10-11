@@ -10,7 +10,6 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
 {
     private static readonly TimeSpan DuracionPermisoEdicion = TimeSpan.FromMinutes(15);
 
-    // CK_UsuarioEmprendedor_TipoDocumento: solo CC, CE, TI o PA.
     private static readonly HashSet<string> TiposDocumentoValidos = new(StringComparer.OrdinalIgnoreCase)
     {
         "CC", "CE", "TI", "PA"
@@ -121,21 +120,39 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             cuenta.Activo = false;
         }
 
+        var eraFormalizado = string.Equals(usuario.TipoFormalizacion, "formalizado", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(usuario.TipoFormalizacion, "si", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(usuario.TipoFormalizacion, "true", StringComparison.OrdinalIgnoreCase);
+        var deformalizando = eraFormalizado && !dto.Formalizado;
+
         usuario.TipoFormalizacion = dto.Formalizado ? "formalizado" : "no_formalizado";
         usuario.NombreEmprendimiento = NullIfWhiteSpace(dto.NombreEmprendimiento);
         usuario.Nit = nit;
         usuario.RazonSocial = razonSocial;
 
-        // CK_UsuarioEmprendedor_Formalizacion: formalizado no admite documento;
-        // no formalizado lo exige (además de NIT/razón en null, ya aplicado arriba).
         if (dto.Formalizado)
         {
             usuario.TipoDocumento = null;
             usuario.NumeroDocumento = null;
         }
-        else if (usuario.TipoDocumento is null || usuario.NumeroDocumento is null)
+        else
         {
-            return Error("Para el perfil no formalizado debes registrar tu documento en el perfil de usuario.");
+            var tipoDoc = NullIfWhiteSpace(dto.TipoDocumento)?.ToUpperInvariant();
+            var numeroDoc = NullIfWhiteSpace(dto.NumeroDocumento);
+            if (tipoDoc is null || !TiposDocumentoValidos.Contains(tipoDoc))
+            {
+                return Error("El tipo de documento no es válido. Valores permitidos: CC, CE, TI, PA.");
+            }
+            if (numeroDoc is null)
+            {
+                return Error("El número de documento es obligatorio si el negocio no está formalizado.");
+            }
+            if (await _perfilRepository.ExisteDocumentoAsync(numeroDoc, cuentaId))
+            {
+                return Error("El documento de identidad ya está registrado por otro usuario.");
+            }
+            usuario.TipoDocumento = tipoDoc;
+            usuario.NumeroDocumento = numeroDoc;
         }
 
         var tipoEmprendimiento = await _userRepository
@@ -149,8 +166,6 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
 
         if (negocio is null)
         {
-            // La cuenta aún no tiene negocio (registro sin onboarding):
-            // se crea aquí con los datos del formulario.
             negocio = await _userRepository.RegistrarNegocioAsync(new Negocio
             {
                 UsuarioId = usuario.Id,
@@ -177,6 +192,15 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         negocio.FechaActualizacion = DateTime.UtcNow;
 
         var empleadosExistentes = negocio.Empleados.ToList();
+        var empleadosNuevos = new List<Empleado>();
+        List<Empleado> empleadosEliminados;
+
+        if (deformalizando)
+        {
+            empleadosEliminados = empleadosExistentes;
+        }
+        else
+        {
         var idsRecibidos = dto.Empleados
             .Where(e => e.Id.HasValue && e.Id.Value > 0)
             .Select(e => e.Id!.Value)
@@ -202,10 +226,9 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             return Error("No puedes registrar dos empleados con el mismo correo.");
         }
 
-        var empleadosEliminados = empleadosExistentes
+        empleadosEliminados = empleadosExistentes
             .Where(e => !idsRecibidos.Contains(e.Id))
             .ToList();
-        var empleadosNuevos = new List<Empleado>();
 
         foreach (var empleadoDto in dto.Empleados)
         {
@@ -246,6 +269,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
                 });
             }
         }
+        }
 
         await _perfilRepository.GuardarEmpleadosAsync(
             permiso,
@@ -282,8 +306,6 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         var usuario = cuenta.UsuarioEmprendedor;
         return new PerfilUsuarioDto
         {
-            // FotoPerfilUrl no se persiste (la BD no tiene la columna):
-            // solo se usa como vista previa en el cliente.
             FotoPerfilUrl = null,
             TipoDocumento = usuario.TipoDocumento ?? string.Empty,
             NumeroDocumento = usuario.NumeroDocumento ?? string.Empty,
@@ -391,8 +413,6 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         var usuario = cuenta.UsuarioEmprendedor!;
         var negocio = usuario.Negocio;
 
-        // Sin negocio (cuenta recién registrada): se devuelven valores por
-        // defecto para que el formulario cargue y el PUT lo cree.
         return new PerfilEmprendedorDto
         {
             CorreoCuenta = cuenta.Correo,
@@ -406,6 +426,8 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             Nit = usuario.Nit ?? string.Empty,
             RazonSocial = usuario.RazonSocial ?? string.Empty,
             Rues = negocio?.Rues ?? string.Empty,
+            TipoDocumento = usuario.TipoDocumento ?? string.Empty,
+            NumeroDocumento = usuario.NumeroDocumento ?? string.Empty,
             CorreoEmpresa = negocio?.CorreoEmpresa ?? negocio?.CorreoContacto ?? string.Empty,
             TieneSitioFisico = negocio?.TieneSitioFisico ?? false,
             Direccion = negocio?.Direccion ?? string.Empty,

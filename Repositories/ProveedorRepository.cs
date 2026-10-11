@@ -89,9 +89,18 @@ public sealed class ProveedorRepository : IProveedorRepository
             .AnyAsync(ip => ip.InsumoId == insumoId && ip.ProveedorId == proveedorId);
     }
 
-    public async Task<InsumoProveedor> AsociarAsync(int insumoId, int proveedorId, decimal costo)
+    public async Task<decimal?> ObtenerCantidadInsumoAsync(int insumoId)
+    {
+        return await _context.Insumos
+            .Where(i => i.Id == insumoId)
+            .Select(i => i.Cantidad)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<InsumoProveedor> AsociarAsync(int insumoId, int proveedorId, decimal costo, decimal? cantidad = null)
     {
         var esElPrimero = !await _context.InsumoProveedors.AnyAsync(ip => ip.InsumoId == insumoId);
+        cantidad ??= await ObtenerCantidadInsumoAsync(insumoId);
 
         var nueva = new InsumoProveedor
         {
@@ -111,6 +120,7 @@ public sealed class ProveedorRepository : IProveedorRepository
             InsumoProveedorId = nueva.Id,
             CostoAnterior = costo,
             CostoNuevo = costo,
+            Cantidad = cantidad,
             FechaCambio = DateTime.UtcNow
         });
         await _context.SaveChangesAsync();
@@ -163,19 +173,21 @@ public sealed class ProveedorRepository : IProveedorRepository
         return true;
     }
 
-    public async Task<bool> ActualizarCostoAsync(int insumoId, int proveedorId, decimal nuevoCosto)
+    public async Task<bool> ActualizarCostoAsync(int insumoId, int proveedorId, decimal nuevoCosto, decimal? cantidad = null)
     {
         var asociacion = await ObtenerAsociacionAsync(insumoId, proveedorId);
         if (asociacion == null) return false;
 
         if (asociacion.Costo != nuevoCosto)
         {
+            cantidad ??= await ObtenerCantidadInsumoAsync(insumoId);
             // criterio 4: se registra en el historial sin acción adicional del usuario
             await _context.HistorialPrecioInsumos.AddAsync(new HistorialPrecioInsumo
             {
                 InsumoProveedorId = asociacion.Id,
                 CostoAnterior = asociacion.Costo,
                 CostoNuevo = nuevoCosto,
+                Cantidad = cantidad,
                 FechaCambio = DateTime.UtcNow
             });
 
