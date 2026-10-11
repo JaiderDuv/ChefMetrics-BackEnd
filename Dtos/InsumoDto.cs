@@ -138,7 +138,7 @@ public class HistorialPrecioDto
 
     public decimal? VariacionPorcentual { get; set; }
 
-     decimal? Diferencia { get; set; }
+    public decimal? Diferencia { get; set; }
 
     public bool? EsSubida { get; set; }
 }
