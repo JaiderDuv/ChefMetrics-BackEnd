@@ -1,5 +1,4 @@
 ﻿using ChefMetrics_BackEnd.Model;
-
 namespace ChefMetrics_BackEnd.Repositories;
 
 public interface IProveedorRepository
@@ -18,10 +17,10 @@ public interface IProveedorRepository
     Task<InsumoProveedor?> ObtenerAsociacionAsync(int insumoId, int proveedorId);
     Task<bool> ExisteAsociacionAsync(int insumoId, int proveedorId);
     Task<decimal?> ObtenerCantidadInsumoAsync(int insumoId);
-    Task<InsumoProveedor> AsociarAsync(int insumoId, int proveedorId, decimal costo, decimal? cantidad = null);
+    Task<InsumoProveedor> AsociarAsync(int insumoId, int proveedorId, decimal costo, decimal cantidad, string unidadMedida);
     Task<bool> DesasociarAsync(int insumoId, int proveedorId);
     Task<bool> MarcarPrincipalAsync(int insumoId, int proveedorId);
-    Task<bool> ActualizarCostoAsync(int insumoId, int proveedorId, decimal nuevoCosto, decimal? cantidad = null);
+    Task<bool> ActualizarCostoAsync(int insumoId, int proveedorId, decimal nuevoCosto, decimal? cantidad = null, string? unidadMedida = null);
 
     Task<Proveedor?> ObtenerPorIdDelNegocioAsync(int negocioId, int proveedorId);
     Task<int> ContarAsociacionesAsync(int proveedorId);
@@ -30,4 +29,5 @@ public interface IProveedorRepository
     void Eliminar(Proveedor proveedor);
     Task GuardarCambiosAsync();
     Task<bool> ExisteNombreAsync(int negocioId, string nombre, int? excluirId = null);
+    Task SincronizarInsumoConPrincipalAsync(int insumoId);
 }

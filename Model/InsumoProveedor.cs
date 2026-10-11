@@ -12,7 +12,8 @@ public partial class InsumoProveedor
     public int ProveedorId { get; set; }
 
     public decimal Costo { get; set; }
-
+    public decimal Cantidad { get; set; }
+    public string UnidadMedida { get; set; } = string.Empty;
     public bool EsPrincipal { get; set; }
 
     public DateTime FechaActualizacion { get; set; }

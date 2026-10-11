@@ -100,12 +100,15 @@ public sealed class ProveedoresController : ControllerBase
     }
 
     [HttpPatch("insumos/{insumoId:int}/proveedores/{proveedorId:int}/costo")]
-    public async Task<IActionResult> ActualizarCosto(int insumoId, int proveedorId, [FromBody] ActualizarCostoProveedorDto dto)
+    public async Task<IActionResult> ActualizarCosto(
+    int insumoId, int proveedorId,
+    [FromBody] ActualizarCostoProveedorDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
         if (!ModelState.IsValid) return BadRequest(ModelState);
 
-        var resultado = await _proveedorService.ActualizarCostoAsync(cuentaId, insumoId, proveedorId, dto.Costo, dto.Cantidad);
+        var resultado = await _proveedorService.ActualizarCostoAsync(
+            cuentaId, insumoId, proveedorId, dto.Costo, dto.Cantidad, dto.UnidadMedida);
         return Responder(resultado);
     }
 

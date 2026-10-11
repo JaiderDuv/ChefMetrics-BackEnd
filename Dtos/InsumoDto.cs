@@ -194,3 +194,5 @@ public class ResultadoHistorialGeneralDto
     public bool NoEncontrado { get; set; }
     public HistorialGeneralDto? Historial { get; set; }
 }
+
+

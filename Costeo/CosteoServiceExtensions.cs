@@ -7,6 +7,7 @@ public static class CosteoServiceExtensions
         services.AddScoped<ICosteoRepository, CosteoRepository>();
         services.AddScoped<ICostoRecetaService, CostoRecetaService>();
         services.AddScoped<ICostosFijosService, CostosFijosService>();
+        services.AddScoped<ISugerirPrecioService, SugerirPrecioService>();
         return services;
     }
 }

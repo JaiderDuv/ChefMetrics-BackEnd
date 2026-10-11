@@ -84,6 +84,8 @@ public sealed class InsumoService : IInsumoService
 
             if (proveedorNormalizado is not null)
             {
+                var cantidadInicial = dto.Cantidad is > 0 ? dto.Cantidad.Value : 1m;
+
                 var proveedor = await _insumoRepository.ObtenerOCrearProveedorAsync(
                     negocioId.Value, proveedorNormalizado);
                 var asociacion = await _insumoRepository.CrearInsumoProveedorAsync(new InsumoProveedor
@@ -91,6 +93,8 @@ public sealed class InsumoService : IInsumoService
                     InsumoId = insumo.Id,
                     ProveedorId = proveedor.Id,
                     Costo = dto.CostoUnitario,
+                    Cantidad = cantidadInicial,
+                    UnidadMedida = unidadNormalizada!,
                     EsPrincipal = true,
                     FechaActualizacion = DateTime.UtcNow
                 });
@@ -99,7 +103,7 @@ public sealed class InsumoService : IInsumoService
                     InsumoProveedorId = asociacion.Id,
                     CostoAnterior = dto.CostoUnitario,
                     CostoNuevo = dto.CostoUnitario,
-                    Cantidad = dto.Cantidad,
+                    Cantidad = cantidadInicial,
                     FechaCambio = DateTime.UtcNow
                 });
             }
@@ -394,7 +398,20 @@ public sealed class InsumoService : IInsumoService
             return ResultadoInsumoDto.Error("Debes enviar al menos un campo para actualizar.");
         }
 
+        if (dto.Cantidad is > 0 || dto.UnidadMedida is not null)
+        {
+            var principal = await _insumoRepository.ObtenerInsumoProveedorPrincipalAsync(insumo.Id);
+            if (principal is not null)
+            {
+                if (dto.Cantidad is > 0) principal.Cantidad = dto.Cantidad.Value;
+                if (dto.UnidadMedida is not null) principal.UnidadMedida = insumo.UnidadMedida;
+                principal.FechaActualizacion = DateTime.UtcNow;
+                await _insumoRepository.GuardarCambiosAsync();
+            }
+        }
+
         insumo.FechaActualizacion = DateTime.UtcNow;
+
 
         try
         {
