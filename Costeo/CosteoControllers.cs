@@ -28,6 +28,33 @@ public sealed class CostoRecetaController : ControllerBase
     }
 }
 
+[ApiController]
+[Route("api/recetas/{id:int}/escalado")]
+[Authorize]
+public sealed class EscaladoRecetaController : ControllerBase
+{
+    private readonly ICostoRecetaService _servicio;
+    public EscaladoRecetaController(ICostoRecetaService servicio) => _servicio = servicio;
+
+    [HttpGet]
+    public async Task<IActionResult> Obtener([FromRoute] int id, [FromQuery] int porciones)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+        if (porciones <= 0) return BadRequest(new { mensaje = "Las porciones deseadas deben ser mayores a 0." });
+
+        var r = await _servicio.CalcularEscaladoAsync(cuentaId, id, porciones);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
+        return Ok(r.Datos);
+    }
+
+    private bool TryObtenerCuentaId(out int cuentaId)
+    {
+        var s = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return int.TryParse(s, out cuentaId);
+    }
+}
+
 // CRUD /api/costos-fijos
 [ApiController]
 [Route("api/costos-fijos")]
