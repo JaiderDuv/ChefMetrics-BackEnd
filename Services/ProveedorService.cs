@@ -101,6 +101,8 @@ public sealed class ProveedorService : IProveedorService
             return ResultadoProveedorDto.NoHallado("El proveedor no existe.");
         if (await _repository.ExisteAsociacionAsync(insumoId, dto.ProveedorId))
             return ResultadoProveedorDto.Error("Este proveedor ya está asociado a este insumo.");
+        if (dto.Costo > 999999.99m)
+            return ResultadoProveedorDto.Error("El costo no puede superar 999999.99 (6 enteros y 2 decimales).");
 
         var asociacion = await _repository.AsociarAsync(
             insumoId, dto.ProveedorId, dto.Costo, dto.Cantidad, dto.UnidadMedida);
@@ -119,6 +121,8 @@ public sealed class ProveedorService : IProveedorService
             return ResultadoProveedorDto.NoHallado("No se encontró el insumo solicitado.");
         if (await _repository.ExisteNombreAsync(negocioId.Value, dto.Nombre))
             return ResultadoProveedorDto.Error("Ya existe un proveedor con ese nombre.");
+        if (dto.Costo > 999999.99m)
+            return ResultadoProveedorDto.Error("El costo no puede superar 999999.99 (6 enteros y 2 decimales).");
 
         var proveedor = await _repository.CrearAsync(new Proveedor
         {
@@ -168,6 +172,8 @@ public sealed class ProveedorService : IProveedorService
     {
         var validacion = await ValidarInsumoDelNegocioAsync(cuentaId, insumoId);
         if (validacion != null) return validacion;
+        if (costo > 999999.99m)
+            return ResultadoProveedorDto.Error("El costo no puede superar 999999.99 (6 enteros y 2 decimales).");
 
         var resultado = await _repository.ActualizarCostoAsync(insumoId, proveedorId, costo, cantidad, unidadMedida);
         if (!resultado)

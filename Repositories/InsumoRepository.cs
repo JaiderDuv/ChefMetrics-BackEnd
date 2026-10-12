@@ -1,4 +1,5 @@
 using ChefMetrics_BackEnd.Model;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChefMetrics_BackEnd.Repositories;
@@ -57,7 +58,7 @@ public sealed class InsumoRepository : IInsumoRepository
 
         if (!string.IsNullOrWhiteSpace(categoria))
         {
-            var categoriaNormalizada = categoria.Trim().ToLower();
+            var categoriaNormalizada = Normalizador.NormalizarCategoria(categoria);
             query = query.Where(i => i.Categoria.ToLower() == categoriaNormalizada);
         }
 
@@ -123,10 +124,11 @@ public sealed class InsumoRepository : IInsumoRepository
 
     public async Task<Proveedor> ObtenerOCrearProveedorAsync(int negocioId, string nombre)
     {
-        var normalizado = nombre.Trim();
+        var clave = Normalizador.ClaveProveedor(nombre);
         var existente = await _context.Proveedors
             .FirstOrDefaultAsync(p =>
-                p.NegocioId == negocioId && p.Nombre.ToLower() == normalizado.ToLower());
+                p.NegocioId == negocioId &&
+                EF.Functions.Collate(p.Nombre, Normalizador.CollationInsensible) == clave);
 
         if (existente is not null)
         {
@@ -136,7 +138,7 @@ public sealed class InsumoRepository : IInsumoRepository
         var nuevo = new Proveedor
         {
             NegocioId = negocioId,
-            Nombre = normalizado,
+            Nombre = Normalizador.NormalizarProveedor(nombre)!,
             FechaCreacion = DateTime.UtcNow
         };
 

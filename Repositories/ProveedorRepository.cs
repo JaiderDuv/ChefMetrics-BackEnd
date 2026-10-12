@@ -1,4 +1,5 @@
 ﻿using ChefMetrics_BackEnd.Model;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChefMetrics_BackEnd.Repositories;
@@ -264,10 +265,11 @@ public sealed class ProveedorRepository : IProveedorRepository
 
     public async Task<bool> ExisteNombreAsync(int negocioId, string nombre, int? excluirId = null)
     {
-        var normalizado = nombre.Trim().ToLower();
+        var clave = Normalizador.ClaveProveedor(nombre);
         var query = _context.Proveedors
             .AsNoTracking()
-            .Where(p => p.NegocioId == negocioId && p.Nombre.ToLower() == normalizado);
+            .Where(p => p.NegocioId == negocioId &&
+                EF.Functions.Collate(p.Nombre, Normalizador.CollationInsensible) == clave);
 
         if (excluirId.HasValue)
             query = query.Where(p => p.Id != excluirId.Value);

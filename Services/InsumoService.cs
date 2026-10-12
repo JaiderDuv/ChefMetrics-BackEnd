@@ -1,6 +1,7 @@
 using ChefMetrics_BackEnd.Dtos;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChefMetrics_BackEnd.Services;
@@ -59,6 +60,10 @@ public sealed class InsumoService : IInsumoService
         if (dto.Cantidad.HasValue && dto.Cantidad.Value < 0)
         {
             return ResultadoInsumoDto.Error("La cantidad no puede ser negativa.");
+        }
+        if (dto.Cantidad.HasValue && dto.Cantidad.Value > MaxCantidadPorUnidad(unidadNormalizada))
+        {
+            return ResultadoInsumoDto.Error(MensajeTopeCantidad(unidadNormalizada));
         }
 
         if (await _insumoRepository.ExisteNombreAsync(negocioId.Value, nombre))
@@ -257,6 +262,11 @@ public sealed class InsumoService : IInsumoService
             {
                 return ResultadoInsumoDto.Error("La cantidad no puede ser negativa.");
             }
+            var tope = MaxCantidadPorUnidad(insumo.UnidadMedida);
+            if (dto.Cantidad.Value > tope)
+            {
+                return ResultadoInsumoDto.Error(MensajeTopeCantidad(insumo.UnidadMedida));
+            }
             insumo.Cantidad = dto.Cantidad.Value;
             hayCambios = true;
         }
@@ -266,6 +276,10 @@ public sealed class InsumoService : IInsumoService
             if (dto.CostoUnitario.Value <= 0)
             {
                 return ResultadoInsumoDto.Error("El costo unitario debe ser mayor a 0.");
+            }
+            if (dto.CostoUnitario.Value > 999999.99m)
+            {
+                return ResultadoInsumoDto.Error("El costo no puede superar 999999.99 (6 enteros y 2 decimales).");
             }
 
             if (string.IsNullOrWhiteSpace(dto.Proveedor))
@@ -690,6 +704,10 @@ public sealed class InsumoService : IInsumoService
         {
             return "El costo unitario debe ser mayor a 0.";
         }
+        if (costoUnitario > 999999.99m)
+        {
+            return "El costo no puede superar 999999.99 (6 enteros y 2 decimales).";
+        }
         if (porcentajeMerma < 0 || porcentajeMerma > 100)
         {
             return "El porcentaje de merma debe estar entre 0 y 100.";
@@ -704,13 +722,22 @@ public sealed class InsumoService : IInsumoService
 
     private static string? NormalizarCategoria(string? valor)
     {
-        if (string.IsNullOrWhiteSpace(valor))
-        {
-            return "otro";
-        }
-
-        var candidato = valor.Trim().ToLowerInvariant();
+        var candidato = Normalizador.NormalizarCategoria(valor);
         return CategoriasValidas.Contains(candidato) ? candidato : null;
+    }
+
+    private static decimal MaxCantidadPorUnidad(string? unidadMedida)
+    {
+        var unidad = unidadMedida?.Trim().ToLowerInvariant();
+        return unidad is "taza" or "unidad" ? 999.99m : 999999.99m;
+    }
+
+    private static string MensajeTopeCantidad(string? unidadMedida)
+    {
+        var unidad = unidadMedida?.Trim().ToLowerInvariant();
+        return unidad is "taza" or "unidad"
+            ? "Para 'taza' o 'unidad' la cantidad máxima es 999.99 (3 enteros y 2 decimales)."
+            : "La cantidad máxima es 999999.99 (6 enteros y 2 decimales).";
     }
 
     private static bool TryNormalizarUnidad(string? valor, out string? normalizada)
