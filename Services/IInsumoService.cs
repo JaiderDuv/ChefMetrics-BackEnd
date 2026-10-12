@@ -15,6 +15,8 @@ public interface IInsumoService
 
     Task<ResultadoEliminarInsumoDto> EliminarAsync(int cuentaId, int insumoId);
 
+    Task<ResultadoInsumoDto> RestaurarAsync(int cuentaId, int insumoId);
+
     Task<ResultadoHistorialDto> ObtenerHistorialPreciosAsync(int cuentaId, int insumoId);
 
     Task<ResultadoHistorialGeneralDto> ObtenerHistorialGeneralAsync(
