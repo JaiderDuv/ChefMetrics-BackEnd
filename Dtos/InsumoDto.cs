@@ -21,6 +21,7 @@ public class CrearInsumoDto
     [Required(ErrorMessage = "El porcentaje de merma es obligatorio.")]
     public decimal PorcentajeMerma { get; set; }
 
+    [Required(ErrorMessage = "El proveedor es obligatorio.")]
     [StringLength(150, ErrorMessage = "El proveedor no puede superar los 150 caracteres.")]
     public string? Proveedor { get; set; }
 
@@ -100,6 +101,7 @@ public class ResultadoInsumoDto
     public string Mensaje { get; set; } = string.Empty;
 
     public bool NoEncontrado { get; set; }
+    public bool Conflicto { get; set; }
     public InsumoDto? Insumo { get; set; }
 
     public static ResultadoInsumoDto Ok(InsumoDto insumo, string mensaje)
@@ -152,6 +154,8 @@ public class HistorialPreciosInsumoDto
 
     public bool HistorialCompletoDisponible { get; set; }
 
+    public bool InsumoEliminado { get; set; }
+
     public List<HistorialPrecioDto> Precios { get; set; } = new();
 }
 
@@ -178,6 +182,8 @@ public class HistorialPrecioGeneralDto
    public decimal? Diferencia { get; set; }
 
     public bool? EsSubida { get; set; }
+
+    public bool InsumoEliminado { get; set; }
 }
 
 public class HistorialGeneralDto

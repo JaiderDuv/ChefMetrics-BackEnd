@@ -106,11 +106,20 @@ public sealed class InsumoService : IInsumoService
                 await _insumoRepository.RegistrarCambioPrecioAsync(new HistorialPrecioInsumo
                 {
                     InsumoProveedorId = asociacion.Id,
+                    NegocioId = negocioId.Value,
+                    InsumoIdOriginal = insumo.Id,
+                    NombreInsumo = nombre,
+                    ProveedorNombre = proveedorNormalizado,
                     CostoAnterior = dto.CostoUnitario,
                     CostoNuevo = dto.CostoUnitario,
                     Cantidad = cantidadInicial,
+                    UnidadMedida = unidadNormalizada,
                     FechaCambio = DateTime.UtcNow
                 });
+
+                // Si este nombre corresponde a un insumo eliminado, se revive su historial.
+                await _insumoRepository.RevincularHistorialEliminadoAsync(
+                    negocioId.Value, nombre, insumo.Id, asociacion.Id);
             }
 
             return ResultadoInsumoDto.Ok(Mapear(insumo, 0, proveedorNormalizado), "El insumo fue creado correctamente.");
@@ -306,6 +315,8 @@ public sealed class InsumoService : IInsumoService
                     InsumoId = insumo.Id,
                     ProveedorId = proveedor.Id,
                     Costo = dto.CostoUnitario.Value,
+                    Cantidad = dto.Cantidad ?? insumo.Cantidad ?? 0m,
+                    UnidadMedida = insumo.UnidadMedida,
                     EsPrincipal = false,
                     FechaActualizacion = DateTime.UtcNow
                 });
@@ -316,6 +327,7 @@ public sealed class InsumoService : IInsumoService
                     CostoAnterior = dto.CostoUnitario.Value,
                     CostoNuevo = dto.CostoUnitario.Value,
                     Cantidad = dto.Cantidad ?? insumo.Cantidad,
+                    UnidadMedida = insumo.UnidadMedida,
                     FechaCambio = DateTime.UtcNow
                 });
             }
@@ -328,6 +340,9 @@ public sealed class InsumoService : IInsumoService
                     CostoAnterior = asociacion.Costo,
                     CostoNuevo = dto.CostoUnitario.Value,
                     Cantidad = dto.Cantidad ?? insumo.Cantidad,
+                    UnidadMedida = string.IsNullOrWhiteSpace(asociacion.UnidadMedida)
+                        ? insumo.UnidadMedida
+                        : asociacion.UnidadMedida,
                     FechaCambio = DateTime.UtcNow
                 });
                 asociacion.Costo = dto.CostoUnitario.Value;
@@ -374,6 +389,8 @@ public sealed class InsumoService : IInsumoService
                             InsumoId = insumo.Id,
                             ProveedorId = proveedorEnt.Id,
                             Costo = insumo.CostoUnitario,
+                            Cantidad = insumo.Cantidad ?? 0m,
+                            UnidadMedida = insumo.UnidadMedida,
                             EsPrincipal = false,
                             FechaActualizacion = DateTime.UtcNow
                         });
@@ -383,6 +400,7 @@ public sealed class InsumoService : IInsumoService
                             CostoAnterior = insumo.CostoUnitario,
                             CostoNuevo = insumo.CostoUnitario,
                             Cantidad = insumo.Cantidad,
+                            UnidadMedida = insumo.UnidadMedida,
                             FechaCambio = DateTime.UtcNow
                         });
                     }
@@ -441,6 +459,65 @@ public sealed class InsumoService : IInsumoService
         return ResultadoInsumoDto.Ok(Mapear(insumo, numeroRecetas, nombrePrincipal), "El insumo fue actualizado correctamente.");
     }
 
+    public async Task<ResultadoInsumoDto> RestaurarAsync(int cuentaId, int insumoId)
+    {
+        var negocioId = await _insumoRepository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (!negocioId.HasValue)
+        {
+            return ResultadoInsumoDto.NoHallado(
+                "Aún no tienes un negocio registrado para administrar insumos.");
+        }
+
+        var archivo = await _insumoRepository.ListarHistorialArchivadoPorInsumoAsync(negocioId.Value, insumoId);
+        if (archivo.Count == 0)
+        {
+            return ResultadoInsumoDto.NoHallado("No se encontró historial archivado para ese insumo.");
+        }
+
+        var ultimo = archivo[0];
+        var nombre = (ultimo.NombreInsumo ?? string.Empty).Trim();
+        if (nombre.Length == 0)
+        {
+            return ResultadoInsumoDto.Error("El historial archivado no tiene un nombre válido para restaurar.");
+        }
+
+        if (await _insumoRepository.ExisteNombreAsync(negocioId.Value, nombre))
+        {
+            return new ResultadoInsumoDto
+            {
+                Exito = false,
+                Conflicto = true,
+                Mensaje = $"Ya existe un insumo activo llamado «{nombre}». Cámbiale el nombre o elimínalo para poder restaurar."
+            };
+        }
+
+        var unidad = (ultimo.UnidadMedida ?? string.Empty).Trim().ToLowerInvariant();
+        if (!UnidadesValidas.Contains(unidad))
+        {
+            unidad = "g";
+        }
+
+        var restaurado = await CrearAsync(cuentaId, new CrearInsumoDto
+        {
+            Nombre = nombre,
+            UnidadMedida = unidad,
+            Categoria = "otro",
+            CostoUnitario = ultimo.CostoNuevo,
+            PorcentajeMerma = 0,
+            Cantidad = ultimo.Cantidad,
+            Proveedor = ultimo.ProveedorNombre,
+            Activo = true
+        });
+
+        if (!restaurado.Exito || restaurado.Insumo is null)
+        {
+            return restaurado;
+        }
+
+        restaurado.Mensaje = $"El insumo «{nombre}» fue restaurado con sus últimos datos guardados.";
+        return restaurado;
+    }
+
     public async Task<ResultadoEliminarInsumoDto> EliminarAsync(int cuentaId, int insumoId)
     {
         var negocioId = await _insumoRepository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
@@ -477,8 +554,8 @@ public sealed class InsumoService : IInsumoService
             };
         }
 
+        await _insumoRepository.ArchivarHistorialAsync(negocioId.Value, insumo.Id);
         _insumoRepository.Eliminar(insumo);
-        await _insumoRepository.EliminarPreciosAsync(insumo.Id);
         await _insumoRepository.GuardarCambiosAsync();
 
         return new ResultadoEliminarInsumoDto
@@ -504,11 +581,34 @@ public sealed class InsumoService : IInsumoService
         var insumo = await _insumoRepository.ObtenerPorIdAsync(negocioId.Value, insumoId);
         if (insumo is null)
         {
+            // El insumo fue eliminado: se sirve su historial archivado.
+            var archivo = await _insumoRepository.ListarHistorialArchivadoPorInsumoAsync(negocioId.Value, insumoId);
+            if (archivo.Count == 0)
+            {
+                return new ResultadoHistorialDto
+                {
+                    Exito = false,
+                    NoEncontrado = true,
+                    Mensaje = "No se encontró el insumo solicitado."
+                };
+            }
+
+            var entradasArchivo = MapearHistorialArchivado(archivo);
+            var ultimo = archivo[0];
             return new ResultadoHistorialDto
             {
-                Exito = false,
-                NoEncontrado = true,
-                Mensaje = "No se encontró el insumo solicitado."
+                Exito = true,
+                Mensaje = "Historial de precios del insumo eliminado.",
+                Historial = new HistorialPreciosInsumoDto
+                {
+                    InsumoId = insumoId,
+                    Nombre = ultimo.NombreInsumo ?? "Insumo eliminado",
+                    ProveedorActual = ultimo.ProveedorNombre,
+                    PrecioActual = ultimo.CostoNuevo,
+                    HistorialCompletoDisponible = true,
+                    InsumoEliminado = true,
+                    Precios = entradasArchivo
+                }
             };
         }
 
@@ -549,11 +649,16 @@ public sealed class InsumoService : IInsumoService
         for (var i = movimientosRecientesPrimero.Count - 1; i >= 0; i--)
         {
             var actual = movimientosRecientesPrimero[i];
-            if (ultimoPorAsociacion.TryGetValue(actual.InsumoProveedorId, out var anterior))
+            var clave = actual.InsumoProveedorId;
+            if (!clave.HasValue)
+            {
+                continue;
+            }
+            if (ultimoPorAsociacion.TryGetValue(clave.Value, out var anterior))
             {
                 resultado[actual.Id] = anterior;
             }
-            ultimoPorAsociacion[actual.InsumoProveedorId] = actual;
+            ultimoPorAsociacion[clave.Value] = actual;
         }
         return resultado;
     }
@@ -563,12 +668,18 @@ public sealed class InsumoService : IInsumoService
 
     private static HistorialPrecioDto MapearHistorial(
         DateTime fecha, decimal precio, string? proveedor, decimal costoAnterior,
-        decimal? cantidad, HistorialPrecioInsumo? anterior)
+        decimal? cantidad, HistorialPrecioInsumo? anterior) =>
+        MapearHistorial(fecha, precio, proveedor, costoAnterior, cantidad,
+            anterior?.CostoNuevo, anterior?.Cantidad);
+
+    private static HistorialPrecioDto MapearHistorial(
+        DateTime fecha, decimal precio, string? proveedor, decimal costoAnterior,
+        decimal? cantidad, decimal? costoNuevoAnterior, decimal? cantidadAnterior)
     {
         var unitarioNuevo = PrecioUnitario(precio, cantidad);
-        var unitarioAnterior = anterior is null
+        var unitarioAnterior = costoNuevoAnterior is null
             ? null
-            : PrecioUnitario(anterior.CostoNuevo, anterior.Cantidad);
+            : PrecioUnitario(costoNuevoAnterior.Value, cantidadAnterior);
 
         decimal? variacion;
         decimal? diferencia;
@@ -664,6 +775,11 @@ public sealed class InsumoService : IInsumoService
             };
         }).ToList();
 
+        var archivo = await _insumoRepository.ListarHistorialArchivadoGeneralAsync(
+            negocioId.Value, nombre, proveedor);
+        entradas.AddRange(MapearHistorialGeneralArchivado(archivo));
+        entradas = entradas.OrderByDescending(e => e.Fecha).ToList();
+
         return new ResultadoHistorialGeneralDto
         {
             Exito = true,
@@ -674,6 +790,95 @@ public sealed class InsumoService : IInsumoService
                 Precios = entradas
             }
         };
+    }
+
+    private static List<HistorialPrecioDto> MapearHistorialArchivado(
+        List<HistorialPrecioInsumo> archivoRecientePrimero)
+    {
+        // Encadena cada fila con su anterior del mismo proveedor (snapshot).
+        var anteriores = new Dictionary<int, HistorialPrecioInsumo>();
+        var ultimoPorProveedor = new Dictionary<string, HistorialPrecioInsumo>(StringComparer.OrdinalIgnoreCase);
+        for (var i = archivoRecientePrimero.Count - 1; i >= 0; i--)
+        {
+            var actual = archivoRecientePrimero[i];
+            var clave = (actual.ProveedorNombre ?? string.Empty).Trim();
+            if (ultimoPorProveedor.TryGetValue(clave, out var anterior))
+            {
+                anteriores[actual.Id] = anterior;
+            }
+            ultimoPorProveedor[clave] = actual;
+        }
+
+        return archivoRecientePrimero.Select(h => MapearHistorial(
+            h.FechaCambio,
+            h.CostoNuevo,
+            h.ProveedorNombre,
+            h.CostoAnterior,
+            h.Cantidad,
+            anteriores.GetValueOrDefault(h.Id))).ToList();
+    }
+
+    private static List<HistorialPrecioGeneralDto> MapearHistorialGeneralArchivado(
+        List<HistorialPrecioInsumo> archivo)
+    {
+        var anteriores = new Dictionary<int, HistorialPrecioInsumo>();
+        var ultimoPorInsumoProveedor = new Dictionary<(int, string), HistorialPrecioInsumo>();
+        foreach (var actual in archivo.OrderBy(h => h.FechaCambio))
+        {
+            var clave = (actual.InsumoIdOriginal ?? 0, (actual.ProveedorNombre ?? string.Empty).Trim().ToLowerInvariant());
+            if (ultimoPorInsumoProveedor.TryGetValue(clave, out var anterior))
+            {
+                anteriores[actual.Id] = anterior;
+            }
+            ultimoPorInsumoProveedor[clave] = actual;
+        }
+
+        return archivo.Select(h =>
+        {
+            var unitarioNuevo = PrecioUnitario(h.CostoNuevo, h.Cantidad);
+            var anterior = anteriores.GetValueOrDefault(h.Id);
+            var unitarioAnterior = anterior is null
+                ? null
+                : PrecioUnitario(anterior.CostoNuevo, anterior.Cantidad);
+
+            decimal? variacion;
+            decimal? diferencia;
+            if (unitarioNuevo.HasValue && unitarioAnterior.HasValue && unitarioAnterior.Value != 0)
+            {
+                variacion = Math.Round((unitarioNuevo.Value - unitarioAnterior.Value) / unitarioAnterior.Value * 100, 2);
+                diferencia = unitarioNuevo.Value - unitarioAnterior.Value;
+            }
+            else
+            {
+                variacion = h.CostoAnterior == 0
+                    ? null
+                    : Math.Round((h.CostoNuevo - h.CostoAnterior) / h.CostoAnterior * 100, 2);
+                diferencia = h.CostoAnterior == 0
+                    ? null
+                    : h.CostoNuevo - h.CostoAnterior;
+            }
+
+            var esSubida = unitarioNuevo.HasValue && unitarioAnterior.HasValue
+                ? (unitarioNuevo.Value == unitarioAnterior.Value ? null : (bool?)(unitarioNuevo.Value > unitarioAnterior.Value))
+                : (h.CostoAnterior == 0 || h.CostoNuevo == h.CostoAnterior
+                    ? null
+                    : (bool?)(h.CostoNuevo > h.CostoAnterior));
+
+            return new HistorialPrecioGeneralDto
+            {
+                InsumoId = h.InsumoIdOriginal ?? 0,
+                NombreInsumo = h.NombreInsumo ?? "Insumo eliminado",
+                Fecha = h.FechaCambio,
+                Precio = h.CostoNuevo,
+                Proveedor = h.ProveedorNombre,
+                Cantidad = h.Cantidad,
+                PrecioUnitario = unitarioNuevo,
+                VariacionPorcentual = variacion,
+                Diferencia = diferencia,
+                EsSubida = esSubida,
+                InsumoEliminado = true
+            };
+        }).ToList();
     }
 
     private static string? ValidarCampos(
@@ -712,7 +917,11 @@ public sealed class InsumoService : IInsumoService
         {
             return "El porcentaje de merma debe estar entre 0 y 100.";
         }
-        if (proveedorNormalizado is not null && proveedorNormalizado.Length > 150)
+        if (proveedorNormalizado is null)
+        {
+            return "El proveedor es obligatorio.";
+        }
+        if (proveedorNormalizado.Length > 150)
         {
             return "El proveedor no puede superar los 150 caracteres.";
         }

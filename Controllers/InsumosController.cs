@@ -141,6 +141,33 @@ public sealed class InsumosController : ControllerBase
         return Ok(resultado.Insumo);
     }
 
+    // POST /api/insumos/{id}/restaurar — revive un insumo eliminado a partir
+    // de su historial archivado, con sus últimos datos guardados.
+    [HttpPost("{id:int}/restaurar")]
+    public async Task<IActionResult> Restaurar([FromRoute] int id)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId))
+        {
+            return Unauthorized();
+        }
+
+        var resultado = await _insumoService.RestaurarAsync(cuentaId, id);
+        if (resultado.NoEncontrado)
+        {
+            return NotFound(new { mensaje = resultado.Mensaje });
+        }
+        if (resultado.Conflicto)
+        {
+            return Conflict(new { mensaje = resultado.Mensaje });
+        }
+        if (!resultado.Exito)
+        {
+            return BadRequest(new { mensaje = resultado.Mensaje });
+        }
+
+        return Ok(resultado.Insumo);
+    }
+
     // DELETE /api/insumos/{id} — bloqueado si el insumo está asociado a una receta.
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Eliminar([FromRoute] int id)
