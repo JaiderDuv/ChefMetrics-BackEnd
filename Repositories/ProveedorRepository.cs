@@ -1,7 +1,6 @@
 ﻿using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
-using ChefMetrics_BackEnd.Utilities;
 namespace ChefMetrics_BackEnd.Repositories;
 
 public sealed class ProveedorRepository : IProveedorRepository
@@ -346,8 +345,9 @@ public sealed class ProveedorRepository : IProveedorRepository
         if (asociacionIds.Any())
         {
             var historial = await _context.HistorialPrecioInsumos
-                .Where(h => asociacionIds.Contains(h.InsumoProveedorId))
-                .ToListAsync();
+                .Where(h => h.InsumoProveedorId != null &&
+                asociacionIds.Contains(h.InsumoProveedorId.Value))
+    .ToListAsync();
             _context.HistorialPrecioInsumos.RemoveRange(historial);
 
             var asociaciones = await _context.InsumoProveedors
