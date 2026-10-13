@@ -48,7 +48,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = jwtSettings.Issuer,
             ValidateAudience = true,
             ValidAudience = jwtSettings.Audience,
-            ValidateLifetime = true,
+            // La sesión no expira por tiempo: los tokens no llevan expiración.
+            ValidateLifetime = false,
             ClockSkew = TimeSpan.Zero
         };
     });

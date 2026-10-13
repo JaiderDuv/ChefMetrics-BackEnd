@@ -1,4 +1,5 @@
-﻿using ChefMetrics_BackEnd.Repositories;
+﻿using ChefMetrics_BackEnd.Model;
+using ChefMetrics_BackEnd.Repositories;
 using ChefMetrics_BackEnd.Utilities;
 
 namespace ChefMetrics_BackEnd.Costeo;
@@ -6,8 +7,9 @@ namespace ChefMetrics_BackEnd.Costeo;
 public interface ICostoRecetaService
 {
     // HU8.2 inyecta esta interfaz y usa Datos.CostoPorPorcion.
-    Task<ResultadoCosteo<CostoRecetaDto>> CalcularAsync(int cuentaId, int recetaId);
-    Task<ResultadoCosteo<EscaladoRecetaDto>> CalcularEscaladoAsync(int cuentaId, int recetaId, int porcionesDeseadas);
+    // costosFijosIds: si se indica, el prorrateo usa solo esos costos fijos; null = todos.
+    Task<ResultadoCosteo<CostoRecetaDto>> CalcularAsync(int cuentaId, int recetaId, List<int>? costosFijosIds = null);
+    Task<ResultadoCosteo<EscaladoRecetaDto>> CalcularEscaladoAsync(int cuentaId, int recetaId, int porcionesDeseadas, List<int>? costosFijosIds = null);
 }
 
 public sealed class CostoRecetaService : ICostoRecetaService
@@ -21,7 +23,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
         _insumoRepository = insumoRepository;
     }
 
-    public async Task<ResultadoCosteo<CostoRecetaDto>> CalcularAsync(int cuentaId, int recetaId)
+    public async Task<ResultadoCosteo<CostoRecetaDto>> CalcularAsync(int cuentaId, int recetaId, List<int>? costosFijosIds = null)
     {
         var negocioId = await _insumoRepository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
         if (!negocioId.HasValue)
@@ -60,10 +62,11 @@ public sealed class CostoRecetaService : ICostoRecetaService
                 i.UnidadMedida, i.PorcentajeMerma, costo, fuente));
         }
 
-        // 2) Costos fijos prorrateados
+        // 2) Costos fijos prorrateados (solo los seleccionados por el usuario, si se indican)
         var fijos = await _repo.ListarCostosFijosAsync(negocioId.Value, soloActivos: true);
         dto.SinCostosFijos = fijos.Count == 0;
         if (dto.SinCostosFijos) dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
+        else fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
         var fijoProrrateado = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
 
         // 3) Totales
@@ -83,7 +86,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
         return ResultadoCosteo<CostoRecetaDto>.Ok(dto);
     }
 
-    public async Task<ResultadoCosteo<EscaladoRecetaDto>> CalcularEscaladoAsync(int cuentaId, int recetaId, int porcionesDeseadas)
+    public async Task<ResultadoCosteo<EscaladoRecetaDto>> CalcularEscaladoAsync(int cuentaId, int recetaId, int porcionesDeseadas, List<int>? costosFijosIds = null)
     {
         if (porcionesDeseadas <= 0)
             return ResultadoCosteo<EscaladoRecetaDto>.Error("Las porciones deseadas deben ser mayores a 0.");
@@ -138,6 +141,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
         var fijos = await _repo.ListarCostosFijosAsync(negocioId.Value, soloActivos: true);
         dto.SinCostosFijos = fijos.Count == 0;
         if (dto.SinCostosFijos) dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
+        else fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
         var fijoProrrateado = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
 
         dto.CostoInsumos = decimal.Round(dto.Lineas.Sum(l => l.CostoInsumo), 2);
@@ -152,5 +156,23 @@ public sealed class CostoRecetaService : ICostoRecetaService
             l.MermaExtra = decimal.Round(l.MermaExtra, 2);
         }
         return ResultadoCosteo<EscaladoRecetaDto>.Ok(dto);
+    }
+
+    // Si el usuario seleccionó costos fijos específicos, el prorrateo usa solo esos.
+    private static List<CostoFijo> FiltrarFijosSeleccionados(
+        List<CostoFijo> fijos, List<int>? ids, List<string> advertencias)
+    {
+        if (ids is null) return fijos;
+        if (ids.Count == 0)
+        {
+            advertencias.Add("No seleccionaste ningún costo fijo; el costo fijo prorrateado es 0.");
+            return new();
+        }
+        var sel = fijos.Where(c => ids.Contains(c.Id)).ToList();
+        if (sel.Count == 0)
+            advertencias.Add("Ninguno de los costos fijos seleccionados aplica al cálculo; el costo fijo prorrateado es 0.");
+        else if (sel.Count < fijos.Count)
+            advertencias.Add($"Costo fijo prorrateado calculado con {sel.Count} de {fijos.Count} costos fijos.");
+        return sel;
     }
 }

@@ -58,11 +58,11 @@ namespace ChefMetrics_BackEnd.Utilities
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.Key));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            // Sin expiración: la sesión permanece activa una vez iniciada.
             var token = new JwtSecurityToken(
                 issuer: settings.Issuer,
                 audience: settings.Audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(settings.AccessTokenMinutes),
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
