@@ -42,7 +42,15 @@ public interface IInsumoRepository
 
     Task<HistorialPrecioInsumo> RegistrarCambioPrecioAsync(HistorialPrecioInsumo cambio);
 
-    Task EliminarPreciosAsync(int insumoId);
+    Task<int> RevincularHistorialEliminadoAsync(
+        int negocioId, string nombreInsumo, int nuevoInsumoId, int nuevaAsociacionId);
+
+    Task ArchivarHistorialAsync(int negocioId, int insumoId);
+
+    Task<List<HistorialPrecioInsumo>> ListarHistorialArchivadoPorInsumoAsync(int negocioId, int insumoId);
+
+    Task<List<HistorialPrecioInsumo>> ListarHistorialArchivadoGeneralAsync(
+        int negocioId, string? nombre, string? proveedor);
 
     Task<List<HistorialPrecioInsumo>> ListarHistorialPorInsumoAsync(int insumoId);
 

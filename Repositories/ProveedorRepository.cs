@@ -1,4 +1,5 @@
 ﻿using ChefMetrics_BackEnd.Model;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 using ChefMetrics_BackEnd.Utilities;
 namespace ChefMetrics_BackEnd.Repositories;
@@ -96,6 +97,41 @@ public sealed class ProveedorRepository : IProveedorRepository
             .FirstOrDefaultAsync();
     }
 
+    private async Task CompletarSnapshotsHistorialAsync(
+        HistorialPrecioInsumo historial, int insumoId, int proveedorId)
+    {
+        // Toda fila de historial nace con sus snapshots, salvo FechaEliminacion.
+        if (historial.NegocioId.HasValue && historial.InsumoIdOriginal.HasValue
+            && !string.IsNullOrWhiteSpace(historial.NombreInsumo)
+            && !string.IsNullOrWhiteSpace(historial.ProveedorNombre))
+        {
+            return;
+        }
+
+        var insumo = await _context.Insumos
+            .AsNoTracking()
+            .Where(i => i.Id == insumoId)
+            .Select(i => new { i.NegocioId, i.Nombre })
+            .FirstOrDefaultAsync();
+        if (insumo is not null)
+        {
+            historial.NegocioId ??= insumo.NegocioId;
+            historial.InsumoIdOriginal ??= insumoId;
+            if (string.IsNullOrWhiteSpace(historial.NombreInsumo)) historial.NombreInsumo = insumo.Nombre;
+        }
+
+        var proveedor = await _context.Proveedors
+            .AsNoTracking()
+            .Where(p => p.Id == proveedorId)
+            .Select(p => p.Nombre)
+            .FirstOrDefaultAsync();
+        if (!string.IsNullOrWhiteSpace(proveedor)
+            && string.IsNullOrWhiteSpace(historial.ProveedorNombre))
+        {
+            historial.ProveedorNombre = proveedor;
+        }
+    }
+
     public async Task<InsumoProveedor> AsociarAsync(
         int insumoId, int proveedorId, decimal costo, decimal cantidad, string unidadMedida)
     {
@@ -115,14 +151,17 @@ public sealed class ProveedorRepository : IProveedorRepository
         await _context.InsumoProveedors.AddAsync(nueva);
         await _context.SaveChangesAsync();
 
-        await _context.HistorialPrecioInsumos.AddAsync(new HistorialPrecioInsumo
+        var inicial = new HistorialPrecioInsumo
         {
             InsumoProveedorId = nueva.Id,
             CostoAnterior = costo,
             CostoNuevo = costo,
             Cantidad = cantidad,
+            UnidadMedida = unidadMedida,
             FechaCambio = DateTime.UtcNow
-        });
+        };
+        await CompletarSnapshotsHistorialAsync(inicial, insumoId, proveedorId);
+        await _context.HistorialPrecioInsumos.AddAsync(inicial);
         await _context.SaveChangesAsync();
 
         // Si es el primero (principal), sincroniza Insumo.Cantidad
@@ -210,14 +249,17 @@ public sealed class ProveedorRepository : IProveedorRepository
 
         if (!hayCambio) return true;
 
-        await _context.HistorialPrecioInsumos.AddAsync(new HistorialPrecioInsumo
+        var movimiento = new HistorialPrecioInsumo
         {
             InsumoProveedorId = asociacion.Id,
             CostoAnterior = asociacion.Costo,
             CostoNuevo = nuevoCosto,
             Cantidad = cantidadFinal,
+            UnidadMedida = unidadFinal,
             FechaCambio = DateTime.UtcNow
-        });
+        };
+        await CompletarSnapshotsHistorialAsync(movimiento, insumoId, proveedorId);
+        await _context.HistorialPrecioInsumos.AddAsync(movimiento);
 
         asociacion.Costo = nuevoCosto;
         asociacion.Cantidad = cantidadFinal;
@@ -264,12 +306,11 @@ public sealed class ProveedorRepository : IProveedorRepository
 
     public async Task<bool> ExisteNombreAsync(int negocioId, string nombre, int? excluirId = null)
     {
-        
-        var normalizado = NormalizadorTexto.Normalizar(nombre);
-
+        var clave = Normalizador.ClaveProveedor(nombre);
         var query = _context.Proveedors
             .AsNoTracking()
-            .Where(p => p.NegocioId == negocioId);
+            .Where(p => p.NegocioId == negocioId &&
+                EF.Functions.Collate(p.Nombre, Normalizador.CollationInsensible) == clave);
 
         if (excluirId.HasValue)
             query = query.Where(p => p.Id != excluirId.Value);
