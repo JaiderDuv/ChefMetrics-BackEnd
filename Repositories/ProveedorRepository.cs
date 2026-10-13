@@ -1,7 +1,6 @@
 ﻿using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
-using ChefMetrics_BackEnd.Utilities;
 namespace ChefMetrics_BackEnd.Repositories;
 
 public sealed class ProveedorRepository : IProveedorRepository
