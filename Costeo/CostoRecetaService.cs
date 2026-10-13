@@ -68,6 +68,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
         if (dto.SinCostosFijos) dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
         else fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
         var fijoProrrateado = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
+        AdvertenciaDivisorBajo(fijos, dto.Advertencias);
 
         // 3) Totales
         dto.CostoInsumos = decimal.Round(dto.Lineas.Sum(l => l.CostoInsumo), 2);
@@ -143,6 +144,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
         if (dto.SinCostosFijos) dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
         else fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
         var fijoProrrateado = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
+        AdvertenciaDivisorBajo(fijos, dto.Advertencias);
 
         dto.CostoInsumos = decimal.Round(dto.Lineas.Sum(l => l.CostoInsumo), 2);
         dto.CostoMermaAplicada = decimal.Round(dto.Lineas.Sum(l => l.MermaExtra), 2);
@@ -174,5 +176,13 @@ public sealed class CostoRecetaService : ICostoRecetaService
         else if (sel.Count < fijos.Count)
             advertencias.Add($"Costo fijo prorrateado calculado con {sel.Count} de {fijos.Count} costos fijos.");
         return sel;
+    }
+
+    // Sanity: un divisor muy bajo (< 10) hace que el prorrateo domine el costo
+    // (ej. divisor 1 carga el monto mensual COMPLETO a cada receta evaluada).
+    private static void AdvertenciaDivisorBajo(List<CostoFijo> fijos, List<string> advertencias)
+    {
+        if (fijos.Any(c => c.ValorDivisor < 10m))
+            advertencias.Add("Uno o más costos fijos tienen un valor divisor menor a 10: el prorrateo puede estar sobrestimado. Revisa el valor divisor en 'Costos fijos'.");
     }
 }

@@ -18,10 +18,16 @@ public sealed class CostosFijosService : ICostosFijosService
     private const string NoExiste = "No se encontró el costo fijo solicitado.";
     private const string Duplicado = "Ya existe un costo fijo con ese nombre en tu negocio.";
 
-    // Valores permitidos por CK_CostoFijo_UnidadProrrateo.
+    // Valores permitidos por CK_CostoFijo_UnidadProrrateo en la BD.
+    // 'horas_produccion' se retiró de las opciones: el sistema no registra la
+    // duración de cada receta, así que no puede prorratear por hora real de producción
+    // (cobraría el mismo $/hora a una receta de 5 min que a una de 3 h).
+    // Los costos fijos existentes con esa unidad se conservan ("valores heredados"):
+    // siguen calculándose igual (monto ÷ divisor) y pueden seguir editándose,
+    // pero no pueden cambiarse a otro valor inválido ni usarse en registros nuevos.
     private static readonly HashSet<string> UnidadesValidas = new(StringComparer.OrdinalIgnoreCase)
     {
-        "recetas_activas", "horas_produccion", "unidades_producidas"
+        "recetas_activas", "unidades_producidas"
     };
 
     private readonly ICosteoRepository _repo;
@@ -62,7 +68,9 @@ public sealed class CostosFijosService : ICostosFijosService
 
         if (decimal.Round(dto.MontoMensual, 2) != dto.MontoMensual)
             return ResultadoCosteo<CostoFijoDto>.Error("El monto mensual admite máximo 2 decimales.");
-        if (decimal.Round(dto.ValorDivisor, 2) != dto.ValorDivisor)
+        if (!dto.ValorDivisor.HasValue)
+            return ResultadoCosteo<CostoFijoDto>.Error("El valor divisor es obligatorio.");
+        if (decimal.Round(dto.ValorDivisor.Value, 2) != dto.ValorDivisor.Value)
             return ResultadoCosteo<CostoFijoDto>.Error("El valor divisor admite máximo 2 decimales.");
 
         if (await _repo.ExisteNombreCostoFijoAsync(negocioId.Value, nombre))
@@ -74,7 +82,7 @@ public sealed class CostosFijosService : ICostosFijosService
             Nombre = nombre,
             MontoMensual = dto.MontoMensual,
             UnidadProrrateo = unidad,
-            ValorDivisor = dto.ValorDivisor,
+            ValorDivisor = dto.ValorDivisor.Value,
             Activo = dto.Activo ?? true
         });
         return ResultadoCosteo<CostoFijoDto>.Ok(Mapear(creado), "El costo fijo fue creado correctamente.");
@@ -107,8 +115,20 @@ public sealed class CostosFijosService : ICostosFijosService
         if (dto.UnidadProrrateo is not null)
         {
             var unidad = NormalizarUnidad(dto.UnidadProrrateo);
-            if (unidad is null) return ResultadoCosteo<CostoFijoDto>.Error(MensajeUnidad());
-            c.UnidadProrrateo = unidad; hayCambios = true;
+            if (unidad is null)
+            {
+                // Valor heredado ('horas_produccion'): ya no se ofrece, pero un costo
+                // fijo existente puede conservarlo. Solo se rechaza si intenta cambiarse
+                // por un valor distinto e inválido.
+                var entrante = dto.UnidadProrrateo.Trim().ToLowerInvariant();
+                if (!string.Equals(c.UnidadProrrateo, entrante, StringComparison.OrdinalIgnoreCase))
+                    return ResultadoCosteo<CostoFijoDto>.Error(MensajeUnidad());
+                // Mismo valor heredado: no hay cambio que aplicar en la unidad.
+            }
+            else
+            {
+                c.UnidadProrrateo = unidad; hayCambios = true;
+            }
         }
         if (dto.ValorDivisor.HasValue)
         {

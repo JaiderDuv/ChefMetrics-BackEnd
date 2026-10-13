@@ -86,8 +86,11 @@ public sealed class CrearCostoFijoDto
     [StringLength(30)]
     public string UnidadProrrateo { get; set; } = "unidades_producidas";
 
+    // Obligatorio y sin valor por defecto: si se omite, el costo mensual completo
+    // se cargaría a cada receta (el default anterior de 1.00 producía costos absurdos).
+    [Required(ErrorMessage = "El valor divisor es obligatorio.")]
     [Range(0.01, 1000000, ErrorMessage = "El valor divisor debe estar entre 0,01 y 1.000.000.")]
-    public decimal ValorDivisor { get; set; } = 1;
+    public decimal? ValorDivisor { get; set; }
 
     public bool? Activo { get; set; }
 }
