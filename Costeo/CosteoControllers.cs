@@ -14,10 +14,10 @@ public sealed class CostoRecetaController : ControllerBase
     public CostoRecetaController(ICostoRecetaService servicio) => _servicio = servicio;
 
     [HttpGet]
-    public async Task<IActionResult> Obtener([FromRoute] int id)
+    public async Task<IActionResult> Obtener([FromRoute] int id, [FromQuery] List<int>? costosFijosIds)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
-        var r = await _servicio.CalcularAsync(cuentaId, id);
+        var r = await _servicio.CalcularAsync(cuentaId, id, costosFijosIds);
         return r.NoEncontrado ? NotFound(new { mensaje = r.Mensaje }) : Ok(r.Datos);
     }
 
@@ -37,12 +37,12 @@ public sealed class EscaladoRecetaController : ControllerBase
     public EscaladoRecetaController(ICostoRecetaService servicio) => _servicio = servicio;
 
     [HttpGet]
-    public async Task<IActionResult> Obtener([FromRoute] int id, [FromQuery] int porciones)
+    public async Task<IActionResult> Obtener([FromRoute] int id, [FromQuery] int porciones, [FromQuery] List<int>? costosFijosIds)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
         if (porciones <= 0) return BadRequest(new { mensaje = "Las porciones deseadas deben ser mayores a 0." });
 
-        var r = await _servicio.CalcularEscaladoAsync(cuentaId, id, porciones);
+        var r = await _servicio.CalcularEscaladoAsync(cuentaId, id, porciones, costosFijosIds);
         if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
         if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
         return Ok(r.Datos);
