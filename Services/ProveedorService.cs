@@ -212,6 +212,27 @@ public sealed class ProveedorService : IProveedorService
         return ResultadoProveedorDto.Ok(MapearProveedor(proveedor), mensaje);
     }
 
+    public async Task<ResultadoChequeoEliminarDto> ChequearEliminarProveedorAsync(int cuentaId, int proveedorId)
+    {
+        var negocioId = await _repository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (negocioId is null)
+            return ResultadoChequeoEliminarDto.NoHallado("Aún no tienes un negocio registrado.");
+
+        var proveedor = await _repository.ObtenerPorIdDelNegocioAsync(negocioId.Value, proveedorId);
+        if (proveedor is null)
+            return ResultadoChequeoEliminarDto.NoHallado("El proveedor no existe.");
+
+        var nombresInsumos = await _repository.ObtenerNombresInsumosAsociadosAsync(proveedorId);
+
+        return ResultadoChequeoEliminarDto.Ok(new ChequeoEliminarProveedorDto
+        {
+            ProveedorId = proveedor.Id,
+            Nombre = proveedor.Nombre,
+            TieneInsumos = nombresInsumos.Count > 0,
+            NombresInsumos = nombresInsumos
+        });
+    }
+
     public async Task<ResultadoProveedorDto> EliminarProveedorAsync(int cuentaId, int proveedorId)
     {
         var negocioId = await _repository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
@@ -222,10 +243,8 @@ public sealed class ProveedorService : IProveedorService
         if (proveedor is null)
             return ResultadoProveedorDto.NoHallado("El proveedor no existe.");
 
-        var asociaciones = await _repository.ContarAsociacionesAsync(proveedorId);
-        if (asociaciones > 0)
-            return ResultadoProveedorDto.Error(
-                $"No se puede eliminar: este proveedor está asociado a {asociaciones} insumo(s). Quítalo de esos insumos primero.");
+        // Elimina todas las asociaciones y su historial antes de eliminar el proveedor
+        await _repository.EliminarAsociacionesDeProveedorAsync(proveedorId);
 
         _repository.Eliminar(proveedor);
         await _repository.GuardarCambiosAsync();

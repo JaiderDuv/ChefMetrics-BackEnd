@@ -135,6 +135,16 @@ public sealed class ProveedoresController : ControllerBase
         return Responder(resultado);
     }
 
+    [HttpGet("proveedores/{proveedorId:int}/chequear-eliminar")]
+    public async Task<IActionResult> ChequearEliminar(int proveedorId)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+
+        var resultado = await _proveedorService.ChequearEliminarProveedorAsync(cuentaId, proveedorId);
+        if (resultado.NoEncontrado) return NotFound(new { mensaje = resultado.Mensaje });
+        return Ok(resultado.Datos);
+    }
+
     [HttpDelete("proveedores/{proveedorId:int}")]
     public async Task<IActionResult> Eliminar(int proveedorId)
     {
