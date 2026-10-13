@@ -346,8 +346,9 @@ public sealed class ProveedorRepository : IProveedorRepository
         if (asociacionIds.Any())
         {
             var historial = await _context.HistorialPrecioInsumos
-                .Where(h => asociacionIds.Contains(h.InsumoProveedorId))
-                .ToListAsync();
+    .Where(h => h.InsumoProveedorId != null &&
+                asociacionIds.Contains(h.InsumoProveedorId.Value))
+    .ToListAsync();
             _context.HistorialPrecioInsumos.RemoveRange(historial);
 
             var asociaciones = await _context.InsumoProveedors
