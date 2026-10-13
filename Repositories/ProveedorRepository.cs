@@ -273,9 +273,7 @@ public sealed class ProveedorRepository : IProveedorRepository
 
         if (excluirId.HasValue)
             query = query.Where(p => p.Id != excluirId.Value);
-
-        var existentes = await query.Select(p => p.Nombre).ToListAsync();
-        return existentes.Any(n => NormalizadorTexto.Normalizar(n) == normalizado);
+        return await query.AnyAsync();
     }
 
     public async Task<List<string>> ObtenerNombresInsumosAsociadosAsync(int proveedorId)
