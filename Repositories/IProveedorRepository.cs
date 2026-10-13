@@ -25,6 +25,8 @@ public interface IProveedorRepository
     Task<Proveedor?> ObtenerPorIdDelNegocioAsync(int negocioId, int proveedorId);
     Task<int> ContarAsociacionesAsync(int proveedorId);
     Task<int> PropagarNombreAInsumosAsync(int negocioId, int proveedorId, string nombreNuevo);
+    Task EliminarAsociacionesDeProveedorAsync(int proveedorId);
+    Task<List<string>> ObtenerNombresInsumosAsociadosAsync(int proveedorId);
     Task ActualizarAsync(Proveedor proveedor);
     void Eliminar(Proveedor proveedor);
     Task GuardarCambiosAsync();

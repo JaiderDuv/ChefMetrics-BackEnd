@@ -1,7 +1,7 @@
 ﻿using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
-
+using ChefMetrics_BackEnd.Utilities;
 namespace ChefMetrics_BackEnd.Repositories;
 
 public sealed class ProveedorRepository : IProveedorRepository
@@ -315,7 +315,19 @@ public sealed class ProveedorRepository : IProveedorRepository
         if (excluirId.HasValue)
             query = query.Where(p => p.Id != excluirId.Value);
 
-        return await query.AnyAsync();
+        var existentes = await query.Select(p => p.Nombre).ToListAsync();
+        return existentes.Any(n => NormalizadorTexto.Normalizar(n) == normalizado);
+    }
+
+    public async Task<List<string>> ObtenerNombresInsumosAsociadosAsync(int proveedorId)
+    {
+        return await _context.InsumoProveedors
+            .AsNoTracking()
+            .Where(ip => ip.ProveedorId == proveedorId)
+            .Select(ip => ip.Insumo.Nombre)
+            .Distinct()
+            .OrderBy(n => n)
+            .ToListAsync();
     }
 
     public async Task ActualizarAsync(Proveedor proveedor)
@@ -325,6 +337,44 @@ public sealed class ProveedorRepository : IProveedorRepository
     }
 
     public void Eliminar(Proveedor proveedor) => _context.Proveedors.Remove(proveedor);
+    public async Task EliminarAsociacionesDeProveedorAsync(int proveedorId)
+    {
+        // Primero borra el historial de precios de todas las asociaciones
+        var asociacionIds = await _context.InsumoProveedors
+            .Where(ip => ip.ProveedorId == proveedorId)
+            .Select(ip => ip.Id)
+            .ToListAsync();
+
+        if (asociacionIds.Any())
+        {
+            var historial = await _context.HistorialPrecioInsumos
+                .Where(h => asociacionIds.Contains(h.InsumoProveedorId))
+                .ToListAsync();
+            _context.HistorialPrecioInsumos.RemoveRange(historial);
+
+            var asociaciones = await _context.InsumoProveedors
+                .Where(ip => ip.ProveedorId == proveedorId)
+                .ToListAsync();
+
+            // Para cada asociación que era principal, limpiar el campo Proveedor del insumo
+            var insumoIdsConPrincipal = asociaciones
+                .Where(ip => ip.EsPrincipal)
+                .Select(ip => ip.InsumoId)
+                .ToList();
+
+            if (insumoIdsConPrincipal.Any())
+            {
+                await _context.Insumos
+                    .Where(i => insumoIdsConPrincipal.Contains(i.Id))
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(i => i.Proveedor, (string?)null)
+                        .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
+            }
+
+            _context.InsumoProveedors.RemoveRange(asociaciones);
+            await _context.SaveChangesAsync();
+        }
+    }
 
     public async Task GuardarCambiosAsync() => await _context.SaveChangesAsync();
 
