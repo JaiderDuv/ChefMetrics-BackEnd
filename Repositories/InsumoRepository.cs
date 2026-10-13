@@ -1,4 +1,5 @@
 using ChefMetrics_BackEnd.Model;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChefMetrics_BackEnd.Repositories;
@@ -57,7 +58,7 @@ public sealed class InsumoRepository : IInsumoRepository
 
         if (!string.IsNullOrWhiteSpace(categoria))
         {
-            var categoriaNormalizada = categoria.Trim().ToLower();
+            var categoriaNormalizada = Normalizador.NormalizarCategoria(categoria);
             query = query.Where(i => i.Categoria.ToLower() == categoriaNormalizada);
         }
 
@@ -123,10 +124,11 @@ public sealed class InsumoRepository : IInsumoRepository
 
     public async Task<Proveedor> ObtenerOCrearProveedorAsync(int negocioId, string nombre)
     {
-        var normalizado = nombre.Trim();
+        var clave = Normalizador.ClaveProveedor(nombre);
         var existente = await _context.Proveedors
             .FirstOrDefaultAsync(p =>
-                p.NegocioId == negocioId && p.Nombre.ToLower() == normalizado.ToLower());
+                p.NegocioId == negocioId &&
+                EF.Functions.Collate(p.Nombre, Normalizador.CollationInsensible) == clave);
 
         if (existente is not null)
         {
@@ -136,7 +138,7 @@ public sealed class InsumoRepository : IInsumoRepository
         var nuevo = new Proveedor
         {
             NegocioId = negocioId,
-            Nombre = normalizado,
+            Nombre = Normalizador.NormalizarProveedor(nombre)!,
             FechaCreacion = DateTime.UtcNow
         };
 
@@ -199,22 +201,151 @@ public sealed class InsumoRepository : IInsumoRepository
 
     public async Task<HistorialPrecioInsumo> RegistrarCambioPrecioAsync(HistorialPrecioInsumo cambio)
     {
+        // Red de seguridad: toda fila de historial nace con sus snapshots
+        // (negocio, insumo, proveedor y unidad), salvo FechaEliminacion.
+        if (cambio.InsumoProveedorId.HasValue
+            && (cambio.NegocioId is null || cambio.InsumoIdOriginal is null
+                || string.IsNullOrWhiteSpace(cambio.NombreInsumo)
+                || string.IsNullOrWhiteSpace(cambio.ProveedorNombre)
+                || string.IsNullOrWhiteSpace(cambio.UnidadMedida)))
+        {
+            var info = await _context.InsumoProveedors
+                .AsNoTracking()
+                .Where(ip => ip.Id == cambio.InsumoProveedorId.Value)
+                .Select(ip => new
+                {
+                    NegocioId = ip.Insumo.NegocioId,
+                    InsumoId = ip.InsumoId,
+                    NombreInsumo = ip.Insumo.Nombre,
+                    ProveedorNombre = ip.Proveedor.Nombre,
+                    UnidadMedida = ip.UnidadMedida
+                })
+                .FirstOrDefaultAsync();
+
+            if (info is not null)
+            {
+                cambio.NegocioId ??= info.NegocioId;
+                cambio.InsumoIdOriginal ??= info.InsumoId;
+                if (string.IsNullOrWhiteSpace(cambio.NombreInsumo)) cambio.NombreInsumo = info.NombreInsumo;
+                if (string.IsNullOrWhiteSpace(cambio.ProveedorNombre)) cambio.ProveedorNombre = info.ProveedorNombre;
+                if (string.IsNullOrWhiteSpace(cambio.UnidadMedida)) cambio.UnidadMedida = info.UnidadMedida;
+            }
+        }
+
         await _context.HistorialPrecioInsumos.AddAsync(cambio);
         await _context.SaveChangesAsync();
         return cambio;
     }
 
-    public async Task EliminarPreciosAsync(int insumoId)
+    public async Task<int> RevincularHistorialEliminadoAsync(
+        int negocioId, string nombreInsumo, int nuevoInsumoId, int nuevaAsociacionId)
     {
-        var historial = await _context.HistorialPrecioInsumos
-            .Where(h => h.InsumoProveedor.InsumoId == insumoId)
+        // Al recrear un insumo con el nombre de uno eliminado, su historial
+        // archivado vuelve a la vida atado al nuevo insumo y asociación.
+        var clave = nombreInsumo.Trim().ToLower();
+        var archivo = await _context.HistorialPrecioInsumos
+            .Where(h => h.FechaEliminacion != null
+                && h.NegocioId == negocioId
+                && h.NombreInsumo != null
+                && h.NombreInsumo.ToLower() == clave)
             .ToListAsync();
-        _context.HistorialPrecioInsumos.RemoveRange(historial);
 
-        var asociaciones = await _context.InsumoProveedors
-            .Where(ip => ip.InsumoId == insumoId)
+        foreach (var h in archivo)
+        {
+            h.InsumoIdOriginal = nuevoInsumoId;
+            h.InsumoProveedorId = nuevaAsociacionId;
+            h.FechaEliminacion = null;
+        }
+
+        await _context.SaveChangesAsync();
+        return archivo.Count;
+    }
+
+    public async Task ArchivarHistorialAsync(int negocioId, int insumoId)
+    {
+        // El historial se conserva: se copian los datos de insumo/proveedor a las
+        // columnas snapshot y se suelta el FK antes de borrar asociaciones e insumo.
+        // Todo con bulk operations sin tracking para no chocar con el borrado del insumo.
+        var ahora = DateTime.UtcNow;
+        var filas = await _context.HistorialPrecioInsumos
+            .AsNoTracking()
+            .Include(h => h.InsumoProveedor)
+                .ThenInclude(ip => ip.Proveedor)
+            .Include(h => h.InsumoProveedor)
+                .ThenInclude(ip => ip.Insumo)
+            .Where(h => h.InsumoProveedorId != null && h.InsumoProveedor.InsumoId == insumoId)
+            .Select(h => new
+            {
+                h.Id,
+                h.NombreInsumo,
+                h.ProveedorNombre,
+                h.UnidadMedida,
+                InsumoNombre = h.InsumoProveedor.Insumo.Nombre,
+                Proveedor = h.InsumoProveedor.Proveedor.Nombre,
+                UnidadAsociacion = h.InsumoProveedor.UnidadMedida,
+                UnidadInsumo = h.InsumoProveedor.Insumo.UnidadMedida
+            })
             .ToListAsync();
-        _context.InsumoProveedors.RemoveRange(asociaciones);
+
+        foreach (var f in filas)
+        {
+            var nombre = string.IsNullOrWhiteSpace(f.NombreInsumo) ? f.InsumoNombre : f.NombreInsumo;
+            var proveedor = string.IsNullOrWhiteSpace(f.ProveedorNombre) ? f.Proveedor : f.ProveedorNombre;
+            string? unidad = string.IsNullOrWhiteSpace(f.UnidadMedida)
+                ? (string.IsNullOrWhiteSpace(f.UnidadAsociacion) ? f.UnidadInsumo : f.UnidadAsociacion)
+                : f.UnidadMedida;
+            if (string.IsNullOrWhiteSpace(unidad))
+            {
+                unidad = null;
+            }
+            await _context.HistorialPrecioInsumos
+                .Where(h => h.Id == f.Id)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(h => h.NegocioId, negocioId)
+                    .SetProperty(h => h.InsumoIdOriginal, insumoId)
+                    .SetProperty(h => h.NombreInsumo, nombre)
+                    .SetProperty(h => h.ProveedorNombre, proveedor)
+                    .SetProperty(h => h.UnidadMedida, unidad)
+                    .SetProperty(h => h.FechaEliminacion, ahora)
+                    .SetProperty(h => h.InsumoProveedorId, (int?)null));
+        }
+
+        await _context.InsumoProveedors
+            .Where(ip => ip.InsumoId == insumoId)
+            .ExecuteDeleteAsync();
+    }
+
+    public Task<List<HistorialPrecioInsumo>> ListarHistorialArchivadoPorInsumoAsync(int negocioId, int insumoId)
+    {
+        return _context.HistorialPrecioInsumos
+            .AsNoTracking()
+            .Where(h => h.FechaEliminacion != null && h.NegocioId == negocioId && h.InsumoIdOriginal == insumoId)
+            .OrderByDescending(h => h.FechaCambio)
+            .ToListAsync();
+    }
+
+    public Task<List<HistorialPrecioInsumo>> ListarHistorialArchivadoGeneralAsync(
+        int negocioId, string? nombre, string? proveedor)
+    {
+        var query = _context.HistorialPrecioInsumos
+            .AsNoTracking()
+            .Where(h => h.FechaEliminacion != null && h.NegocioId == negocioId);
+
+        if (!string.IsNullOrWhiteSpace(nombre))
+        {
+            var termino = nombre.Trim().ToLower();
+            query = query.Where(h => h.NombreInsumo != null && h.NombreInsumo.ToLower().Contains(termino));
+        }
+
+        if (!string.IsNullOrWhiteSpace(proveedor))
+        {
+            var termino = proveedor.Trim().ToLower();
+            query = query.Where(h => h.ProveedorNombre != null && h.ProveedorNombre.ToLower().Contains(termino));
+        }
+
+        return query
+            .OrderByDescending(h => h.FechaCambio)
+            .ToListAsync();
     }
 
     public async Task<List<HistorialPrecioInsumo>> ListarHistorialPorInsumoAsync(int insumoId)

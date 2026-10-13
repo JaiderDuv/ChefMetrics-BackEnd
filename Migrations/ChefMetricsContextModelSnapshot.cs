@@ -118,7 +118,7 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.HasIndex(new[] { "Correo" }, "UQ_Cuenta_Correo")
                         .IsUnique();
 
-                    b.ToTable("Cuenta");
+                    b.ToTable("Cuenta", (string)null);
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Empleado", b =>
@@ -417,7 +417,7 @@ namespace ChefMetrics_BackEnd.Migrations
 
                     b.HasIndex(new[] { "CuentaId" }, "IX_PasswordResetTokens_CuentaId");
 
-                    b.ToTable("PasswordResetTokens");
+                    b.ToTable("PasswordResetTokens", (string)null);
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.PerfilEditGrant", b =>
@@ -456,7 +456,7 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.HasIndex(new[] { "TokenHash" }, "UQ_PerfilEditGrant_TokenHash")
                         .IsUnique();
 
-                    b.ToTable("PerfilEditGrants");
+                    b.ToTable("PerfilEditGrants", (string)null);
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.ProductoMenu", b =>
@@ -522,7 +522,7 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.HasIndex(new[] { "ProductoMenuId", "RecetaId" }, "UQ_ProductoMenuReceta")
                         .IsUnique();
 
-                    b.ToTable("ProductoMenuReceta");
+                    b.ToTable("ProductoMenuReceta", (string)null);
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Proveedor", b =>
@@ -596,7 +596,7 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.HasIndex(new[] { "NegocioId", "Nombre" }, "UQ_Receta_NegocioNombre")
                         .IsUnique();
 
-                    b.ToTable("Receta");
+                    b.ToTable("Receta", (string)null);
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.RecetaInsumo", b =>
@@ -666,7 +666,7 @@ namespace ChefMetrics_BackEnd.Migrations
 
                     b.HasIndex(new[] { "CuentaId" }, "IX_RefreshTokens_CuentaId");
 
-                    b.ToTable("RefreshTokens");
+                    b.ToTable("RefreshTokens", (string)null);
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.Role", b =>
@@ -688,7 +688,7 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.HasIndex(new[] { "Nombre" }, "UQ_Roles_Nombre")
                         .IsUnique();
 
-                    b.ToTable("Roles");
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("ChefMetrics_BackEnd.Model.TipoEmprendimiento", b =>
