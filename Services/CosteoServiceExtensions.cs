@@ -1,4 +1,6 @@
-﻿namespace ChefMetrics_BackEnd.Costeo;
+﻿using ChefMetrics_BackEnd.Repositories;
+
+namespace ChefMetrics_BackEnd.Services;
 
 public static class CosteoServiceExtensions
 {

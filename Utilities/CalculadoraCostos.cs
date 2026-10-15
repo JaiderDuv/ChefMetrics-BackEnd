@@ -1,6 +1,6 @@
-﻿using ChefMetrics_BackEnd.Utilities;
+﻿using ChefMetrics_BackEnd.Dtos;
 
-namespace ChefMetrics_BackEnd.Costeo;
+namespace ChefMetrics_BackEnd.Utilities;
 
 public static class CalculadoraCostos
 {

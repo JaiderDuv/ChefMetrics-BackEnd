@@ -1,7 +1,8 @@
-﻿using ChefMetrics_BackEnd.Model;
+﻿using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
 
-namespace ChefMetrics_BackEnd.Costeo;
+namespace ChefMetrics_BackEnd.Services;
 
 public interface ICostosFijosService
 {

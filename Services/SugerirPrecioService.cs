@@ -1,4 +1,6 @@
-﻿namespace ChefMetrics_BackEnd.Costeo;
+﻿using ChefMetrics_BackEnd.Dtos;
+
+namespace ChefMetrics_BackEnd.Services;
 
 public interface ISugerirPrecioService
 {

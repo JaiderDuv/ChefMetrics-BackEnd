@@ -1,12 +1,13 @@
-﻿using ChefMetrics_BackEnd.Model;
+﻿using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics_BackEnd.Model;
 using Microsoft.EntityFrameworkCore;
 
-namespace ChefMetrics_BackEnd.Costeo;
+namespace ChefMetrics_BackEnd.Repositories;
 
 public interface ICosteoRepository
 {
     Task<Receta?> ObtenerRecetaConInsumosAsync(int negocioId, int recetaId);
-    Task<Dictionary<int, decimal>> ObtenerCostosProveedorPrincipalAsync(IEnumerable<int> insumoIds);
+    Task<Dictionary<int, PrecioProveedorPrincipal>> ObtenerCostosProveedorPrincipalAsync(IEnumerable<int> insumoIds);
     Task<List<CostoFijo>> ListarCostosFijosAsync(int negocioId, bool soloActivos);
     Task<CostoFijo?> ObtenerCostoFijoAsync(int negocioId, int id, bool conTracking);
     Task<bool> ExisteNombreCostoFijoAsync(int negocioId, string nombre, int? excluirId = null);
@@ -25,16 +26,21 @@ public sealed class CosteoRepository : ICosteoRepository
             .Include(r => r.RecetaInsumos).ThenInclude(ri => ri.Insumo)
             .FirstOrDefaultAsync(r => r.Id == recetaId && r.NegocioId == negocioId);
 
-    // Costo del proveedor marcado como principal (si hay varios, el más reciente).
-    public async Task<Dictionary<int, decimal>> ObtenerCostosProveedorPrincipalAsync(IEnumerable<int> insumoIds)
+    // Cotización del proveedor marcado como principal (si hay varios, el más reciente).
+    // Devuelve el paquete completo: el precio por unidad se calcula en el servicio.
+    public async Task<Dictionary<int, PrecioProveedorPrincipal>> ObtenerCostosProveedorPrincipalAsync(IEnumerable<int> insumoIds)
     {
         var ids = insumoIds.ToList();
         var filas = await _db.InsumoProveedors.AsNoTracking()
             .Where(ip => ids.Contains(ip.InsumoId) && ip.EsPrincipal)
-            .Select(ip => new { ip.InsumoId, ip.Costo, ip.FechaActualizacion })
+            .Select(ip => new { ip.InsumoId, ip.Costo, ip.Cantidad, ip.UnidadMedida, ip.FechaActualizacion })
             .ToListAsync();
         return filas.GroupBy(f => f.InsumoId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.FechaActualizacion).First().Costo);
+            .ToDictionary(g => g.Key, g =>
+            {
+                var x = g.OrderByDescending(f => f.FechaActualizacion).First();
+                return new PrecioProveedorPrincipal(x.Costo, x.Cantidad, x.UnidadMedida);
+            });
     }
 
     public Task<List<CostoFijo>> ListarCostosFijosAsync(int negocioId, bool soloActivos) =>

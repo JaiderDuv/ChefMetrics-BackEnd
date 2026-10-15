@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace ChefMetrics_BackEnd.Costeo;
+namespace ChefMetrics_BackEnd.Dtos;
 
 public sealed class ResultadoCosteo<T>
 {
@@ -15,6 +15,9 @@ public sealed class ResultadoCosteo<T>
 }
 
 // ---------- Costo de receta (CONTRATO que consume HU8.2) ----------
+// Cotización del proveedor principal: Costo es el TOTAL del paquete
+// (Cantidad + UnidadMedida). El precio por unidad se calcula dividiendo.
+public sealed record PrecioProveedorPrincipal(decimal Costo, decimal Cantidad, string UnidadMedida);
 public sealed class LineaCostoDto
 {
     public int InsumoId { get; set; }
