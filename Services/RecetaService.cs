@@ -252,6 +252,10 @@ public sealed class RecetaService : IRecetaService
 
     private static string? NormalizarTexto(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();
 
+    // Insumo.CostoUnitario es el total del paquete (Insumo.Cantidad): se divide para el precio por unidad.
+    private static decimal CostoPorUnidad(Insumo i) =>
+        i.Cantidad.HasValue && i.Cantidad.Value > 0 ? i.CostoUnitario / i.Cantidad.Value : i.CostoUnitario;
+
     private static RecetaDto Mapear(Receta r)
     {
         var lineas = r.RecetaInsumos.Select(ri => new RecetaInsumoDto
@@ -261,7 +265,7 @@ public sealed class RecetaService : IRecetaService
             Cantidad = ri.Cantidad,
             UnidadMedida = ri.UnidadMedida,
             CostoLinea = ConversorUnidades.CostoLinea(ri.Cantidad, ri.UnidadMedida,
-                ri.Insumo.UnidadMedida, ri.Insumo.CostoUnitario, ri.Insumo.PorcentajeMerma)
+                ri.Insumo.UnidadMedida, CostoPorUnidad(ri.Insumo), ri.Insumo.PorcentajeMerma)
         }).ToList();
 
         var total = decimal.Round(lineas.Sum(l => l.CostoLinea), 2);

@@ -1,4 +1,4 @@
-﻿namespace ChefMetrics_BackEnd.Costeo;
+﻿namespace ChefMetrics_BackEnd.Dtos;
 
 public sealed class SugerirPrecioDto
 {

@@ -1,8 +1,9 @@
-﻿using ChefMetrics_BackEnd.Model;
+﻿using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
 using ChefMetrics_BackEnd.Utilities;
 
-namespace ChefMetrics_BackEnd.Costeo;
+namespace ChefMetrics_BackEnd.Services;
 
 public interface ICostoRecetaService
 {
@@ -50,11 +51,16 @@ public sealed class CostoRecetaService : ICostoRecetaService
             }
 
             decimal costo; string fuente;
-            if (principales.TryGetValue(i.Id, out var cp)) { costo = cp; fuente = "proveedor_principal"; }
+            if (principales.TryGetValue(i.Id, out var pp) &&
+                CostoPorUnidad(pp, i.UnidadMedida) is { } cpu)
+            { costo = cpu; fuente = "proveedor_principal"; }
             else
             {
-                costo = i.CostoUnitario; fuente = "costo_unitario_respaldo";
-                dto.Advertencias.Add($"'{i.Nombre}' no tiene proveedor principal; se usó su costo unitario.");
+                if (principales.ContainsKey(i.Id))
+                    dto.Advertencias.Add($"'{i.Nombre}': no se pudo determinar su precio por unidad con los datos del proveedor; se usó su costo unitario.");
+                else
+                    dto.Advertencias.Add($"'{i.Nombre}' no tiene proveedor principal; se usó su costo unitario.");
+                costo = CostoRespaldoPorUnidad(i); fuente = "costo_unitario_respaldo";
             }
             if (costo <= 0) dto.Advertencias.Add($"'{i.Nombre}' tiene costo 0; el resultado puede estar subestimado.");
 
@@ -127,11 +133,16 @@ public sealed class CostoRecetaService : ICostoRecetaService
             }
 
             decimal costo; string fuente;
-            if (principales.TryGetValue(i.Id, out var cp)) { costo = cp; fuente = "proveedor_principal"; }
+            if (principales.TryGetValue(i.Id, out var pp) &&
+                CostoPorUnidad(pp, i.UnidadMedida) is { } cpu)
+            { costo = cpu; fuente = "proveedor_principal"; }
             else
             {
-                costo = i.CostoUnitario; fuente = "costo_unitario_respaldo";
-                dto.Advertencias.Add($"'{i.Nombre}' no tiene proveedor principal; se usó su costo unitario.");
+                if (principales.ContainsKey(i.Id))
+                    dto.Advertencias.Add($"'{i.Nombre}': no se pudo determinar su precio por unidad con los datos del proveedor; se usó su costo unitario.");
+                else
+                    dto.Advertencias.Add($"'{i.Nombre}' no tiene proveedor principal; se usó su costo unitario.");
+                costo = CostoRespaldoPorUnidad(i); fuente = "costo_unitario_respaldo";
             }
             if (costo <= 0) dto.Advertencias.Add($"'{i.Nombre}' tiene costo 0; el resultado puede estar subestimado.");
 
@@ -159,6 +170,21 @@ public sealed class CostoRecetaService : ICostoRecetaService
         }
         return ResultadoCosteo<EscaladoRecetaDto>.Ok(dto);
     }
+
+    // Precio por unidad del insumo a partir del paquete del proveedor principal.
+    // null si no se puede determinar (cantidad 0 o unidad incompatible).
+    // Nota: el factor convierte cantidades (1 kg -> 1000 g), así que el precio
+    // por unidad se divide por él (precio por g = precio por kg / 1000).
+    private static decimal? CostoPorUnidad(PrecioProveedorPrincipal pp, string unidadInsumo)
+    {
+        if (pp.Cantidad <= 0 || string.IsNullOrWhiteSpace(pp.UnidadMedida)) return null;
+        var factor = ConversorUnidades.Convertir(1m, pp.UnidadMedida, unidadInsumo);
+        return factor is null or 0 ? null : pp.Costo / pp.Cantidad / factor;
+    }
+
+    // Respaldo: Insumo.CostoUnitario también es el total del paquete (Insumo.Cantidad).
+    private static decimal CostoRespaldoPorUnidad(Insumo i) =>
+        i.Cantidad.HasValue && i.Cantidad.Value > 0 ? i.CostoUnitario / i.Cantidad.Value : i.CostoUnitario;
 
     // Si el usuario seleccionó costos fijos específicos, el prorrateo usa solo esos.
     private static List<CostoFijo> FiltrarFijosSeleccionados(
