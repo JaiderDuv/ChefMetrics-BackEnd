@@ -10,6 +10,10 @@ public static class CosteoServiceExtensions
         services.AddScoped<ICostoRecetaService, CostoRecetaService>();
         services.AddScoped<ICostosFijosService, CostosFijosService>();
         services.AddScoped<ISugerirPrecioService, SugerirPrecioService>();
+        services.AddScoped<IProductoMenuRepository, ProductoMenuRepository>();
+        services.AddScoped<ICostoProductoService, CostoProductoService>();
+        services.AddScoped<IProductoMenuService, ProductoMenuService>();
+        services.AddScoped<ISugerirPrecioProductoService, SugerirPrecioProductoService>();
         return services;
     }
 }
