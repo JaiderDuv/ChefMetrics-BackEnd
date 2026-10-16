@@ -1,0 +1,199 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace ChefMetrics_BackEnd.Dtos;
+
+// ---------- Ítems del producto ----------
+// Un producto se compone de recetas (mínimo una) y opcionalmente de
+// insumos directos (empaques) que no forman parte de ninguna receta.
+// NOTA: no hay cambios de BD en esta HU: solo se persiste
+// ProductoMenu + ProductoMenuReceta (tablas existentes). Los insumos
+// directos NO se almacenan; se usan de forma transitoria en los
+// endpoints de costeo/preview con el mismo tratamiento de merma y
+// proveedor principal.
+public sealed class RecetaEnProductoDto
+{
+    [Range(1, int.MaxValue, ErrorMessage = "Selecciona una receta.")]
+    public int RecetaId { get; set; }
+
+    [Range(0.001, 10000, ErrorMessage = "La cantidad debe estar entre 0.001 y 10000.")]
+    public decimal Cantidad { get; set; }
+}
+
+public sealed class InsumoDirectoDto
+{
+    [Range(1, int.MaxValue, ErrorMessage = "Selecciona un insumo.")]
+    public int InsumoId { get; set; }
+
+    [Range(0.001, 100000, ErrorMessage = "La cantidad debe estar entre 0.001 y 100000.")]
+    public decimal Cantidad { get; set; }
+
+    [Required(ErrorMessage = "La unidad es obligatoria.")]
+    [RegularExpression(@"(?i)^(g|kg|ml|l|oz|lb|unidad|taza)$", ErrorMessage = "Unidad de medida no válida.")]
+    public string UnidadMedida { get; set; } = "unidad";
+}
+
+// ---------- Crear (POST) ----------
+public sealed class CrearProductoMenuDto
+{
+    [Required(ErrorMessage = "El nombre es obligatorio.")]
+    [StringLength(75, MinimumLength = 3, ErrorMessage = "El nombre debe tener entre 3 y 75 caracteres.")]
+    [RegularExpression(@"^(?=.*\p{L})[\p{L}\p{N} .,'\-()&]+$",
+        ErrorMessage = "El nombre solo admite letras, números, espacios y . , ' - ( ) & (y debe incluir letras).")]
+    public string Nombre { get; set; } = string.Empty;
+
+    [Range(0.01, 999999.99, ErrorMessage = "El precio de venta no puede exceder los 6 dígitos (máximo 999.999,99).")]
+    public decimal? PrecioVenta { get; set; }
+
+    public bool? Activo { get; set; }
+
+    [MinLength(1, ErrorMessage = "El producto necesita al menos una receta.")]
+    [MaxLength(50, ErrorMessage = "Máximo 50 recetas por producto.")]
+    public List<RecetaEnProductoDto> Recetas { get; set; } = new();
+}
+
+// ---------- Actualizar total (PUT estandarizado) ----------
+public sealed class ActualizarProductoMenuDto
+{
+    [Required(ErrorMessage = "El nombre es obligatorio.")]
+    [StringLength(75, MinimumLength = 3, ErrorMessage = "El nombre debe tener entre 3 y 75 caracteres.")]
+    [RegularExpression(@"^(?=.*\p{L})[\p{L}\p{N} .,'\-()&]+$",
+        ErrorMessage = "El nombre solo admite letras, números, espacios y . , ' - ( ) & (y debe incluir letras).")]
+    public string Nombre { get; set; } = string.Empty;
+
+    [Range(0.01, 999999.99, ErrorMessage = "El precio de venta no puede exceder los 6 dígitos (máximo 999.999,99).")]
+    public decimal? PrecioVenta { get; set; }
+
+    [Required(ErrorMessage = "Indica si el producto está activo.")]
+    public bool Activo { get; set; } = true;
+
+    [MinLength(1, ErrorMessage = "El producto necesita al menos una receta.")]
+    [MaxLength(50, ErrorMessage = "Máximo 50 recetas por producto.")]
+    public List<RecetaEnProductoDto> Recetas { get; set; } = new();
+}
+
+// ---------- Actualizar parcial (PATCH: solo campos editados) ----------
+public sealed class PatchProductoMenuDto
+{
+    [StringLength(75, MinimumLength = 3, ErrorMessage = "El nombre debe tener entre 3 y 75 caracteres.")]
+    [RegularExpression(@"^(?=.*\p{L})[\p{L}\p{N} .,'\-()&]+$",
+        ErrorMessage = "El nombre solo admite letras, números, espacios y . , ' - ( ) & (y debe incluir letras).")]
+    public string? Nombre { get; set; }
+
+    [Range(0.01, 999999.99, ErrorMessage = "El precio de venta no puede exceder los 6 dígitos (máximo 999.999,99).")]
+    public decimal? PrecioVenta { get; set; }
+
+    // Para quitar el precio con PATCH se usa QuitarPrecioVenta = true.
+    // (decimal? solo no distingue "no enviado" de "quitar".)
+    public bool? QuitarPrecioVenta { get; set; }
+
+    public bool? Activo { get; set; }
+
+    [MinLength(1, ErrorMessage = "El producto necesita al menos una receta.")]
+    [MaxLength(50, ErrorMessage = "Máximo 50 recetas por producto.")]
+    public List<RecetaEnProductoDto>? Recetas { get; set; }
+}
+
+// ---------- Lectura ----------
+public sealed class RecetaDetalleProductoDto
+{
+    public int RecetaId { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public decimal Cantidad { get; set; }
+    public decimal CostoUnitario { get; set; }
+    public decimal CostoAportado { get; set; }
+}
+
+public sealed class InsumoDirectoDetalleDto
+{
+    public int InsumoId { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public decimal Cantidad { get; set; }
+    public string UnidadReceta { get; set; } = string.Empty;
+    public string UnidadInsumo { get; set; } = string.Empty;
+    public decimal CostoAportado { get; set; }
+    public string FuenteCosto { get; set; } = "proveedor_principal";
+}
+
+public class ProductoMenuDto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public decimal? PrecioVenta { get; set; }
+    public decimal CostoTotal { get; set; }
+    public decimal? MargenReal { get; set; }
+    public int NumRecetas { get; set; }
+    public bool Activo { get; set; }
+    public DateTime FechaCreacion { get; set; }
+}
+
+public sealed class ProductoMenuDetalleDto : ProductoMenuDto
+{
+    public List<RecetaDetalleProductoDto> Recetas { get; set; } = new();
+    public List<InsumoDirectoDetalleDto> InsumosDirectos { get; set; } = new();
+    public decimal CostoRecetas { get; set; }
+    public decimal CostoInsumosDirectos { get; set; }
+    public List<string> Advertencias { get; set; } = new();
+}
+
+// ---------- Costeo del producto ----------
+// costoTotalProducto = Σ (costoReceta × cantidad) + Σ (costo insumo directo)
+// margenReal = (precioVenta − costoTotal) ÷ precioVenta × 100
+public sealed class CostoProductoDto
+{
+    public int ProductoId { get; set; }
+    public string Producto { get; set; } = string.Empty;
+    public decimal CostoRecetas { get; set; }
+    public decimal CostoInsumosDirectos { get; set; }
+    public decimal CostoTotal { get; set; }
+    public decimal? PrecioVenta { get; set; }
+    public decimal? MargenReal { get; set; }
+    public bool SinCostosFijos { get; set; }
+    public List<RecetaDetalleProductoDto> Recetas { get; set; } = new();
+    public List<InsumoDirectoDetalleDto> InsumosDirectos { get; set; } = new();
+    public List<string> Advertencias { get; set; } = new();
+}
+
+public sealed class PreviewCostoProductoDto
+{
+    public List<RecetaEnProductoDto> Recetas { get; set; } = new();
+    public List<InsumoDirectoDto> InsumosDirectos { get; set; } = new();
+    public List<int>? CostosFijosIds { get; set; }
+}
+
+// ---------- Precio sugerido del menú ----------
+public sealed class SugerirPrecioProductoDto
+{
+    public decimal MargenDeseado { get; set; }
+}
+
+public sealed class PreviewPrecioProductoDto
+{
+    public List<RecetaEnProductoDto> Recetas { get; set; } = new();
+    public List<InsumoDirectoDto> InsumosDirectos { get; set; } = new();
+    public decimal MargenDeseado { get; set; }
+    public List<int>? CostosFijosIds { get; set; }
+}
+
+public sealed class PrecioSugeridoProductoDto
+{
+    public int? ProductoId { get; set; }
+    public string Producto { get; set; } = string.Empty;
+    public decimal CostoTotal { get; set; }
+    public decimal MargenDeseado { get; set; }
+    public decimal? PrecioSugerido { get; set; }
+    public bool MargenValido { get; set; }
+    public List<string> Advertencias { get; set; } = new();
+}
+
+public sealed class ResultadoProductoMenuDto
+{
+    public bool Exito { get; init; }
+    public bool NoEncontrado { get; init; }
+    public string Mensaje { get; init; } = string.Empty;
+    public ProductoMenuDetalleDto? Producto { get; init; }
+
+    public static ResultadoProductoMenuDto Ok(ProductoMenuDetalleDto p, string mensaje) =>
+        new() { Exito = true, Producto = p, Mensaje = mensaje };
+    public static ResultadoProductoMenuDto Error(string mensaje) => new() { Mensaje = mensaje };
+    public static ResultadoProductoMenuDto NoHallado(string mensaje) => new() { NoEncontrado = true, Mensaje = mensaje };
+}
