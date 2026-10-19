@@ -40,4 +40,6 @@ public partial class Negocio
     public virtual TipoEmprendimiento TipoEmprendimiento { get; set; } = null!;
 
     public virtual UsuarioEmprendedor Usuario { get; set; } = null!;
+
+    public decimal UmbralMargenMinimo { get; set; } = 20;
 }
