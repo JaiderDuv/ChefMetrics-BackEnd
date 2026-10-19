@@ -1,0 +1,94 @@
+﻿using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics_BackEnd.Repositories;
+
+namespace ChefMetrics_BackEnd.Services;
+
+public sealed class EvaluacionMenuService : IEvaluacionMenuService
+{
+    private const string SinNegocio = "Aún no tienes un negocio registrado para evaluar el menú.";
+
+    private readonly IUmbralMargenRepository _umbralRepo;
+    private readonly IInsumoRepository _insumos; // ya resuelve negocioId por cuentaId en otras HU
+    private readonly IProductoMenuService _productos;
+
+    public EvaluacionMenuService(
+        IUmbralMargenRepository umbralRepo,
+        IInsumoRepository insumos,
+        IProductoMenuService productos)
+    {
+        _umbralRepo = umbralRepo;
+        _insumos = insumos;
+        _productos = productos;
+    }
+
+    public async Task<ResultadoEvaluacionDto> ObtenerUmbralAsync(int cuentaId)
+    {
+        var negocioId = await _insumos.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (!negocioId.HasValue) return ResultadoEvaluacionDto.NoHallado(SinNegocio);
+
+        var umbral = await _umbralRepo.ObtenerAsync(negocioId.Value) ?? 20m;
+        return ResultadoEvaluacionDto.Ok(new UmbralMargenDto { UmbralMargenMinimo = umbral });
+    }
+
+    public async Task<ResultadoEvaluacionDto> ActualizarUmbralAsync(int cuentaId, ActualizarUmbralDto dto)
+    {
+        var negocioId = await _insumos.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (!negocioId.HasValue) return ResultadoEvaluacionDto.NoHallado(SinNegocio);
+
+        if (dto.UmbralMargenMinimo < 0)
+            return ResultadoEvaluacionDto.Error("El umbral no puede ser negativo.");
+
+        var actualizado = await _umbralRepo.ActualizarAsync(negocioId.Value, dto.UmbralMargenMinimo);
+        if (!actualizado) return ResultadoEvaluacionDto.NoHallado(SinNegocio);
+
+        return ResultadoEvaluacionDto.Ok(
+            new UmbralMargenDto { UmbralMargenMinimo = dto.UmbralMargenMinimo },
+            "Umbral actualizado correctamente.");
+    }
+
+    public async Task<ResultadoEvaluacionDto> EvaluarAsync(int cuentaId)
+    {
+        var negocioId = await _insumos.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (!negocioId.HasValue) return ResultadoEvaluacionDto.NoHallado(SinNegocio);
+
+        var umbral = await _umbralRepo.ObtenerAsync(negocioId.Value) ?? 30m;
+
+        // Reutiliza el costeo ya calculado en HU10.1; solo evalúa el menú vigente.
+        var productos = await _productos.ListarAsync(cuentaId, busqueda: null, incluirInactivos: false);
+        productos ??= new();
+
+        var evaluados = productos.Select(p =>
+        {
+            var sinPrecio = !p.PrecioVenta.HasValue;
+            var noCalculable = !p.MargenReal.HasValue;
+
+            string? motivo = null;
+            if (sinPrecio) motivo = "El producto no tiene precio de venta definido.";
+            else if (noCalculable) motivo = "El costo del producto no está disponible todavía.";
+
+            return new ProductoEvaluacionDto
+            {
+                ProductoId = p.Id,
+                Nombre = p.Nombre,
+                CostoTotal = p.CostoTotal,
+                PrecioVenta = p.PrecioVenta,
+                MargenReal = p.MargenReal,
+                MargenNoCalculable = noCalculable,
+                MotivoNoCalculable = motivo,
+                EnRiesgo = p.MargenReal.HasValue && p.MargenReal.Value < umbral
+            };
+        });
+
+        // Menor margen primero (lo más urgente); sin margen calculable, al final.
+        var ordenados = evaluados
+            .OrderBy(p => p.MargenNoCalculable)
+            .ThenBy(p => p.MargenReal)
+            .ToList();
+
+        return ResultadoEvaluacionDto.Ok(new EvaluacionMenuDto
+        {
+            UmbralMargenMinimo = umbral,
+            Productos = ordenados
+        });
+    }
+}
