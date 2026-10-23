@@ -116,7 +116,10 @@ public sealed class CostoProductoService : ICostoProductoService
             : (await _productos.ObtenerInsumosActivosAsync(negocioId, idsDirectos.Distinct()))
                 .ToDictionary(i => i.Id);
 
-        // 1) Recetas: cada una a costo total HU8.1 (sin fijos aquí; los fijos se prorratean una vez a nivel producto).
+        // 1) Recetas: cada una a costo total HU8.1 (sin fijos aquí).
+        // Además se acumulan las preparaciones equivalentes que consume el producto:
+        // una receta completa = 1 preparación; media receta = 0,5 preparaciones.
+        decimal preparacionesEquivalentes = 0;
         foreach (var item in recetas)
         {
             if (!mapaRecetas.TryGetValue(item.RecetaId, out var receta))
@@ -134,6 +137,7 @@ public sealed class CostoProductoService : ICostoProductoService
 
             // Cantidad = porciones de esta receta dentro del producto.
             var costoPorPorcion = costoRecetaSinFijos / receta.PorcionesBase;
+            preparacionesEquivalentes += item.Cantidad / receta.PorcionesBase;
             var aportado = decimal.Round(costoPorPorcion * item.Cantidad, 2);
             dto.Recetas.Add(new RecetaDetalleProductoDto
             {
@@ -180,8 +184,11 @@ public sealed class CostoProductoService : ICostoProductoService
 
         dto.CostoRecetas = decimal.Round(dto.Recetas.Sum(r => r.CostoAportado), 2);
         dto.CostoInsumosDirectos = decimal.Round(dto.InsumosDirectos.Sum(i => i.CostoAportado), 2);
+        dto.CostoDirecto = decimal.Round(dto.CostoRecetas + dto.CostoInsumosDirectos, 2);
 
-        // 3) Fijos prorrateados UNA vez a nivel producto (no por receta, para no multiplicarlos).
+        // 3) Fijos: la cuota es por preparación completa de receta. El producto
+        // consume Σ (porciones usadas ÷ porciones base) preparaciones equivalentes,
+        // así que se le asigna esa fracción de la cuota (reparto fino).
         var fijos = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
         dto.SinCostosFijos = fijos.Count == 0;
         decimal fijoProrrateado = 0;
@@ -192,22 +199,33 @@ public sealed class CostoProductoService : ICostoProductoService
         else
         {
             fijos = FiltrarFijos(fijos, costosFijosIds, dto.Advertencias);
-            fijoProrrateado = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
+            var cuotaPorPreparacion = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
+            fijoProrrateado = cuotaPorPreparacion * preparacionesEquivalentes;
             if (fijos.Any(c => c.ValorDivisor < 10m))
                 dto.Advertencias.Add("Uno o más costos fijos tienen un valor divisor menor a 10: el prorrateo puede estar sobrestimado.");
+            if (cuotaPorPreparacion > 0 && preparacionesEquivalentes <= 0)
+                dto.Advertencias.Add("No se pudo determinar cuántas preparaciones equivalentes usa el producto; el costo fijo prorrateado es 0.");
         }
 
-        dto.CostoTotal = decimal.Round(dto.CostoRecetas + dto.CostoInsumosDirectos + fijoProrrateado, 2);
+        dto.PreparacionesEquivalentes = decimal.Round(preparacionesEquivalentes, 4);
+        dto.CostoFijoProrrateado = decimal.Round(fijoProrrateado, 2);
+        dto.CostoTotal = decimal.Round(dto.CostoDirecto + dto.CostoFijoProrrateado, 2);
 
-        // Margen real sobre el precio de venta: (precio − costo) ÷ precio × 100.
-        // Misma definición que la sugerencia de precio de receta y el umbral del menú.
+        // Margen directo: precio contra recetas + empaques, sin fijos.
+        // Es la base del menú y de la sugerencia de precio por defecto.
+        if (dto.PrecioVenta.HasValue && dto.PrecioVenta.Value > 0 && dto.CostoDirecto > 0)
+            dto.MargenDirecto = decimal.Round((dto.PrecioVenta.Value - dto.CostoDirecto) / dto.PrecioVenta.Value * 100m, 2);
+
+        // Margen real con costo completo: (precio − costo total) ÷ precio × 100.
+        // Se conserva para el análisis y el detalle del producto.
         if (dto.PrecioVenta.HasValue && dto.PrecioVenta.Value > 0 && dto.CostoTotal > 0)
             dto.MargenReal = decimal.Round((dto.PrecioVenta.Value - dto.CostoTotal) / dto.PrecioVenta.Value * 100m, 2);
 
         return ResultadoCosteo<CostoProductoDto>.Ok(dto);
     }
 
-    // Costo total de UNA receta sin fijos (los fijos se suman una vez a nivel producto).
+    // Costo total de UNA receta sin fijos. Los fijos se reparten aparte,
+    // según las preparaciones equivalentes que consume el producto.
     private static decimal CostoRecetaSinFijos(
         Receta receta,
         Dictionary<int, PrecioProveedorPrincipal> principales,

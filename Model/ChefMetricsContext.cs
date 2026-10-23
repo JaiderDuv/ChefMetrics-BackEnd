@@ -68,6 +68,9 @@ public partial class ChefMetricsContext : DbContext
             entity.HasIndex(e => e.NegocioId, "IX_CostoFijo_NegocioId");
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.Categoria)
+                .HasMaxLength(50)
+                .HasDefaultValue("Otros");
             entity.Property(e => e.MontoMensual).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.Nombre).HasMaxLength(150);
             entity.Property(e => e.UnidadProrrateo)

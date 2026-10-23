@@ -61,29 +61,33 @@ public sealed class EvaluacionMenuService : IEvaluacionMenuService
         var evaluados = productos.Select(p =>
         {
             var sinPrecio = !p.PrecioVenta.HasValue;
-            var noCalculable = !p.MargenReal.HasValue;
+            // La evaluación principal usa el margen directo: es el que
+            // depende del precio y del costo de ingredientes/empaques.
+            var noCalculable = !p.MargenDirecto.HasValue;
 
             string? motivo = null;
             if (sinPrecio) motivo = "El producto no tiene precio de venta definido.";
-            else if (noCalculable) motivo = "El costo del producto no está disponible todavía.";
+            else if (noCalculable) motivo = "El costo directo del producto no está disponible todavía.";
 
             return new ProductoEvaluacionDto
             {
                 ProductoId = p.Id,
                 Nombre = p.Nombre,
+                CostoDirecto = p.CostoDirecto,
                 CostoTotal = p.CostoTotal,
                 PrecioVenta = p.PrecioVenta,
+                MargenDirecto = p.MargenDirecto,
                 MargenReal = p.MargenReal,
                 MargenNoCalculable = noCalculable,
                 MotivoNoCalculable = motivo,
-                EnRiesgo = p.MargenReal.HasValue && p.MargenReal.Value < umbral
+                EnRiesgo = p.MargenDirecto.HasValue && p.MargenDirecto.Value < umbral
             };
         });
 
-        // Menor margen primero (lo más urgente); sin margen calculable, al final.
+        // Menor margen directo primero (lo más urgente); sin margen calculable, al final.
         var ordenados = evaluados
             .OrderBy(p => p.MargenNoCalculable)
-            .ThenBy(p => p.MargenReal)
+            .ThenBy(p => p.MargenDirecto)
             .ToList();
 
         return ResultadoEvaluacionDto.Ok(new EvaluacionMenuDto

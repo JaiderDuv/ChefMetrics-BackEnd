@@ -154,7 +154,11 @@ public sealed class CostoRecetaService : ICostoRecetaService
         dto.SinCostosFijos = fijos.Count == 0;
         if (dto.SinCostosFijos) dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
         else fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
-        var fijoProrrateado = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
+
+        // La cuota es por preparación base. Al escalar a más porciones se consumen
+        // "factor" preparaciones equivalentes (8 porciones de una base de 4 = 2).
+        var cuotaPorPreparacion = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
+        var fijoProrrateado = cuotaPorPreparacion * factor;
         AdvertenciaDivisorBajo(fijos, dto.Advertencias);
 
         dto.CostoInsumos = decimal.Round(dto.Lineas.Sum(l => l.CostoInsumo), 2);

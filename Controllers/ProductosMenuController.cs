@@ -119,12 +119,13 @@ public sealed class ProductosMenuController : ControllerBase
         return Ok(r.Datos);
     }
 
-    // POST /api/productos-menu/{id}/precio-sugerido { margenDeseado }
+    // POST /api/productos-menu/{id}/precio-sugerido { margenDeseado, costosFijosIds }
+    // costosFijosIds vacío = precio con costo directo; null = incluye todos los fijos.
     [HttpPost("{id:int}/precio-sugerido")]
     public async Task<IActionResult> PrecioSugerido([FromRoute] int id, [FromBody] SugerirPrecioProductoDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
-        var r = await _precios.CalcularAsync(cuentaId, id, dto.MargenDeseado);
+        var r = await _precios.CalcularAsync(cuentaId, id, dto.MargenDeseado, dto.CostosFijosIds);
         if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
         if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
         return Ok(r.Datos);

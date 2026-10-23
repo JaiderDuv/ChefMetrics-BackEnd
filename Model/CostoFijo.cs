@@ -11,6 +11,10 @@ public partial class CostoFijo
 
     public string Nombre { get; set; } = null!;
 
+    // Categoría organizativa (Arriendo, Nómina, Servicios, etc.).
+    // No interviene en el cálculo; sirve para agrupar y analizar los fijos.
+    public string Categoria { get; set; } = "Otros";
+
     public decimal MontoMensual { get; set; }
 
     public string UnidadProrrateo { get; set; } = null!;

@@ -20,7 +20,7 @@ public sealed class SugerirPrecioController : ControllerBase
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
 
-        var r = await _servicio.CalcularAsync(cuentaId, id, dto.MargenDeseado);
+        var r = await _servicio.CalcularAsync(cuentaId, id, dto.MargenDeseado, dto.CostosFijosIds);
         if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
         if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
         return Ok(r.Datos);

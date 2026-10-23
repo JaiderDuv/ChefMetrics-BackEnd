@@ -14,6 +14,7 @@ public static class CosteoServiceExtensions
         services.AddScoped<ICostoProductoService, CostoProductoService>();
         services.AddScoped<IProductoMenuService, ProductoMenuService>();
         services.AddScoped<ISugerirPrecioProductoService, SugerirPrecioProductoService>();
+        services.AddScoped<IPuntoEquilibrioService, PuntoEquilibrioService>();
         return services;
     }
 }

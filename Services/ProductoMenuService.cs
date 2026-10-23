@@ -48,13 +48,18 @@ public sealed class ProductoMenuService : IProductoMenuService
             // Costo completo del producto: recetas por porciones y empaques guardados.
             var costo = await _costos.CalcularAsync(cuentaId, p.Id);
             var total = costo.Exito && costo.Datos is not null ? costo.Datos.CostoTotal : 0;
+            var directo = costo.Exito && costo.Datos is not null ? costo.Datos.CostoDirecto : 0;
+            var fijo = costo.Exito && costo.Datos is not null ? costo.Datos.CostoFijoProrrateado : 0;
             lista.Add(new ProductoMenuDto
             {
                 Id = p.Id,
                 Nombre = p.Nombre,
                 PrecioVenta = p.PrecioVenta,
                 CostoTotal = total,
+                CostoDirecto = directo,
+                CostoFijoProrrateado = fijo,
                 MargenReal = Margen(p.PrecioVenta, total),
+                MargenDirecto = Margen(p.PrecioVenta, directo),
                 NumRecetas = p.ProductoMenuReceta.Count,
                 Activo = p.Activo,
                 FechaCreacion = p.FechaCreacion
@@ -80,7 +85,10 @@ public sealed class ProductoMenuService : IProductoMenuService
             Nombre = c.Producto,
             PrecioVenta = c.PrecioVenta,
             CostoTotal = c.CostoTotal,
+            CostoDirecto = c.CostoDirecto,
+            CostoFijoProrrateado = c.CostoFijoProrrateado,
             MargenReal = c.MargenReal,
+            MargenDirecto = c.MargenDirecto,
             NumRecetas = c.Recetas.Count,
             Activo = producto!.Activo,
             FechaCreacion = producto.FechaCreacion,

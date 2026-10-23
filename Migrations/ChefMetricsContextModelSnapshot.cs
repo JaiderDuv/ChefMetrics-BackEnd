@@ -35,6 +35,13 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
+                    b.Property<string>("Categoria")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasDefaultValue("Otros");
+
                     b.Property<decimal>("MontoMensual")
                         .HasColumnType("decimal(12, 2)");
 

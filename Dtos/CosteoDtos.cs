@@ -70,6 +70,7 @@ public sealed class CostoFijoDto
 {
     public int Id { get; set; }
     public string Nombre { get; set; } = string.Empty;
+    public string Categoria { get; set; } = "Otros";
     public decimal MontoMensual { get; set; }
     public string UnidadProrrateo { get; set; } = string.Empty;
     public decimal ValorDivisor { get; set; }
@@ -81,6 +82,10 @@ public sealed class CrearCostoFijoDto
     [Required(ErrorMessage = "El nombre es obligatorio.")]
     [StringLength(150, MinimumLength = 3, ErrorMessage = "El nombre debe tener entre 3 y 150 caracteres.")]
     public string Nombre { get; set; } = string.Empty;
+
+    // Si no se envía, el servicio lo guarda como "Otros" (compatibilidad).
+    [StringLength(50, MinimumLength = 2, ErrorMessage = "La categoría debe tener entre 2 y 50 caracteres.")]
+    public string Categoria { get; set; } = "Otros";
 
     [Range(0.01, 9999999999, ErrorMessage = "El monto mensual debe ser mayor a 0.")]
     public decimal MontoMensual { get; set; }
@@ -102,6 +107,9 @@ public sealed class ActualizarCostoFijoDto
 {
     [StringLength(150, MinimumLength = 3, ErrorMessage = "El nombre debe tener entre 3 y 150 caracteres.")]
     public string? Nombre { get; set; }
+
+    [StringLength(50, MinimumLength = 2, ErrorMessage = "La categoría debe tener entre 2 y 50 caracteres.")]
+    public string? Categoria { get; set; }
 
     [Range(0.01, 9999999999, ErrorMessage = "El monto mensual debe ser mayor a 0.")]
     public decimal? MontoMensual { get; set; }

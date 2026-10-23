@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace ChefMetrics_BackEnd.Controllers;
 
 // GET /api/recetas/{id}/costo
+// Sin costosFijosIds en la query, el binding entrega una lista vacía:
+// el cálculo usa el costo directo (ningún fijo). Para incluir fijos,
+// enviar sus IDs como parámetros repetidos (?costosFijosIds=1&costosFijosIds=2).
 [ApiController]
 [Route("api/recetas/{id:int}/costo")]
 [Authorize]
@@ -35,6 +38,8 @@ public sealed class CostoRecetaController : ControllerBase
 [Authorize]
 public sealed class EscaladoRecetaController : ControllerBase
 {
+    // Igual que el costo: sin costosFijosIds se usa el costo directo.
+    // Para incluir fijos, enviar sus IDs como parámetros repetidos.
     private readonly ICostoRecetaService _servicio;
     public EscaladoRecetaController(ICostoRecetaService servicio) => _servicio = servicio;
 
@@ -64,7 +69,13 @@ public sealed class EscaladoRecetaController : ControllerBase
 public sealed class CostosFijosController : ControllerBase
 {
     private readonly ICostosFijosService _servicio;
-    public CostosFijosController(ICostosFijosService servicio) => _servicio = servicio;
+    private readonly IPuntoEquilibrioService _equilibrio;
+
+    public CostosFijosController(ICostosFijosService servicio, IPuntoEquilibrioService equilibrio)
+    {
+        _servicio = servicio;
+        _equilibrio = equilibrio;
+    }
 
     [HttpGet]
     public async Task<IActionResult> Listar([FromQuery] bool incluirInactivos = false)
@@ -74,6 +85,18 @@ public sealed class CostosFijosController : ControllerBase
         return lista is null
             ? NotFound(new { mensaje = "Aún no tienes un negocio registrado para administrar costos fijos." })
             : Ok(lista);
+    }
+
+    // GET /api/costos-fijos/punto-equilibrio
+    // Debe declararse antes de {id:int} por claridad; el constraint int evita ambigüedad.
+    [HttpGet("punto-equilibrio")]
+    public async Task<IActionResult> PuntoEquilibrio()
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+        var r = await _equilibrio.CalcularAsync(cuentaId);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
+        return Ok(r.Datos);
     }
 
     [HttpGet("{id:int}")]

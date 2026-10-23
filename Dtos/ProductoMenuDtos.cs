@@ -131,7 +131,20 @@ public class ProductoMenuDto
     public string Nombre { get; set; } = string.Empty;
     public decimal? PrecioVenta { get; set; }
     public decimal CostoTotal { get; set; }
+
+    // Costo directo = recetas + empaques, sin costos fijos. Es el que se usa
+    // para el punto de equilibrio y el food cost.
+    public decimal CostoDirecto { get; set; }
+
+    // Cuota de costos fijos prorrateada incluida en CostoTotal.
+    public decimal CostoFijoProrrateado { get; set; }
+
     public decimal? MargenReal { get; set; }
+
+    // Margen calculado solo con el costo directo (recetas + empaques).
+    // Es la base del menú y de la sugerencia de precio por defecto.
+    public decimal? MargenDirecto { get; set; }
+
     public int NumRecetas { get; set; }
     public bool Activo { get; set; }
     public DateTime FechaCreacion { get; set; }
@@ -155,9 +168,24 @@ public sealed class CostoProductoDto
     public string Producto { get; set; } = string.Empty;
     public decimal CostoRecetas { get; set; }
     public decimal CostoInsumosDirectos { get; set; }
+
+    // Costo directo = recetas + empaques (sin fijos). Es el costo real de producción.
+    public decimal CostoDirecto { get; set; }
+
+    // Cuota mensual de costos fijos prorrateada que se suma al costo completo.
+    public decimal CostoFijoProrrateado { get; set; }
+
+    // Preparaciones base que consume el producto:
+    // Σ (porciones usadas ÷ porciones base de cada receta).
+    public decimal PreparacionesEquivalentes { get; set; }
+
     public decimal CostoTotal { get; set; }
     public decimal? PrecioVenta { get; set; }
     public decimal? MargenReal { get; set; }
+
+    // Margen sobre el precio de venta usando solo el costo directo (sin fijos).
+    public decimal? MargenDirecto { get; set; }
+
     public bool SinCostosFijos { get; set; }
     public List<RecetaDetalleProductoDto> Recetas { get; set; } = new();
     public List<InsumoDirectoDetalleDto> InsumosDirectos { get; set; } = new();
@@ -175,6 +203,12 @@ public sealed class PreviewCostoProductoDto
 public sealed class SugerirPrecioProductoDto
 {
     public decimal MargenDeseado { get; set; }
+
+    // Si se indica, el costo base usa solo estos costos fijos;
+    // null = todos los activos, lista vacía = ninguno (costo directo).
+    // La interfaz envía una lista vacía por defecto para no cargar todos
+    // los fijos al precio de un solo producto.
+    public List<int>? CostosFijosIds { get; set; }
 }
 
 public sealed class PreviewPrecioProductoDto
@@ -189,7 +223,15 @@ public sealed class PrecioSugeridoProductoDto
 {
     public int? ProductoId { get; set; }
     public string Producto { get; set; } = string.Empty;
+
+    // Costo base usado para calcular el precio sugerido:
+    // es el directo si no se seleccionaron fijos, o el completo si se incluyeron.
     public decimal CostoTotal { get; set; }
+
+    public decimal CostoDirecto { get; set; }
+    public decimal CostoFijoProrrateado { get; set; }
+    public bool IncluyeCostosFijos { get; set; }
+
     public decimal MargenDeseado { get; set; }
     public decimal? PrecioSugerido { get; set; }
     public bool MargenValido { get; set; }

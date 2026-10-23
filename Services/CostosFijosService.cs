@@ -64,6 +64,10 @@ public sealed class CostosFijosService : ICostosFijosService
         var nombre = dto.Nombre.Trim();
         if (nombre.Length < 3) return ResultadoCosteo<CostoFijoDto>.Error("El nombre debe tener al menos 3 caracteres.");
 
+        var categoria = NormalizarCategoria(dto.Categoria);
+        if (categoria is null)
+            return ResultadoCosteo<CostoFijoDto>.Error("La categoría debe tener entre 2 y 50 caracteres.");
+
         var unidad = NormalizarUnidad(dto.UnidadProrrateo);
         if (unidad is null) return ResultadoCosteo<CostoFijoDto>.Error(MensajeUnidad());
 
@@ -81,6 +85,7 @@ public sealed class CostosFijosService : ICostosFijosService
         {
             NegocioId = negocioId.Value,
             Nombre = nombre,
+            Categoria = categoria,
             MontoMensual = dto.MontoMensual,
             UnidadProrrateo = unidad,
             ValorDivisor = dto.ValorDivisor.Value,
@@ -106,6 +111,13 @@ public sealed class CostosFijosService : ICostosFijosService
                 await _repo.ExisteNombreCostoFijoAsync(negocioId.Value, nombre, c.Id))
                 return ResultadoCosteo<CostoFijoDto>.Error(Duplicado);
             c.Nombre = nombre; hayCambios = true;
+        }
+        if (dto.Categoria is not null)
+        {
+            var categoria = NormalizarCategoria(dto.Categoria);
+            if (categoria is null)
+                return ResultadoCosteo<CostoFijoDto>.Error("La categoría debe tener entre 2 y 50 caracteres.");
+            c.Categoria = categoria; hayCambios = true;
         }
         if (dto.MontoMensual.HasValue)
         {
@@ -164,6 +176,15 @@ public sealed class CostosFijosService : ICostosFijosService
         return u is not null && UnidadesValidas.Contains(u) ? u : null;
     }
 
+    // Categoría libre: se normaliza y se limita a 50 caracteres. Si llega vacía,
+    // se usa "Otros" para no romper clientes antiguos que aún no la envían.
+    private static string? NormalizarCategoria(string? valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return "Otros";
+        var categoria = valor.Trim();
+        return categoria.Length is >= 2 and <= 50 ? categoria : null;
+    }
+
     private static string MensajeUnidad() =>
         $"La unidad de prorrateo no es válida. Valores permitidos: {string.Join(", ", UnidadesValidas.OrderBy(u => u))}.";
 
@@ -171,6 +192,7 @@ public sealed class CostosFijosService : ICostosFijosService
     {
         Id = c.Id,
         Nombre = c.Nombre,
+        Categoria = c.Categoria,
         MontoMensual = c.MontoMensual,
         UnidadProrrateo = c.UnidadProrrateo,
         ValorDivisor = c.ValorDivisor,

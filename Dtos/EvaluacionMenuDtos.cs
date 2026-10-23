@@ -17,9 +17,21 @@ public sealed class ProductoEvaluacionDto
 {
     public int ProductoId { get; set; }
     public string Nombre { get; set; } = string.Empty;
+
+    // Costo directo (recetas + empaques): base del margen y del precio.
+    public decimal CostoDirecto { get; set; }
+
+    // Costo completo con la cuota de fijos, para análisis.
     public decimal CostoTotal { get; set; }
+
     public decimal? PrecioVenta { get; set; }
+
+    // Margen directo: el que se evalúa por defecto en el menú.
+    public decimal? MargenDirecto { get; set; }
+
+    // Margen con costo completo, solo como referencia.
     public decimal? MargenReal { get; set; }
+
     public bool MargenNoCalculable { get; set; }
     public string? MotivoNoCalculable { get; set; }
     public bool EnRiesgo { get; set; }
