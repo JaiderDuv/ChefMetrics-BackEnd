@@ -43,7 +43,11 @@ public sealed class CostoRecetaDto
     public decimal CostoFijoProrrateado { get; set; }
     public decimal CostoTotal { get; set; }
     public decimal CostoPorPorcion { get; set; }
+    // SinCostosFijos describe el cálculo: true si no se aplicó ningún fijo.
+    // HayCostosFijosConfigurados distingue "no hay fijos configurados" de
+    // "hay fijos, pero no se seleccionó ninguno".
     public bool SinCostosFijos { get; set; }
+    public bool HayCostosFijosConfigurados { get; set; }
     public List<string> Advertencias { get; set; } = new();
     public List<LineaCostoDto> Lineas { get; set; } = new();
 }
@@ -61,6 +65,7 @@ public sealed class EscaladoRecetaDto
     public decimal CostoTotal { get; set; }
     public decimal CostoPorPorcion { get; set; }
     public bool SinCostosFijos { get; set; }
+    public bool HayCostosFijosConfigurados { get; set; }
     public List<string> Advertencias { get; set; } = new();
     public List<LineaCostoDto> Lineas { get; set; } = new();
 }
@@ -95,9 +100,10 @@ public sealed class CrearCostoFijoDto
     public string UnidadProrrateo { get; set; } = "unidades_producidas";
 
     // Obligatorio y sin valor por defecto: si se omite, el costo mensual completo
-    // se cargaría a cada receta (el default anterior de 1.00 producía costos absurdos).
+    // se cargaría a cada receta. El mínimo es 1 preparación al mes; valores
+    // fraccionarios hacían explotar el prorrateo.
     [Required(ErrorMessage = "El valor divisor es obligatorio.")]
-    [Range(0.01, 1000000, ErrorMessage = "El valor divisor debe estar entre 0,01 y 1.000.000.")]
+    [Range(1, 1000000, ErrorMessage = "El valor divisor debe estar entre 1 y 1.000.000.")]
     public decimal? ValorDivisor { get; set; }
 
     public bool? Activo { get; set; }
@@ -117,7 +123,7 @@ public sealed class ActualizarCostoFijoDto
     [StringLength(30)]
     public string? UnidadProrrateo { get; set; }
 
-    [Range(0.01, 1000000, ErrorMessage = "El valor divisor debe estar entre 0,01 y 1.000.000.")]
+    [Range(1, 1000000, ErrorMessage = "El valor divisor debe estar entre 1 y 1.000.000.")]
     public decimal? ValorDivisor { get; set; }
 
     public bool? Activo { get; set; }

@@ -186,7 +186,10 @@ public sealed class CostoProductoDto
     // Margen sobre el precio de venta usando solo el costo directo (sin fijos).
     public decimal? MargenDirecto { get; set; }
 
+    // SinCostosFijos = no se aplicó ningún fijo al cálculo.
+    // HayCostosFijosConfigurados = el negocio tiene fijos activos configurados.
     public bool SinCostosFijos { get; set; }
+    public bool HayCostosFijosConfigurados { get; set; }
     public List<RecetaDetalleProductoDto> Recetas { get; set; } = new();
     public List<InsumoDirectoDetalleDto> InsumosDirectos { get; set; } = new();
     public List<string> Advertencias { get; set; } = new();
@@ -204,10 +207,9 @@ public sealed class SugerirPrecioProductoDto
 {
     public decimal MargenDeseado { get; set; }
 
-    // Si se indica, el costo base usa solo estos costos fijos;
-    // null = todos los activos, lista vacía = ninguno (costo directo).
-    // La interfaz envía una lista vacía por defecto para no cargar todos
-    // los fijos al precio de un solo producto.
+    // null = todos los activos, lista vacía = ninguno (costo directo),
+    // lista con IDs = solo esos costos fijos. La interfaz envía una
+    // selección explícita para no cargar todos los fijos por accidente.
     public List<int>? CostosFijosIds { get; set; }
 }
 

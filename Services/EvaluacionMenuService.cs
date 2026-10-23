@@ -61,13 +61,17 @@ public sealed class EvaluacionMenuService : IEvaluacionMenuService
         var evaluados = productos.Select(p =>
         {
             var sinPrecio = !p.PrecioVenta.HasValue;
-            // La evaluación principal usa el margen directo: es el que
-            // depende del precio y del costo de ingredientes/empaques.
             var noCalculable = !p.MargenDirecto.HasValue;
 
             string? motivo = null;
             if (sinPrecio) motivo = "El producto no tiene precio de venta definido.";
             else if (noCalculable) motivo = "El costo directo del producto no está disponible todavía.";
+
+            // Un producto está en riesgo si cualquiera de sus márgenes queda
+            // por debajo del umbral. Así no se declara "sin riesgo" un producto
+            // rentable en directo pero con margen real negativo por los fijos.
+            var enRiesgo = (p.MargenDirecto.HasValue && p.MargenDirecto.Value < umbral)
+                        || (p.MargenReal.HasValue && p.MargenReal.Value < umbral);
 
             return new ProductoEvaluacionDto
             {
@@ -80,14 +84,17 @@ public sealed class EvaluacionMenuService : IEvaluacionMenuService
                 MargenReal = p.MargenReal,
                 MargenNoCalculable = noCalculable,
                 MotivoNoCalculable = motivo,
-                EnRiesgo = p.MargenDirecto.HasValue && p.MargenDirecto.Value < umbral
+                EnRiesgo = enRiesgo
             };
         });
 
-        // Menor margen directo primero (lo más urgente); sin margen calculable, al final.
+        // Primero el margen más bajo (directo o real), para que lo urgente
+        // aparezca arriba; sin margen calculable, al final.
         var ordenados = evaluados
             .OrderBy(p => p.MargenNoCalculable)
-            .ThenBy(p => p.MargenDirecto)
+            .ThenBy(p => Math.Min(
+                p.MargenDirecto ?? decimal.MaxValue,
+                p.MargenReal ?? decimal.MaxValue))
             .ToList();
 
         return ResultadoEvaluacionDto.Ok(new EvaluacionMenuDto

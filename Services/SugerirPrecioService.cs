@@ -4,7 +4,8 @@ namespace ChefMetrics_BackEnd.Services;
 
 public interface ISugerirPrecioService
 {
-    // costosFijosIds: si se indica, el costo por porción considera solo esos costos fijos; null = todos.
+    // costosFijosIds: null = todos los fijos activos; lista vacía = ninguno;
+    // lista con IDs = solo esos costos fijos.
     Task<ResultadoCosteo<PrecioSugeridoDto>> CalcularAsync(
         int cuentaId, int recetaId, decimal margenDeseado, List<int>? costosFijosIds = null);
 }

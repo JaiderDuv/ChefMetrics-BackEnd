@@ -42,15 +42,17 @@ public sealed class ProductoMenuService : IProductoMenuService
         if (!negocioId.HasValue) return null;
 
         var productos = await _repo.ListarAsync(negocioId.Value, busqueda, incluirInactivos);
-        var lista = new List<ProductoMenuDto>();
-        foreach (var p in productos)
+
+        // Un solo cálculo por lote: se cargan recetas, proveedores y fijos una vez,
+        // en lugar de repetir 4-5 consultas por cada producto.
+        var costos = await _costos.CalcularLoteAsync(negocioId.Value, productos);
+        var lista = productos.Select(p =>
         {
-            // Costo completo del producto: recetas por porciones y empaques guardados.
-            var costo = await _costos.CalcularAsync(cuentaId, p.Id);
-            var total = costo.Exito && costo.Datos is not null ? costo.Datos.CostoTotal : 0;
-            var directo = costo.Exito && costo.Datos is not null ? costo.Datos.CostoDirecto : 0;
-            var fijo = costo.Exito && costo.Datos is not null ? costo.Datos.CostoFijoProrrateado : 0;
-            lista.Add(new ProductoMenuDto
+            costos.TryGetValue(p.Id, out var costo);
+            var total = costo?.CostoTotal ?? 0;
+            var directo = costo?.CostoDirecto ?? 0;
+            var fijo = costo?.CostoFijoProrrateado ?? 0;
+            return new ProductoMenuDto
             {
                 Id = p.Id,
                 Nombre = p.Nombre,
@@ -63,9 +65,10 @@ public sealed class ProductoMenuService : IProductoMenuService
                 NumRecetas = p.ProductoMenuReceta.Count,
                 Activo = p.Activo,
                 FechaCreacion = p.FechaCreacion
-            });
-        }
-        return lista.OrderBy(p => p.Nombre).ToList();
+            };
+        }).OrderBy(p => p.Nombre).ToList();
+
+        return lista;
     }
 
     public async Task<ResultadoProductoMenuDto> ObtenerAsync(int cuentaId, int id)

@@ -4,8 +4,8 @@ public sealed class SugerirPrecioDto
 {
     public decimal MargenDeseado { get; set; }
 
-    // Si se indica, el costo fijo prorrateado usa solo estos costos fijos;
-    // null = todos los activos, lista vacía = ninguno (prorrateo 0).
+    // null = todos los activos, lista vacía = ninguno (prorrateo 0),
+    // lista con IDs = solo esos costos fijos.
     public List<int>? CostosFijosIds { get; set; }
 }
 

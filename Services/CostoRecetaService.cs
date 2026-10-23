@@ -8,7 +8,8 @@ namespace ChefMetrics_BackEnd.Services;
 public interface ICostoRecetaService
 {
     // HU8.2 inyecta esta interfaz y usa Datos.CostoPorPorcion.
-    // costosFijosIds: si se indica, el prorrateo usa solo esos costos fijos; null = todos.
+    // costosFijosIds: null = todos los fijos activos; lista vacía = ninguno;
+    // lista con IDs = solo esos costos fijos.
     Task<ResultadoCosteo<CostoRecetaDto>> CalcularAsync(int cuentaId, int recetaId, List<int>? costosFijosIds = null);
     Task<ResultadoCosteo<EscaladoRecetaDto>> CalcularEscaladoAsync(int cuentaId, int recetaId, int porcionesDeseadas, List<int>? costosFijosIds = null);
 }
@@ -69,10 +70,14 @@ public sealed class CostoRecetaService : ICostoRecetaService
         }
 
         // 2) Costos fijos prorrateados (solo los seleccionados por el usuario, si se indican)
-        var fijos = await _repo.ListarCostosFijosAsync(negocioId.Value, soloActivos: true);
+        var fijosConfigurados = await _repo.ListarCostosFijosAsync(negocioId.Value, soloActivos: true);
+        dto.HayCostosFijosConfigurados = fijosConfigurados.Count > 0;
+        var fijos = fijosConfigurados;
+        if (!dto.HayCostosFijosConfigurados)
+            dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
+        else
+            fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
         dto.SinCostosFijos = fijos.Count == 0;
-        if (dto.SinCostosFijos) dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
-        else fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
         var fijoProrrateado = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
         AdvertenciaDivisorBajo(fijos, dto.Advertencias);
 
@@ -150,10 +155,14 @@ public sealed class CostoRecetaService : ICostoRecetaService
                 i.UnidadMedida, i.PorcentajeMerma, costo, fuente));
         }
 
-        var fijos = await _repo.ListarCostosFijosAsync(negocioId.Value, soloActivos: true);
+        var fijosConfigurados = await _repo.ListarCostosFijosAsync(negocioId.Value, soloActivos: true);
+        dto.HayCostosFijosConfigurados = fijosConfigurados.Count > 0;
+        var fijos = fijosConfigurados;
+        if (!dto.HayCostosFijosConfigurados)
+            dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
+        else
+            fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
         dto.SinCostosFijos = fijos.Count == 0;
-        if (dto.SinCostosFijos) dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
-        else fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
 
         // La cuota es por preparación base. Al escalar a más porciones se consumen
         // "factor" preparaciones equivalentes (8 porciones de una base de 4 = 2).

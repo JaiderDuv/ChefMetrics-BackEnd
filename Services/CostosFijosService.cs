@@ -75,6 +75,8 @@ public sealed class CostosFijosService : ICostosFijosService
             return ResultadoCosteo<CostoFijoDto>.Error("El monto mensual admite máximo 2 decimales.");
         if (!dto.ValorDivisor.HasValue)
             return ResultadoCosteo<CostoFijoDto>.Error("El valor divisor es obligatorio.");
+        if (dto.ValorDivisor.Value < 1m)
+            return ResultadoCosteo<CostoFijoDto>.Error("El valor divisor debe ser al menos 1 preparación al mes.");
         if (decimal.Round(dto.ValorDivisor.Value, 2) != dto.ValorDivisor.Value)
             return ResultadoCosteo<CostoFijoDto>.Error("El valor divisor admite máximo 2 decimales.");
 
@@ -91,7 +93,8 @@ public sealed class CostosFijosService : ICostosFijosService
             ValorDivisor = dto.ValorDivisor.Value,
             Activo = dto.Activo ?? true
         });
-        return ResultadoCosteo<CostoFijoDto>.Ok(Mapear(creado), "El costo fijo fue creado correctamente.");
+        return ResultadoCosteo<CostoFijoDto>.Ok(Mapear(creado),
+            "El costo fijo fue creado correctamente." + AdvertenciaDivisor(creado.ValorDivisor));
     }
 
     public async Task<ResultadoCosteo<CostoFijoDto>> ActualizarAsync(int cuentaId, int id, ActualizarCostoFijoDto dto)
@@ -145,6 +148,8 @@ public sealed class CostosFijosService : ICostosFijosService
         }
         if (dto.ValorDivisor.HasValue)
         {
+            if (dto.ValorDivisor.Value < 1m)
+                return ResultadoCosteo<CostoFijoDto>.Error("El valor divisor debe ser al menos 1 preparación al mes.");
             if (decimal.Round(dto.ValorDivisor.Value, 2) != dto.ValorDivisor.Value)
                 return ResultadoCosteo<CostoFijoDto>.Error("El valor divisor admite máximo 2 decimales.");
             c.ValorDivisor = dto.ValorDivisor.Value; hayCambios = true;
@@ -154,7 +159,8 @@ public sealed class CostosFijosService : ICostosFijosService
         if (!hayCambios) return ResultadoCosteo<CostoFijoDto>.Error("Debes enviar al menos un campo para actualizar.");
 
         await _repo.GuardarCambiosAsync();
-        return ResultadoCosteo<CostoFijoDto>.Ok(Mapear(c), "El costo fijo fue actualizado correctamente.");
+        return ResultadoCosteo<CostoFijoDto>.Ok(Mapear(c),
+            "El costo fijo fue actualizado correctamente." + AdvertenciaDivisor(c.ValorDivisor));
     }
 
     public async Task<ResultadoCosteo<bool>> EliminarAsync(int cuentaId, int id)
@@ -169,6 +175,14 @@ public sealed class CostosFijosService : ICostosFijosService
         await _repo.GuardarCambiosAsync();
         return ResultadoCosteo<bool>.Ok(true, "El costo fijo fue eliminado correctamente.");
     }
+
+    // El prorrateo es muy sensible con divisores pequeños: con 1, todo el
+    // costo mensual se carga a una sola preparación. No se bloquea (puede ser
+    // un negocio pequeño real), pero el mensaje lo advierte explícitamente.
+    private static string AdvertenciaDivisor(decimal divisor) =>
+        divisor < 10m
+            ? " Advertencia: con un divisor menor a 10, la cuota prorrateada por preparación puede quedar muy alta."
+            : string.Empty;
 
     private static string? NormalizarUnidad(string? valor)
     {

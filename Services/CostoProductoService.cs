@@ -14,6 +14,12 @@ public interface ICostoProductoService
 
     Task<ResultadoCosteo<CostoProductoDto>> CalcularPreviewAsync(
         int cuentaId, PreviewCostoProductoDto dto);
+
+    // Calcula el costo de varios productos con una sola carga de datos.
+    // Evita el N+1 del listado de menú y de los reportes que lo consumen.
+    Task<Dictionary<int, CostoProductoDto>> CalcularLoteAsync(
+        int negocioId, IReadOnlyCollection<ProductoMenu> productos,
+        List<int>? costosFijosIds = null);
 }
 
 public sealed class CostoProductoService : ICostoProductoService
@@ -90,13 +96,6 @@ public sealed class CostoProductoService : ICostoProductoService
         List<RecetaEnProductoDto> recetas, List<InsumoDirectoDto> directos,
         List<int>? costosFijosIds)
     {
-        var dto = new CostoProductoDto
-        {
-            ProductoId = productoId,
-            Producto = nombre,
-            PrecioVenta = precioVenta
-        };
-
         if (recetas.Count == 0)
             return ResultadoCosteo<CostoProductoDto>.Error("El producto necesita al menos una receta.");
 
@@ -115,6 +114,44 @@ public sealed class CostoProductoService : ICostoProductoService
             ? new Dictionary<int, Insumo>()
             : (await _productos.ObtenerInsumosActivosAsync(negocioId, idsDirectos.Distinct()))
                 .ToDictionary(i => i.Id);
+
+        var fijosConfigurados = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
+        var advertenciasFijos = new List<string>();
+        var fijosAplicados = fijosConfigurados.Count == 0
+            ? new List<CostoFijo>()
+            : SeleccionarFijos(fijosConfigurados, costosFijosIds, advertenciasFijos);
+
+        var dto = CalcularNucleo(
+            productoId, nombre, precioVenta, recetas, directos,
+            mapaRecetas, principales, mapaDirectos,
+            fijosConfigurados, fijosAplicados, advertenciasFijos);
+
+        return dto is null
+            ? ResultadoCosteo<CostoProductoDto>.Error("El producto necesita al menos una receta.")
+            : ResultadoCosteo<CostoProductoDto>.Ok(dto);
+    }
+
+    // Cálculo síncrono con los datos ya precargados. Se usa tanto para un
+    // producto como para el lote del listado de menú.
+    private static CostoProductoDto? CalcularNucleo(
+        int productoId, string nombre, decimal? precioVenta,
+        List<RecetaEnProductoDto> recetas, List<InsumoDirectoDto> directos,
+        Dictionary<int, Receta> mapaRecetas,
+        Dictionary<int, PrecioProveedorPrincipal> principales,
+        Dictionary<int, Insumo> mapaDirectos,
+        List<CostoFijo> fijosConfigurados,
+        List<CostoFijo> fijosAplicados,
+        IReadOnlyList<string> advertenciasFijos)
+    {
+        if (recetas.Count == 0) return null;
+
+        var dto = new CostoProductoDto
+        {
+            ProductoId = productoId,
+            Producto = nombre,
+            PrecioVenta = precioVenta
+        };
+        dto.Advertencias.AddRange(advertenciasFijos);
 
         // 1) Recetas: cada una a costo total HU8.1 (sin fijos aquí).
         // Además se acumulan las preparaciones equivalentes que consume el producto:
@@ -189,19 +226,20 @@ public sealed class CostoProductoService : ICostoProductoService
         // 3) Fijos: la cuota es por preparación completa de receta. El producto
         // consume Σ (porciones usadas ÷ porciones base) preparaciones equivalentes,
         // así que se le asigna esa fracción de la cuota (reparto fino).
-        var fijos = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
-        dto.SinCostosFijos = fijos.Count == 0;
+        dto.HayCostosFijosConfigurados = fijosConfigurados.Count > 0;
+        dto.SinCostosFijos = fijosAplicados.Count == 0;
         decimal fijoProrrateado = 0;
-        if (dto.SinCostosFijos)
+
+        if (!dto.HayCostosFijosConfigurados)
         {
             dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
         }
         else
         {
-            fijos = FiltrarFijos(fijos, costosFijosIds, dto.Advertencias);
-            var cuotaPorPreparacion = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
+            var cuotaPorPreparacion = CalculadoraCostos.FijoProrrateado(
+                fijosAplicados.Select(c => (c.MontoMensual, c.ValorDivisor)));
             fijoProrrateado = cuotaPorPreparacion * preparacionesEquivalentes;
-            if (fijos.Any(c => c.ValorDivisor < 10m))
+            if (fijosAplicados.Any(c => c.ValorDivisor < 10m))
                 dto.Advertencias.Add("Uno o más costos fijos tienen un valor divisor menor a 10: el prorrateo puede estar sobrestimado.");
             if (cuotaPorPreparacion > 0 && preparacionesEquivalentes <= 0)
                 dto.Advertencias.Add("No se pudo determinar cuántas preparaciones equivalentes usa el producto; el costo fijo prorrateado es 0.");
@@ -221,7 +259,76 @@ public sealed class CostoProductoService : ICostoProductoService
         if (dto.PrecioVenta.HasValue && dto.PrecioVenta.Value > 0 && dto.CostoTotal > 0)
             dto.MargenReal = decimal.Round((dto.PrecioVenta.Value - dto.CostoTotal) / dto.PrecioVenta.Value * 100m, 2);
 
-        return ResultadoCosteo<CostoProductoDto>.Ok(dto);
+        return dto;
+    }
+
+    public async Task<Dictionary<int, CostoProductoDto>> CalcularLoteAsync(
+        int negocioId, IReadOnlyCollection<ProductoMenu> productos,
+        List<int>? costosFijosIds = null)
+    {
+        var resultado = new Dictionary<int, CostoProductoDto>();
+        if (productos.Count == 0) return resultado;
+
+        var recetasPorProducto = productos.ToDictionary(
+            p => p.Id,
+            p => p.ProductoMenuReceta.Select(pr => new RecetaEnProductoDto
+            {
+                RecetaId = pr.RecetaId,
+                Cantidad = pr.Cantidad
+            }).ToList());
+
+        var directosPorProducto = productos.ToDictionary(
+            p => p.Id,
+            p => p.ProductoMenuInsumos.Select(pi => new InsumoDirectoDto
+            {
+                InsumoId = pi.InsumoId,
+                Cantidad = pi.Cantidad,
+                UnidadMedida = pi.UnidadMedida
+            }).ToList());
+
+        // Una sola consulta para todas las recetas y otra para todos los insumos.
+        var recetaIds = recetasPorProducto.Values
+            .SelectMany(r => r)
+            .Select(r => r.RecetaId)
+            .Distinct()
+            .ToList();
+        var mapaRecetas = (await _productos.ObtenerRecetasConInsumosAsync(negocioId, recetaIds))
+            .ToDictionary(r => r.Id);
+
+        var idsDirectos = directosPorProducto.Values
+            .SelectMany(d => d)
+            .Select(d => d.InsumoId)
+            .Distinct()
+            .ToList();
+        var idsDeRecetas = mapaRecetas.Values
+            .SelectMany(r => r.RecetaInsumos)
+            .Select(ri => ri.InsumoId);
+        var principales = await _costeo.ObtenerCostosProveedorPrincipalAsync(
+            idsDirectos.Concat(idsDeRecetas).Distinct());
+
+        var mapaDirectos = idsDirectos.Count == 0
+            ? new Dictionary<int, Insumo>()
+            : (await _productos.ObtenerInsumosActivosAsync(negocioId, idsDirectos))
+                .ToDictionary(i => i.Id);
+
+        var fijosConfigurados = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
+        var advertenciasFijos = new List<string>();
+        var fijosAplicados = fijosConfigurados.Count == 0
+            ? new List<CostoFijo>()
+            : SeleccionarFijos(fijosConfigurados, costosFijosIds, advertenciasFijos);
+
+        foreach (var p in productos)
+        {
+            var dto = CalcularNucleo(
+                p.Id, p.Nombre, p.PrecioVenta,
+                recetasPorProducto[p.Id], directosPorProducto[p.Id],
+                mapaRecetas, principales, mapaDirectos,
+                fijosConfigurados, fijosAplicados, advertenciasFijos);
+
+            if (dto is not null) resultado[p.Id] = dto;
+        }
+
+        return resultado;
     }
 
     // Costo total de UNA receta sin fijos. Los fijos se reparten aparte,
@@ -281,7 +388,7 @@ public sealed class CostoProductoService : ICostoProductoService
     private static decimal CostoRespaldoPorUnidad(Insumo i) =>
         i.Cantidad.HasValue && i.Cantidad.Value > 0 ? i.CostoUnitario / i.Cantidad.Value : i.CostoUnitario;
 
-    private static List<CostoFijo> FiltrarFijos(List<CostoFijo> fijos, List<int>? ids, List<string> advertencias)
+    private static List<CostoFijo> SeleccionarFijos(List<CostoFijo> fijos, List<int>? ids, List<string> advertencias)
     {
         if (ids is null) return fijos;
         if (ids.Count == 0)
