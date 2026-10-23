@@ -51,7 +51,8 @@ public sealed class EvaluacionMenuService : IEvaluacionMenuService
         var negocioId = await _insumos.ObtenerNegocioIdPorCuentaAsync(cuentaId);
         if (!negocioId.HasValue) return ResultadoEvaluacionDto.NoHallado(SinNegocio);
 
-        var umbral = await _umbralRepo.ObtenerAsync(negocioId.Value) ?? 30m;
+        // Mismo umbral por defecto que ObtenerUmbralAsync y Negocio.UmbralMargenMinimo.
+        var umbral = await _umbralRepo.ObtenerAsync(negocioId.Value) ?? 20m;
 
         // Reutiliza el costeo ya calculado en HU10.1; solo evalúa el menú vigente.
         var productos = await _productos.ListarAsync(cuentaId, busqueda: null, incluirInactivos: false);

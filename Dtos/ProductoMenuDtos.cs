@@ -5,16 +5,15 @@ namespace ChefMetrics_BackEnd.Dtos;
 // ---------- Ítems del producto ----------
 // Un producto se compone de recetas (mínimo una) y opcionalmente de
 // insumos directos (empaques) que no forman parte de ninguna receta.
-// NOTA: no hay cambios de BD en esta HU: solo se persiste
-// ProductoMenu + ProductoMenuReceta (tablas existentes). Los insumos
-// directos NO se almacenan; se usan de forma transitoria en los
-// endpoints de costeo/preview con el mismo tratamiento de merma y
-// proveedor principal.
+// Los insumos directos SÍ se persisten en ProductoMenuInsumo y entran en
+// el costo, el margen y la evaluación del menú.
 public sealed class RecetaEnProductoDto
 {
     [Range(1, int.MaxValue, ErrorMessage = "Selecciona una receta.")]
     public int RecetaId { get; set; }
 
+    // Cantidad = porciones de esta receta que entran en el producto:
+    // el costo se calcula como (costo de insumos ÷ porciones base) × porciones.
     [Range(0.001, 10000, ErrorMessage = "La cantidad debe estar entre 0.001 y 10000.")]
     public decimal Cantidad { get; set; }
 }
@@ -49,6 +48,9 @@ public sealed class CrearProductoMenuDto
     [MinLength(1, ErrorMessage = "El producto necesita al menos una receta.")]
     [MaxLength(50, ErrorMessage = "Máximo 50 recetas por producto.")]
     public List<RecetaEnProductoDto> Recetas { get; set; } = new();
+
+    [MaxLength(50, ErrorMessage = "Máximo 50 insumos directos por producto.")]
+    public List<InsumoDirectoDto> InsumosDirectos { get; set; } = new();
 }
 
 // ---------- Actualizar total (PUT estandarizado) ----------
@@ -69,6 +71,9 @@ public sealed class ActualizarProductoMenuDto
     [MinLength(1, ErrorMessage = "El producto necesita al menos una receta.")]
     [MaxLength(50, ErrorMessage = "Máximo 50 recetas por producto.")]
     public List<RecetaEnProductoDto> Recetas { get; set; } = new();
+
+    [MaxLength(50, ErrorMessage = "Máximo 50 insumos directos por producto.")]
+    public List<InsumoDirectoDto> InsumosDirectos { get; set; } = new();
 }
 
 // ---------- Actualizar parcial (PATCH: solo campos editados) ----------
@@ -91,6 +96,10 @@ public sealed class PatchProductoMenuDto
     [MinLength(1, ErrorMessage = "El producto necesita al menos una receta.")]
     [MaxLength(50, ErrorMessage = "Máximo 50 recetas por producto.")]
     public List<RecetaEnProductoDto>? Recetas { get; set; }
+
+    // null = no cambia los empaques guardados; lista (aunque vacía) = reemplaza.
+    [MaxLength(50, ErrorMessage = "Máximo 50 insumos directos por producto.")]
+    public List<InsumoDirectoDto>? InsumosDirectos { get; set; }
 }
 
 // ---------- Lectura ----------
@@ -98,7 +107,9 @@ public sealed class RecetaDetalleProductoDto
 {
     public int RecetaId { get; set; }
     public string Nombre { get; set; } = string.Empty;
+    // Porciones de esta receta que entran en el producto.
     public decimal Cantidad { get; set; }
+    // Costo por porción de la receta (insumos ÷ porciones base).
     public decimal CostoUnitario { get; set; }
     public decimal CostoAportado { get; set; }
 }
@@ -136,8 +147,8 @@ public sealed class ProductoMenuDetalleDto : ProductoMenuDto
 }
 
 // ---------- Costeo del producto ----------
-// costoTotalProducto = Σ (costoReceta × cantidad) + Σ (costo insumo directo)
-// margenReal = (precioVenta − costoTotal) ÷ precioVenta × 100
+// costoTotalProducto = Σ (costoPorPorcionDeReceta × porciones) + Σ (costo insumo directo) + fijos prorrateados
+// margenReal = (precioVenta − costoTotal) ÷ precioVenta × 100   (margen sobre el precio de venta)
 public sealed class CostoProductoDto
 {
     public int ProductoId { get; set; }

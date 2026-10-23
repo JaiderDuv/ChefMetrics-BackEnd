@@ -13,6 +13,7 @@ public interface IProductoMenuRepository
     Task<List<Insumo>> ObtenerInsumosActivosAsync(int negocioId, IEnumerable<int> insumoIds);
     Task<ProductoMenu> CrearAsync(ProductoMenu producto);
     void ReemplazarRecetas(ProductoMenu producto, IEnumerable<ProductoMenuRecetum> nuevas);
+    void ReemplazarInsumos(ProductoMenu producto, IEnumerable<ProductoMenuInsumo> nuevos);
     void Eliminar(ProductoMenu producto);
     Task GuardarCambiosAsync();
 }
@@ -41,11 +42,13 @@ public sealed class ProductoMenuRepository : IProductoMenuRepository
         _db.ProductoMenus.AsNoTracking()
             .Include(p => p.ProductoMenuReceta).ThenInclude(pr => pr.Receta)
                 .ThenInclude(r => r.RecetaInsumos).ThenInclude(ri => ri.Insumo)
+            .Include(p => p.ProductoMenuInsumos).ThenInclude(pi => pi.Insumo)
             .FirstOrDefaultAsync(p => p.Id == id && p.NegocioId == negocioId);
 
     public Task<ProductoMenu?> ObtenerParaEditarAsync(int negocioId, int id) =>
         _db.ProductoMenus
             .Include(p => p.ProductoMenuReceta)
+            .Include(p => p.ProductoMenuInsumos)
             .FirstOrDefaultAsync(p => p.Id == id && p.NegocioId == negocioId);
 
     public Task<bool> ExisteNombreAsync(int negocioId, string nombre, int? excluirId = null)
@@ -90,9 +93,20 @@ public sealed class ProductoMenuRepository : IProductoMenuRepository
         }
     }
 
+    public void ReemplazarInsumos(ProductoMenu producto, IEnumerable<ProductoMenuInsumo> nuevos)
+    {
+        _db.ProductoMenuInsumos.RemoveRange(producto.ProductoMenuInsumos);
+        foreach (var n in nuevos)
+        {
+            n.ProductoMenuId = producto.Id;
+            _db.ProductoMenuInsumos.Add(n);
+        }
+    }
+
     public void Eliminar(ProductoMenu producto)
     {
         _db.ProductoMenuReceta.RemoveRange(producto.ProductoMenuReceta);
+        _db.ProductoMenuInsumos.RemoveRange(producto.ProductoMenuInsumos);
         _db.ProductoMenus.Remove(producto);
     }
 

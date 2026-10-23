@@ -35,7 +35,8 @@ public sealed class SugerirPrecioProductoService : ISugerirPrecioProductoService
         return Armar(null, "(vista previa)", costo.Datos.CostoTotal, dto.MargenDeseado, costo.Datos.Advertencias);
     }
 
-    // Margen por suma sobre el costo: precio = costo + (costo × margen/100).
+    // Margen sobre el precio de venta: precio = costo ÷ (1 − margen/100).
+    // Misma definición que la sugerencia de receta y el margen real del producto.
     private static ResultadoCosteo<PrecioSugeridoProductoDto> Armar(
         int? productoId, string nombre, decimal costoTotal, decimal margen, List<string> advertencias)
     {
@@ -66,8 +67,7 @@ public sealed class SugerirPrecioProductoService : ISugerirPrecioProductoService
         else
         {
             dto.MargenValido = true;
-            // Toda fracción, unidad o decena se aproxima hacia arriba a la centena (143 → 200).
-            dto.PrecioSugerido = decimal.Ceiling((costoTotal + (costoTotal * (margen / 100m))) / 100m) * 100;
+            dto.PrecioSugerido = decimal.Round(costoTotal / (1 - (margen / 100m)), 2);
         }
 
         return ResultadoCosteo<PrecioSugeridoProductoDto>.Ok(dto);

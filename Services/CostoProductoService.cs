@@ -49,9 +49,20 @@ public sealed class CostoProductoService : ICostoProductoService
             .Select(pr => new RecetaEnProductoDto { RecetaId = pr.RecetaId, Cantidad = pr.Cantidad })
             .ToList();
 
+        // Si no llegan insumos directos explícitos (preview), se usan los
+        // empaques guardados del producto.
+        var directos = insumosDirectos ?? producto.ProductoMenuInsumos
+            .Select(pi => new InsumoDirectoDto
+            {
+                InsumoId = pi.InsumoId,
+                Cantidad = pi.Cantidad,
+                UnidadMedida = pi.UnidadMedida
+            })
+            .ToList();
+
         return await CalcularNucleoAsync(
             negocioId.Value, producto.Id, producto.Nombre, producto.PrecioVenta,
-            recetas, insumosDirectos ?? new(), costosFijosIds);
+            recetas, directos, costosFijosIds);
     }
 
     public async Task<ResultadoCosteo<CostoProductoDto>> CalcularPreviewAsync(
@@ -71,10 +82,9 @@ public sealed class CostoProductoService : ICostoProductoService
     }
 
     // ---------- Núcleo reutilizable ----------
-    // Por cada receta: costo total HU8.1 (insumos con conversión, merma,
-    // proveedor principal y fijos prorrateados) × cantidad en el producto.
-    // Insumos directos (empaques): mismo tratamiento de merma y proveedor.
-    // costoTotalProducto = Σ (costoReceta × cantidad) + Σ (costo insumo directo)
+    // Por cada receta: (costo de insumos de la receta ÷ porciones base) × porciones
+    // del producto. Insumos directos (empaques): mismo tratamiento de merma y proveedor.
+    // costoTotalProducto = Σ (costoPorPorcion × porciones) + Σ (costo insumo directo) + fijos prorrateados
     private async Task<ResultadoCosteo<CostoProductoDto>> CalcularNucleoAsync(
         int negocioId, int productoId, string nombre, decimal? precioVenta,
         List<RecetaEnProductoDto> recetas, List<InsumoDirectoDto> directos,
@@ -115,14 +125,22 @@ public sealed class CostoProductoService : ICostoProductoService
                 continue;
             }
 
-            var costoReceta = CostoRecetaSinFijos(receta, principales, dto.Advertencias);
-            var aportado = decimal.Round(costoReceta * item.Cantidad, 2);
+            var costoRecetaSinFijos = CostoRecetaSinFijos(receta, principales, dto.Advertencias);
+            if (receta.PorcionesBase <= 0)
+            {
+                dto.Advertencias.Add($"La receta '{receta.Nombre}' no tiene porciones base; no se pudo costear.");
+                continue;
+            }
+
+            // Cantidad = porciones de esta receta dentro del producto.
+            var costoPorPorcion = costoRecetaSinFijos / receta.PorcionesBase;
+            var aportado = decimal.Round(costoPorPorcion * item.Cantidad, 2);
             dto.Recetas.Add(new RecetaDetalleProductoDto
             {
                 RecetaId = receta.Id,
                 Nombre = receta.Nombre,
                 Cantidad = item.Cantidad,
-                CostoUnitario = decimal.Round(costoReceta, 2),
+                CostoUnitario = decimal.Round(costoPorPorcion, 2),
                 CostoAportado = aportado
             });
         }
@@ -181,9 +199,10 @@ public sealed class CostoProductoService : ICostoProductoService
 
         dto.CostoTotal = decimal.Round(dto.CostoRecetas + dto.CostoInsumosDirectos + fijoProrrateado, 2);
 
-        // Margen real coherente con el precio por suma: (precio − costo) ÷ costo × 100.
+        // Margen real sobre el precio de venta: (precio − costo) ÷ precio × 100.
+        // Misma definición que la sugerencia de precio de receta y el umbral del menú.
         if (dto.PrecioVenta.HasValue && dto.PrecioVenta.Value > 0 && dto.CostoTotal > 0)
-            dto.MargenReal = decimal.Round((dto.PrecioVenta.Value - dto.CostoTotal) / dto.CostoTotal * 100m, 2);
+            dto.MargenReal = decimal.Round((dto.PrecioVenta.Value - dto.CostoTotal) / dto.PrecioVenta.Value * 100m, 2);
 
         return ResultadoCosteo<CostoProductoDto>.Ok(dto);
     }

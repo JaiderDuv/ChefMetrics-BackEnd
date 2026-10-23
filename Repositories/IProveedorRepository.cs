@@ -7,6 +7,7 @@ public interface IProveedorRepository
 
     Task<int?> ObtenerNegocioIdDeInsumoAsync(int insumoId);
     Task<bool> ExisteInsumoEnNegocioAsync(int negocioId, int insumoId);
+    Task<string?> ObtenerUnidadInsumoAsync(int negocioId, int insumoId);
 
     Task<List<Proveedor>> ListarPorNegocioAsync(int negocioId);
     Task<List<Proveedor>> BuscarPorNombreAsync(int negocioId, string termino, int limite);

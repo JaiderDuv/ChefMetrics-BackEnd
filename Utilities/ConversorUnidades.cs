@@ -37,4 +37,16 @@ public static class ConversorUnidades
             || a.Familia != b.Familia) return null;
         return cantidad * a.Factor / b.Factor;
     }
+
+    // Precio por unidad del insumo para un paquete de proveedor.
+    // Convierte la cantidad del paquete a la unidad base del insumo; null si la
+    // familia del paquete no es compatible (los paquetes en familias distintas no
+    // se comparan entre sí para no elegir un proveedor "barato" equivocado).
+    public static decimal? PrecioPorUnidad(decimal costo, decimal cantidadPaquete, string unidadPaquete, string unidadInsumo)
+    {
+        if (cantidadPaquete <= 0) return null;
+        var cantidadBase = Convertir(cantidadPaquete, unidadPaquete, unidadInsumo);
+        if (cantidadBase is null or <= 0) return null;
+        return costo / cantidadBase.Value;
+    }
 }

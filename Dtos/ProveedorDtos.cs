@@ -177,6 +177,8 @@ public class InsumoProveedorDto
     public decimal Costo { get; set; }
     public decimal Cantidad { get; set; }
     public string UnidadMedida { get; set; } = string.Empty;
+    // Precio por unidad base del insumo (convertido desde el paquete).
+    // null si la familia del paquete no es compatible con la del insumo.
     public decimal? PrecioUnitario { get; set; }
     public bool EsPrincipal { get; set; }
     public bool EsMasBarato { get; set; }

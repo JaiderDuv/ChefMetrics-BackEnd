@@ -29,13 +29,15 @@ public sealed class RecetaService : IRecetaService
 
     private readonly IRecetaRepository _recetaRepository;
     private readonly IInsumoRepository _insumoRepository;
+    private readonly ICosteoRepository _costeoRepository;
     private readonly IWebHostEnvironment _env;
 
     public RecetaService(IRecetaRepository recetaRepository, IInsumoRepository insumoRepository,
-                         IWebHostEnvironment env)
+                         ICosteoRepository costeoRepository, IWebHostEnvironment env)
     {
         _recetaRepository = recetaRepository;
         _insumoRepository = insumoRepository;
+        _costeoRepository = costeoRepository;
         _env = env;
     }
 
@@ -44,7 +46,12 @@ public sealed class RecetaService : IRecetaService
         var negocioId = await _insumoRepository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
         if (!negocioId.HasValue) return null;
         var recetas = await _recetaRepository.ListarAsync(negocioId.Value, busqueda);
-        return recetas.Select(Mapear).ToList();
+
+        // Precio por unidad del proveedor principal para que las tarjetas muestren
+        // el mismo costo de insumos que el panel "Ver costo real".
+        var principales = await _costeoRepository.ObtenerCostosProveedorPrincipalAsync(
+            recetas.SelectMany(r => r.RecetaInsumos.Select(ri => ri.InsumoId)));
+        return recetas.Select(r => Mapear(r, principales)).ToList();
     }
 
     public async Task<ResultadoRecetaDto> ObtenerPorIdAsync(int cuentaId, int recetaId)
@@ -52,9 +59,8 @@ public sealed class RecetaService : IRecetaService
         var negocioId = await _insumoRepository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
         if (!negocioId.HasValue) return ResultadoRecetaDto.NoHallado(SinNegocio);
         var receta = await _recetaRepository.ObtenerPorIdAsync(negocioId.Value, recetaId);
-        return receta is null
-            ? ResultadoRecetaDto.NoHallado(NoExiste)
-            : ResultadoRecetaDto.Ok(Mapear(receta), "Detalle de la receta.");
+        if (receta is null) return ResultadoRecetaDto.NoHallado(NoExiste);
+        return ResultadoRecetaDto.Ok(await MapearAsync(receta), "Detalle de la receta.");
     }
 
     public async Task<ResultadoRecetaDto> CrearAsync(int cuentaId, GuardarRecetaDto dto)
@@ -78,7 +84,7 @@ public sealed class RecetaService : IRecetaService
                 RecetaInsumos = ingredientes!
             });
             var creada = await _recetaRepository.ObtenerPorIdAsync(negocioId.Value, receta.Id);
-            return ResultadoRecetaDto.Ok(Mapear(creada!), "La receta fue creada correctamente.");
+            return ResultadoRecetaDto.Ok(await MapearAsync(creada!), "La receta fue creada correctamente.");
         }
         catch (DbUpdateException)
         {
@@ -107,7 +113,7 @@ public sealed class RecetaService : IRecetaService
         catch (DbUpdateException) { return ResultadoRecetaDto.Error(NombreDuplicado); }
 
         var actualizada = await _recetaRepository.ObtenerPorIdAsync(negocioId.Value, receta.Id);
-        return ResultadoRecetaDto.Ok(Mapear(actualizada!), "La receta fue actualizada correctamente.");
+        return ResultadoRecetaDto.Ok(await MapearAsync(actualizada!), "La receta fue actualizada correctamente.");
     }
 
     public async Task<ResultadoEliminarRecetaDto> EliminarAsync(int cuentaId, int recetaId)
@@ -175,7 +181,7 @@ public sealed class RecetaService : IRecetaService
         BorrarArchivo(anterior);
 
         var actualizada = await _recetaRepository.ObtenerPorIdAsync(negocioId.Value, receta.Id);
-        return ResultadoRecetaDto.Ok(Mapear(actualizada!), "La imagen fue guardada correctamente.");
+        return ResultadoRecetaDto.Ok(await MapearAsync(actualizada!), "La imagen fue guardada correctamente.");
     }
 
     public async Task<ResultadoRecetaDto> QuitarImagenAsync(int cuentaId, int recetaId)
@@ -192,7 +198,7 @@ public sealed class RecetaService : IRecetaService
         BorrarArchivo(anterior);
 
         var actualizada = await _recetaRepository.ObtenerPorIdAsync(negocioId.Value, receta.Id);
-        return ResultadoRecetaDto.Ok(Mapear(actualizada!), "La imagen fue eliminada.");
+        return ResultadoRecetaDto.Ok(await MapearAsync(actualizada!), "La imagen fue eliminada.");
     }
 
     private string RaizWeb() => _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
@@ -256,16 +262,33 @@ public sealed class RecetaService : IRecetaService
     private static decimal CostoPorUnidad(Insumo i) =>
         i.Cantidad.HasValue && i.Cantidad.Value > 0 ? i.CostoUnitario / i.Cantidad.Value : i.CostoUnitario;
 
-    private static RecetaDto Mapear(Receta r)
+    // Receta mapeada con el precio por unidad del proveedor principal (si existe),
+    // de modo que la tarjeta y el panel "Ver costo real" usen el mismo costo.
+    private async Task<RecetaDto> MapearAsync(Receta r)
     {
-        var lineas = r.RecetaInsumos.Select(ri => new RecetaInsumoDto
+        var principales = await _costeoRepository.ObtenerCostosProveedorPrincipalAsync(
+            r.RecetaInsumos.Select(ri => ri.InsumoId));
+        return Mapear(r, principales);
+    }
+
+    private RecetaDto Mapear(Receta r, IReadOnlyDictionary<int, Dtos.PrecioProveedorPrincipal>? principales = null)
+    {
+        var lineas = r.RecetaInsumos.Select(ri =>
         {
-            InsumoId = ri.InsumoId,
-            InsumoNombre = ri.Insumo.Nombre,
-            Cantidad = ri.Cantidad,
-            UnidadMedida = ri.UnidadMedida,
-            CostoLinea = ConversorUnidades.CostoLinea(ri.Cantidad, ri.UnidadMedida,
-                ri.Insumo.UnidadMedida, CostoPorUnidad(ri.Insumo), ri.Insumo.PorcentajeMerma)
+            var cpu = principales is not null &&
+                      principales.TryGetValue(ri.InsumoId, out var pp) &&
+                      ConversorUnidades.PrecioPorUnidad(pp.Costo, pp.Cantidad, pp.UnidadMedida, ri.Insumo.UnidadMedida) is { } p
+                        ? p
+                        : CostoPorUnidad(ri.Insumo);
+            return new RecetaInsumoDto
+            {
+                InsumoId = ri.InsumoId,
+                InsumoNombre = ri.Insumo.Nombre,
+                Cantidad = ri.Cantidad,
+                UnidadMedida = ri.UnidadMedida,
+                CostoLinea = ConversorUnidades.CostoLinea(ri.Cantidad, ri.UnidadMedida,
+                    ri.Insumo.UnidadMedida, cpu, ri.Insumo.PorcentajeMerma)
+            };
         }).ToList();
 
         var total = decimal.Round(lineas.Sum(l => l.CostoLinea), 2);

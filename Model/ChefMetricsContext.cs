@@ -33,6 +33,8 @@ public partial class ChefMetricsContext : DbContext
 
     public virtual DbSet<ProductoMenuRecetum> ProductoMenuReceta { get; set; }
 
+    public virtual DbSet<ProductoMenuInsumo> ProductoMenuInsumos { get; set; }
+
     public virtual DbSet<Proveedor> Proveedors { get; set; }
 
     public virtual DbSet<RecetaInsumo> RecetaInsumos { get; set; }
@@ -329,6 +331,30 @@ public partial class ChefMetricsContext : DbContext
                 .HasForeignKey(d => d.RecetaId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ProductoMenuReceta_Receta");
+        });
+
+        modelBuilder.Entity<ProductoMenuInsumo>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_ProductoMenuInsumo");
+
+            entity.ToTable("ProductoMenuInsumo");
+
+            entity.HasIndex(e => e.InsumoId, "IX_ProductoMenuInsumo_InsumoId");
+
+            entity.HasIndex(e => new { e.ProductoMenuId, e.InsumoId }, "UQ_ProductoMenuInsumo").IsUnique();
+
+            entity.Property(e => e.Cantidad).HasColumnType("decimal(12, 3)");
+
+            entity.Property(e => e.UnidadMedida).HasMaxLength(10);
+
+            entity.HasOne(d => d.ProductoMenu).WithMany(p => p.ProductoMenuInsumos)
+                .HasForeignKey(d => d.ProductoMenuId)
+                .HasConstraintName("FK_ProductoMenuInsumo_Producto");
+
+            entity.HasOne(d => d.Insumo).WithMany()
+                .HasForeignKey(d => d.InsumoId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductoMenuInsumo_Insumo");
         });
 
         modelBuilder.Entity<Proveedor>(entity =>

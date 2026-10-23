@@ -20,4 +20,6 @@ public partial class ProductoMenu
     public virtual Negocio Negocio { get; set; } = null!;
 
     public virtual ICollection<ProductoMenuRecetum> ProductoMenuReceta { get; set; } = new List<ProductoMenuRecetum>();
+
+    public virtual ICollection<ProductoMenuInsumo> ProductoMenuInsumos { get; set; } = new List<ProductoMenuInsumo>();
 }

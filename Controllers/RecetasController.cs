@@ -27,9 +27,6 @@ public sealed class RecetasController : ControllerBase
             : Ok(lista);
     }
 
-    // GET /api/recetas/{id}
-    [HttpGet("{id:int}")]
-
     // POST /api/recetas/{id}/imagen  (multipart/form-data, campo "archivo")
     [HttpPost("{id:int}/imagen")]
     [RequestSizeLimit(3_000_000)]
@@ -53,6 +50,8 @@ public sealed class RecetasController : ControllerBase
         if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
         return Ok(r.Receta);
     }
+    // GET /api/recetas/{id}
+    [HttpGet("{id:int}")]
     public async Task<IActionResult> ObtenerPorId([FromRoute] int id)
     {
 
