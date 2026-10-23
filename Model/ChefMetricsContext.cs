@@ -220,6 +220,7 @@ public partial class ChefMetricsContext : DbContext
                 .IsUnique()
                 .HasFilter("([EsPrincipal]=(1))");
 
+            entity.Property(e => e.Cantidad).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Costo).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.FechaActualizacion).HasDefaultValueSql("(sysutcdatetime())");
 
@@ -254,6 +255,7 @@ public partial class ChefMetricsContext : DbContext
             entity.Property(e => e.TelefonoContacto)
                 .HasMaxLength(20)
                 .IsUnicode(false);
+            entity.Property(e => e.UmbralMargenMinimo).HasColumnType("decimal(18, 2)");
 
             entity.HasOne(d => d.TipoEmprendimiento).WithMany(p => p.Negocios)
                 .HasForeignKey(d => d.TipoEmprendimientoId)
