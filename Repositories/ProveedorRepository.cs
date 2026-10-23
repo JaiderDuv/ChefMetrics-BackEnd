@@ -52,11 +52,12 @@ public sealed class ProveedorRepository : IProveedorRepository
 
     public async Task<List<Proveedor>> BuscarPorNombreAsync(int negocioId, string termino, int limite)
     {
-        var prefijo = termino.Trim().ToLower();
+        var texto = termino.Trim();
         var top = limite < 1 ? 8 : Math.Min(limite, 20);
         return await _context.Proveedors
             .AsNoTracking()
-            .Where(p => p.NegocioId == negocioId && p.Nombre.ToLower().StartsWith(prefijo))
+            .Where(p => p.NegocioId == negocioId &&
+                EF.Functions.Collate(p.Nombre, Normalizador.CollationInsensible).Contains(texto))
             .OrderBy(p => p.Nombre)
             .Take(top)
             .ToListAsync();
