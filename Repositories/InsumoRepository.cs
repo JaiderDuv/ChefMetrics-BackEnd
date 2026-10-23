@@ -49,11 +49,12 @@ public sealed class InsumoRepository : IInsumoRepository
 
         if (!string.IsNullOrWhiteSpace(busqueda))
         {
-            var termino = busqueda.Trim().ToLower();
+            var termino = busqueda.Trim();
             query = query.Where(i =>
-                i.Nombre.ToLower().Contains(termino) ||
+                EF.Functions.Collate(i.Nombre, Normalizador.CollationInsensible).Contains(termino) ||
                 _context.InsumoProveedors.Any(ip =>
-                    ip.InsumoId == i.Id && ip.Proveedor.Nombre.ToLower().Contains(termino)));
+                    ip.InsumoId == i.Id && ip.EsPrincipal &&
+                    EF.Functions.Collate(ip.Proveedor.Nombre, Normalizador.CollationInsensible).Contains(termino)));
         }
 
         if (!string.IsNullOrWhiteSpace(categoria))
