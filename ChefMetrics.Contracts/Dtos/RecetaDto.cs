@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace ChefMetrics_BackEnd.Dtos;
+namespace ChefMetrics.Contracts;
 
 public sealed class RecetaInsumoDto
 {

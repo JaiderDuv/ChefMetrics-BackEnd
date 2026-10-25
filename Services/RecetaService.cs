@@ -1,4 +1,4 @@
-﻿using ChefMetrics_BackEnd.Dtos;
+﻿using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
 using ChefMetrics_BackEnd.Utilities;
@@ -271,7 +271,7 @@ public sealed class RecetaService : IRecetaService
         return Mapear(r, principales);
     }
 
-    private RecetaDto Mapear(Receta r, IReadOnlyDictionary<int, Dtos.PrecioProveedorPrincipal>? principales = null)
+    private RecetaDto Mapear(Receta r, IReadOnlyDictionary<int, PrecioProveedorPrincipal>? principales = null)
     {
         var lineas = r.RecetaInsumos.Select(ri =>
         {

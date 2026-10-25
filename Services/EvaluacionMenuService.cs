@@ -1,4 +1,4 @@
-﻿using ChefMetrics_BackEnd.Dtos;
+﻿using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Repositories;
 
 namespace ChefMetrics_BackEnd.Services;

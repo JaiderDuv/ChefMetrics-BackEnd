@@ -1,4 +1,4 @@
-using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
 using ChefMetrics_BackEnd.Utilities;
@@ -306,7 +306,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         var usuario = cuenta.UsuarioEmprendedor;
         return new PerfilUsuarioDto
         {
-            FotoPerfilUrl = null,
+            FotoPerfilUrl = usuario.FotoPerfilUrl,
             TipoDocumento = usuario.TipoDocumento ?? string.Empty,
             NumeroDocumento = usuario.NumeroDocumento ?? string.Empty,
             TelefonoContacto = usuario.Negocio?.TelefonoContacto ?? string.Empty,
@@ -351,6 +351,12 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             return Error("El teléfono de contacto debe tener al menos 7 dígitos.");
         }
 
+        if (!FotoPerfilHelper.TryNormalizar(dto.FotoPerfilUrl, out var foto, out var error))
+        {
+            return Error(error!);
+        }
+
+        usuario.FotoPerfilUrl = foto;
         usuario.TipoDocumento = esFormalizado ? null : tipoDoc;
         usuario.NumeroDocumento = esFormalizado ? null : NullIfWhiteSpace(dto.NumeroDocumento);
         usuario.Nombres = NullIfWhiteSpace(dto.Nombres);

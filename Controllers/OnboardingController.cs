@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ChefMetrics_BackEnd.Model;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -56,14 +57,12 @@ public class OnboardingController : ControllerBase
             usuario.NumeroDocumento,
             CorreoElectronico = cuenta.Correo,
             usuario.Negocio?.TelefonoContacto,
-            // La foto no se persiste (la BD no tiene la columna):
-            // solo se usa como vista previa en el cliente.
-            FotoPerfilUrl = (string?)null
+            FotoPerfilUrl = usuario.FotoPerfilUrl
         });
     }
 
-    // Recibe la foto pero no la persiste (sin columna en BD): la vista previa
-    // vive en el cliente. Se responde OK para no romper el flujo de onboarding.
+    // Guarda la foto de perfil del emprendedor. Se acepta una data URL de imagen
+    // o un valor vacío para quitarla.
     [HttpPost("foto-perfil")]
     public async Task<IActionResult> GuardarFotoPerfil([FromBody] OnboardingFotoPerfilDto dto)
     {
@@ -75,16 +74,28 @@ public class OnboardingController : ControllerBase
             return Unauthorized();
         }
 
-        var existe = await _context.UsuarioEmprendedors
-            .AsNoTracking()
-            .AnyAsync(u => u.CuentaId == cuentaId);
+        var usuario = await _context.UsuarioEmprendedors
+            .FirstOrDefaultAsync(u => u.CuentaId == cuentaId);
 
-        if (!existe)
+        if (usuario is null)
         {
             return NotFound(new { mensaje = "No se encontró el perfil." });
         }
 
-        return Ok(new { exito = true, mensaje = "Vista previa actualizada (la foto no se guarda en el servidor)." });
+        if (!FotoPerfilHelper.TryNormalizar(dto.FotoPerfilUrl, out var foto, out var error))
+        {
+            return BadRequest(new { mensaje = error });
+        }
+
+        usuario.FotoPerfilUrl = foto;
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            exito = true,
+            fotoPerfilUrl = foto,
+            mensaje = foto is null ? "Foto de perfil eliminada." : "Foto de perfil guardada."
+        });
     }
 
     [HttpGet("datos-negocio")]

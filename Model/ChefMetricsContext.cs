@@ -477,6 +477,7 @@ public partial class ChefMetricsContext : DbContext
                 .HasMaxLength(100)
                 .HasDefaultValue("");
             entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.FotoPerfilUrl).HasColumnType("nvarchar(max)");
             entity.Property(e => e.Nit)
                 .HasMaxLength(20)
                 .IsUnicode(false)

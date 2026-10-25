@@ -9,14 +9,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="ChefMetrics.Contracts\**" />
     <Compile Remove="Datas\**" />
     <Compile Remove="Models\**" />
+    <Content Remove="ChefMetrics.Contracts\**" />
     <Content Remove="Datas\**" />
     <Content Remove="Models\**" />
+    <EmbeddedResource Remove="ChefMetrics.Contracts\**" />
     <EmbeddedResource Remove="Datas\**" />
     <EmbeddedResource Remove="Models\**" />
+    <None Remove="ChefMetrics.Contracts\**" />
     <None Remove="Datas\**" />
     <None Remove="Models\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="ChefMetrics.Contracts\ChefMetrics.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

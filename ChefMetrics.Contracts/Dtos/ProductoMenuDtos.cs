@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ChefMetrics_BackEnd.Dtos;
+namespace ChefMetrics.Contracts;
 
 // ---------- Ítems del producto ----------
 // Un producto se compone de recetas (mínimo una) y opcionalmente de

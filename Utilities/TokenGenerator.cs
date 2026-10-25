@@ -49,20 +49,27 @@ namespace ChefMetrics_BackEnd.Utilities
                     "La clave de firma JWT debe tener al menos 32 caracteres.");
             }
 
+            var ahora = DateTime.UtcNow;
+            var minutos = settings.AccessTokenMinutes > 0
+                ? settings.AccessTokenMinutes
+                : 15;
+
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, cuenta.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, cuenta.Correo),
-                new Claim(JwtRegisteredClaimNames.UniqueName, usuario?.NombreEmprendimiento ?? string.Empty)
+                new Claim(JwtRegisteredClaimNames.UniqueName, usuario?.NombreEmprendimiento ?? string.Empty),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.Key));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-            // Sin expiración: la sesión permanece activa una vez iniciada.
             var token = new JwtSecurityToken(
                 issuer: settings.Issuer,
                 audience: settings.Audience,
                 claims: claims,
+                notBefore: ahora,
+                expires: ahora.AddMinutes(minutos),
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
