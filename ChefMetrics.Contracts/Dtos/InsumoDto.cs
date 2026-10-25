@@ -18,9 +18,6 @@ public class CrearInsumoDto
     [Required(ErrorMessage = "El costo unitario es obligatorio.")]
     public decimal CostoUnitario { get; set; }
 
-    [Required(ErrorMessage = "El porcentaje de merma es obligatorio.")]
-    public decimal PorcentajeMerma { get; set; }
-
     [Required(ErrorMessage = "El proveedor es obligatorio.")]
     [StringLength(150, ErrorMessage = "El proveedor no puede superar los 150 caracteres.")]
     public string? Proveedor { get; set; }
@@ -44,8 +41,6 @@ public class ActualizarInsumoDto
 
     public decimal? CostoUnitario { get; set; }
 
-    public decimal? PorcentajeMerma { get; set; }
-
     [StringLength(150, ErrorMessage = "El proveedor no puede superar los 150 caracteres.")]
     public string? Proveedor { get; set; }
 
@@ -62,7 +57,6 @@ public class InsumoDto
     public string UnidadMedida { get; set; } = string.Empty;
     public string Categoria { get; set; } = string.Empty;
     public decimal CostoUnitario { get; set; }
-    public decimal PorcentajeMerma { get; set; }
     public string? Proveedor { get; set; }
     public decimal? Cantidad { get; set; }
     public bool Activo { get; set; }

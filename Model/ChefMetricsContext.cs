@@ -195,7 +195,6 @@ public partial class ChefMetricsContext : DbContext
             entity.Property(e => e.Cantidad).HasColumnType("decimal(38, 2)");
             entity.Property(e => e.FechaActualizacion).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.Nombre).HasMaxLength(150);
-            entity.Property(e => e.PorcentajeMerma).HasColumnType("decimal(5, 2)");
             entity.Property(e => e.Proveedor).HasMaxLength(150);
             entity.Property(e => e.UnidadMedida)
                 .HasMaxLength(10)
@@ -393,6 +392,9 @@ public partial class ChefMetricsContext : DbContext
             entity.HasIndex(e => new { e.RecetaId, e.InsumoId }, "UQ_RecetaInsumo").IsUnique();
 
             entity.Property(e => e.Cantidad).HasColumnType("decimal(12, 3)");
+            entity.Property(e => e.PorcentajeMerma)
+                .HasColumnType("decimal(5, 2)")
+                .HasDefaultValue(0m);
             entity.Property(e => e.UnidadMedida)
                 .HasMaxLength(10)
                 .IsUnicode(false);

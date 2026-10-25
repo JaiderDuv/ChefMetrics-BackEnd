@@ -14,6 +14,9 @@ public sealed class RecetaInsumoDto
     [Range(0.001, 100000, ErrorMessage = "La cantidad debe estar entre 0.001 y 100000.")]
     public decimal Cantidad { get; set; }
 
+    [Range(0, 100, ErrorMessage = "La merma debe estar entre 0 y 100 %.")]
+    public decimal PorcentajeMerma { get; set; }
+
     [Required(ErrorMessage = "La unidad es obligatoria.")]
     [RegularExpression(@"(?i)^(g|kg|ml|l|oz|lb|unidad|taza)$", ErrorMessage = "Unidad de medida no válida.")]
     public string UnidadMedida { get; set; } = "g";

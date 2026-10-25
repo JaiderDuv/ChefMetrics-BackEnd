@@ -88,7 +88,7 @@ public sealed class CostoProductoService : ICostoProductoService
 
     // ---------- Núcleo reutilizable ----------
     // Por cada receta: (costo de insumos de la receta ÷ porciones base) × porciones
-    // del producto. Insumos directos (empaques): mismo tratamiento de merma y proveedor.
+    // del producto. Insumos directos (empaques): se costean con proveedor, sin merma de receta.
     // costoTotalProducto = Σ (costoPorPorcion × porciones) + Σ (costo insumo directo) + fijos prorrateados
     private async Task<ResultadoCosteo<CostoProductoDto>> CalcularNucleoAsync(
         int negocioId, int productoId, string nombre, decimal? precioVenta,
@@ -202,9 +202,10 @@ public sealed class CostoProductoService : ICostoProductoService
             }
 
             var cpu = CostoInsumoPorUnidad(insumo, principales, dto.Advertencias);
+            // Los empaques/insumos directos no son una preparación: no tienen merma propia.
             var linea = CalculadoraCostos.Linea(
                 insumo.Id, insumo.Nombre, d.Cantidad, unidad,
-                insumo.UnidadMedida, insumo.PorcentajeMerma, cpu, FuenteDe(insumo, principales));
+                insumo.UnidadMedida, 0m, cpu, FuenteDe(insumo, principales));
             var aportado = decimal.Round(linea.CostoInsumo, 2);
             dto.InsumosDirectos.Add(new InsumoDirectoDetalleDto
             {
@@ -349,7 +350,7 @@ public sealed class CostoProductoService : ICostoProductoService
 
             var cpu = CostoInsumoPorUnidad(i, principales, advertencias, receta.Nombre);
             total += ConversorUnidades.CostoLinea(
-                ri.Cantidad, ri.UnidadMedida, i.UnidadMedida, cpu, i.PorcentajeMerma);
+                ri.Cantidad, ri.UnidadMedida, i.UnidadMedida, cpu, ri.PorcentajeMerma);
         }
         return decimal.Round(total, 2);
     }

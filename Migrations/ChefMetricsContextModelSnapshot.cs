@@ -290,9 +290,6 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
-                    b.Property<decimal>("PorcentajeMerma")
-                        .HasColumnType("decimal(5, 2)");
-
                     b.Property<string>("Proveedor")
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
@@ -687,6 +684,11 @@ namespace ChefMetrics_BackEnd.Migrations
 
                     b.Property<int>("InsumoId")
                         .HasColumnType("int");
+
+                    b.Property<decimal>("PorcentajeMerma")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(5, 2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<int>("RecetaId")
                         .HasColumnType("int");

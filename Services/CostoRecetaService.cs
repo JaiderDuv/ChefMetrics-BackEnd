@@ -65,7 +65,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
             if (costo <= 0) dto.Advertencias.Add($"'{i.Nombre}' tiene costo 0; el resultado puede estar subestimado.");
 
             dto.Lineas.Add(CalculadoraCostos.Linea(i.Id, i.Nombre, ri.Cantidad, ri.UnidadMedida,
-                i.UnidadMedida, i.PorcentajeMerma, costo, fuente));
+                i.UnidadMedida, ri.PorcentajeMerma, costo, fuente));
         }
 
         // 2) Costos fijos prorrateados (solo los seleccionados por el usuario, si se indican)
@@ -151,7 +151,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
             if (costo <= 0) dto.Advertencias.Add($"'{i.Nombre}' tiene costo 0; el resultado puede estar subestimado.");
 
             dto.Lineas.Add(CalculadoraCostos.Linea(i.Id, i.Nombre, ri.Cantidad * factor, ri.UnidadMedida,
-                i.UnidadMedida, i.PorcentajeMerma, costo, fuente));
+                i.UnidadMedida, ri.PorcentajeMerma, costo, fuente));
         }
 
         var fijosConfigurados = await _repo.ListarCostosFijosAsync(negocioId.Value, soloActivos: true);

@@ -250,7 +250,18 @@ public sealed class RecetaService : IRecetaService
             if (!ConversorUnidades.Compatibles(unidad!, insumo.UnidadMedida))
                 return ($"La unidad '{unidad}' no es compatible con el insumo '{insumo.Nombre}', que se mide en '{insumo.UnidadMedida}'.", null);
 
-            resultado.Add(new RecetaInsumo { InsumoId = item.InsumoId, Cantidad = item.Cantidad, UnidadMedida = unidad! });
+            if (item.PorcentajeMerma < 0 || item.PorcentajeMerma > 100)
+                return ("La merma de cada ingrediente debe estar entre 0 y 100 %.", null);
+            if (decimal.Round(item.PorcentajeMerma, 2) != item.PorcentajeMerma)
+                return ("La merma admite máximo 2 decimales.", null);
+
+            resultado.Add(new RecetaInsumo
+            {
+                InsumoId = item.InsumoId,
+                Cantidad = item.Cantidad,
+                PorcentajeMerma = item.PorcentajeMerma,
+                UnidadMedida = unidad!
+            });
         }
         return (null, resultado);
     }
@@ -284,9 +295,10 @@ public sealed class RecetaService : IRecetaService
                 InsumoId = ri.InsumoId,
                 InsumoNombre = ri.Insumo.Nombre,
                 Cantidad = ri.Cantidad,
+                PorcentajeMerma = ri.PorcentajeMerma,
                 UnidadMedida = ri.UnidadMedida,
                 CostoLinea = ConversorUnidades.CostoLinea(ri.Cantidad, ri.UnidadMedida,
-                    ri.Insumo.UnidadMedida, cpu, ri.Insumo.PorcentajeMerma)
+                    ri.Insumo.UnidadMedida, cpu, ri.PorcentajeMerma)
             };
         }).ToList();
 

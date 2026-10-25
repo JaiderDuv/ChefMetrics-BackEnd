@@ -13,6 +13,9 @@ public partial class RecetaInsumo
 
     public decimal Cantidad { get; set; }
 
+    // Porcentaje de merma propio de esta preparación (0-100).
+    public decimal PorcentajeMerma { get; set; }
+
     public string UnidadMedida { get; set; } = null!;
 
     public virtual Insumo Insumo { get; set; } = null!;
