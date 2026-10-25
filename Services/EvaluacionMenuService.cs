@@ -35,8 +35,8 @@ public sealed class EvaluacionMenuService : IEvaluacionMenuService
         var negocioId = await _insumos.ObtenerNegocioIdPorCuentaAsync(cuentaId);
         if (!negocioId.HasValue) return ResultadoEvaluacionDto.NoHallado(SinNegocio);
 
-        if (dto.UmbralMargenMinimo < 0)
-            return ResultadoEvaluacionDto.Error("El umbral no puede ser negativo.");
+        if (dto.UmbralMargenMinimo < 0 || dto.UmbralMargenMinimo > 100)
+            return ResultadoEvaluacionDto.Error("El umbral debe estar entre 0 y 100 %.");
 
         var actualizado = await _umbralRepo.ActualizarAsync(negocioId.Value, dto.UmbralMargenMinimo);
         if (!actualizado) return ResultadoEvaluacionDto.NoHallado(SinNegocio);
@@ -67,11 +67,10 @@ public sealed class EvaluacionMenuService : IEvaluacionMenuService
             if (sinPrecio) motivo = "El producto no tiene precio de venta definido.";
             else if (noCalculable) motivo = "El costo directo del producto no está disponible todavía.";
 
-            // Un producto está en riesgo si cualquiera de sus márgenes queda
-            // por debajo del umbral. Así no se declara "sin riesgo" un producto
-            // rentable en directo pero con margen real negativo por los fijos.
-            var enRiesgo = (p.MargenDirecto.HasValue && p.MargenDirecto.Value < umbral)
-                        || (p.MargenReal.HasValue && p.MargenReal.Value < umbral);
+            // La evaluación se basa en el margen directo. Los costos fijos se
+            // cubren con el punto de equilibrio y no se cargan a cada producto,
+            // así que no deben convertir un producto rentable en "en riesgo".
+            var enRiesgo = p.MargenDirecto.HasValue && p.MargenDirecto.Value < umbral;
 
             return new ProductoEvaluacionDto
             {
@@ -88,13 +87,11 @@ public sealed class EvaluacionMenuService : IEvaluacionMenuService
             };
         });
 
-        // Primero el margen más bajo (directo o real), para que lo urgente
-        // aparezca arriba; sin margen calculable, al final.
+        // Primero el margen directo más bajo, para que lo urgente aparezca
+        // arriba; sin margen calculable, al final.
         var ordenados = evaluados
             .OrderBy(p => p.MargenNoCalculable)
-            .ThenBy(p => Math.Min(
-                p.MargenDirecto ?? decimal.MaxValue,
-                p.MargenReal ?? decimal.MaxValue))
+            .ThenBy(p => p.MargenDirecto ?? decimal.MaxValue)
             .ToList();
 
         return ResultadoEvaluacionDto.Ok(new EvaluacionMenuDto

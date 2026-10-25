@@ -9,7 +9,7 @@ public sealed class UmbralMargenDto
 
 public sealed class ActualizarUmbralDto
 {
-    [Range(0, 99999.99, ErrorMessage = "El umbral no puede ser negativo.")]
+    [Range(0, 100, ErrorMessage = "El umbral debe estar entre 0 y 100 %.")]
     public decimal UmbralMargenMinimo { get; set; }
 }
 
@@ -26,10 +26,10 @@ public sealed class ProductoEvaluacionDto
 
     public decimal? PrecioVenta { get; set; }
 
-    // Margen directo: el que se evalúa por defecto en el menú.
+    // Margen directo: el indicador con el que se evalúa el riesgo.
     public decimal? MargenDirecto { get; set; }
 
-    // Margen con costo completo, solo como referencia.
+    // Margen con costo completo, solo como referencia para análisis.
     public decimal? MargenReal { get; set; }
 
     public bool MargenNoCalculable { get; set; }
