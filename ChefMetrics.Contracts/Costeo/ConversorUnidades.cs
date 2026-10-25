@@ -1,5 +1,6 @@
-﻿namespace ChefMetrics_BackEnd.Utilities;
+namespace ChefMetrics.Contracts;
 
+// Única fuente de conversión de unidades para backend y frontend.
 public static class ConversorUnidades
 {
     // Factor respecto a la unidad base de cada familia (g, ml, unidad).
@@ -21,15 +22,11 @@ public static class ConversorUnidades
     public static bool Compatibles(string a, string b) =>
         Tabla.TryGetValue(a, out var x) && Tabla.TryGetValue(b, out var y) && x.Familia == y.Familia;
 
-    // Costo de una línea de receta, considerando conversión de unidad y merma.
-    public static decimal CostoLinea(decimal cantidad, string unidadReceta, string unidadInsumo,
-                                     decimal costoUnitario, decimal mermaPorcentaje)
-    {
-        if (!Compatibles(unidadReceta, unidadInsumo)) return 0m;
-        var enUnidadInsumo = cantidad * Tabla[unidadReceta].Factor / Tabla[unidadInsumo].Factor;
-        var paraComprar = enUnidadInsumo * (1m + mermaPorcentaje / 100m);
-        return decimal.Round(paraComprar * costoUnitario, 2);
-    }
+    public static IEnumerable<string> UnidadesDeLaMismaFamilia(string unidad) =>
+        Tabla.TryGetValue(unidad, out var x)
+            ? Tabla.Where(t => t.Value.Familia == x.Familia).Select(t => t.Key)
+            : Tabla.Keys;
+
     // Convierte una cantidad de una unidad a otra de la misma familia. null si no son compatibles.
     public static decimal? Convertir(decimal cantidad, string deUnidad, string aUnidad)
     {
@@ -48,5 +45,15 @@ public static class ConversorUnidades
         var cantidadBase = Convertir(cantidadPaquete, unidadPaquete, unidadInsumo);
         if (cantidadBase is null or <= 0) return null;
         return costo / cantidadBase.Value;
+    }
+
+    // Costo de una línea de receta, considerando conversión de unidad y merma.
+    public static decimal CostoLinea(decimal cantidad, string unidadReceta, string unidadInsumo,
+        decimal costoUnitario, decimal mermaPorcentaje)
+    {
+        var convertida = Convertir(cantidad, unidadReceta, unidadInsumo);
+        if (convertida is null) return 0m;
+        return decimal.Round(
+            CalculadoraCostos.CantidadParaComprar(convertida.Value, mermaPorcentaje) * costoUnitario, 2);
     }
 }

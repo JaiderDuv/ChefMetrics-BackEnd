@@ -93,12 +93,11 @@ public sealed class PatchProductoMenuDto
 
     public bool? Activo { get; set; }
 
-    [MinLength(1, ErrorMessage = "El producto necesita al menos una receta.")]
-    [MaxLength(50, ErrorMessage = "Máximo 50 recetas por producto.")]
+    // La validación de mínimo/máximo se hace en ProductoMenuService para no
+    // romper la generación del esquema OpenAPI de las listas anulables.
     public List<RecetaEnProductoDto>? Recetas { get; set; }
 
     // null = no cambia los empaques guardados; lista (aunque vacía) = reemplaza.
-    [MaxLength(50, ErrorMessage = "Máximo 50 insumos directos por producto.")]
     public List<InsumoDirectoDto>? InsumosDirectos { get; set; }
 }
 

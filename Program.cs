@@ -5,7 +5,16 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
 using System.Text;
+
+// El documento OpenAPI se serializa con la cultura del proceso. En equipos
+// configurados con coma decimal eso produce JSON inválido (por ejemplo,
+// "maximum": 999999,99), así que el backend usa una cultura invariante.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -85,7 +94,10 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    // La política de autorización de respaldo también cubre los endpoints
+    // generados por MapOpenApi. El documento solo se expone en Development,
+    // pero debe ser anónimo para que Swagger UI pueda cargarlo.
+    app.MapOpenApi().AllowAnonymous();
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/openapi/v1.json", "ChefMetrics BackEnd API v1");

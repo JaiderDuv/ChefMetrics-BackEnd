@@ -1,4 +1,5 @@
-﻿using ChefMetrics_BackEnd.Model;
+﻿using ChefMetrics.Contracts;
+using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 namespace ChefMetrics_BackEnd.Repositories;

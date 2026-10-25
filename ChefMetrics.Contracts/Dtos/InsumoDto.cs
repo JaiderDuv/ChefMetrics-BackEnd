@@ -25,7 +25,7 @@ public class CrearInsumoDto
     [StringLength(150, ErrorMessage = "El proveedor no puede superar los 150 caracteres.")]
     public string? Proveedor { get; set; }
 
-    [Range(0, double.MaxValue, ErrorMessage = "La cantidad no puede ser negativa.")]
+    [Range(typeof(decimal), "0", "999999.99", ErrorMessage = "La cantidad no puede ser negativa.")]
     public decimal? Cantidad { get; set; }
 
     public bool? Activo { get; set; }
@@ -49,7 +49,7 @@ public class ActualizarInsumoDto
     [StringLength(150, ErrorMessage = "El proveedor no puede superar los 150 caracteres.")]
     public string? Proveedor { get; set; }
 
-    [Range(0, double.MaxValue, ErrorMessage = "La cantidad no puede ser negativa.")]
+    [Range(typeof(decimal), "0", "999999.99", ErrorMessage = "La cantidad no puede ser negativa.")]
     public decimal? Cantidad { get; set; }
 
     public bool? Activo { get; set; }
