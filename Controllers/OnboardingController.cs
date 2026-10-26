@@ -56,14 +56,11 @@ public class OnboardingController : ControllerBase
             usuario.NumeroDocumento,
             CorreoElectronico = cuenta.Correo,
             usuario.Negocio?.TelefonoContacto,
-            // La foto no se persiste (la BD no tiene la columna):
-            // solo se usa como vista previa en el cliente.
-            FotoPerfilUrl = (string?)null
+            FotoPerfilUrl = usuario.FotoPerfilUrl
         });
     }
 
-    // Recibe la foto pero no la persiste (sin columna en BD): la vista previa
-    // vive en el cliente. Se responde OK para no romper el flujo de onboarding.
+
     [HttpPost("foto-perfil")]
     public async Task<IActionResult> GuardarFotoPerfil([FromBody] OnboardingFotoPerfilDto dto)
     {
@@ -75,16 +72,18 @@ public class OnboardingController : ControllerBase
             return Unauthorized();
         }
 
-        var existe = await _context.UsuarioEmprendedors
-            .AsNoTracking()
-            .AnyAsync(u => u.CuentaId == cuentaId);
+        var usuario = await _context.UsuarioEmprendedors
+            .FirstOrDefaultAsync(u => u.CuentaId == cuentaId);
 
-        if (!existe)
+        if (usuario is null)
         {
             return NotFound(new { mensaje = "No se encontró el perfil." });
         }
 
-        return Ok(new { exito = true, mensaje = "Vista previa actualizada (la foto no se guarda en el servidor)." });
+        usuario.FotoPerfilUrl = string.IsNullOrWhiteSpace(dto.FotoPerfilUrl) ? null : dto.FotoPerfilUrl;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { exito = true, mensaje = "Foto de perfil guardada." });
     }
 
     [HttpGet("datos-negocio")]
@@ -119,7 +118,8 @@ public class OnboardingController : ControllerBase
             negocio?.Rues,
             negocio?.CorreoEmpresa,
             negocio?.TieneSitioFisico,
-            negocio?.Direccion
+            negocio?.Direccion,
+            negocio?.LogoUrl
         });
     }
 

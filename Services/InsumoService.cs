@@ -760,6 +760,22 @@ public sealed class InsumoService : IInsumoService
                     ? null
                     : (bool?)(h.CostoNuevo > h.CostoAnterior));
 
+            decimal? diferenciaPaquete = null;
+            decimal? variacionPaquete = null;
+            var referenciaPaquete = anterior?.CostoNuevo;
+            if (referenciaPaquete is null && h.CostoAnterior != h.CostoNuevo)
+            {
+                referenciaPaquete = h.CostoAnterior;
+            }
+            if (referenciaPaquete.HasValue && referenciaPaquete.Value != 0)
+            {
+                diferenciaPaquete = h.CostoNuevo - referenciaPaquete.Value;
+                variacionPaquete = Math.Round((h.CostoNuevo - referenciaPaquete.Value) / referenciaPaquete.Value * 100, 2);
+            }
+            var esSubidaPaquete = diferenciaPaquete is null || diferenciaPaquete == 0
+                ? null
+                : (bool?)(diferenciaPaquete > 0);
+
             return new HistorialPrecioGeneralDto
             {
                 InsumoId = h.InsumoProveedor.InsumoId,
@@ -771,7 +787,10 @@ public sealed class InsumoService : IInsumoService
                 PrecioUnitario = unitarioNuevo,
                 VariacionPorcentual = variacion,
                 Diferencia = diferencia,
-                EsSubida = esSubida
+                EsSubida = esSubida,
+                DiferenciaPaquete = diferenciaPaquete,
+                VariacionPaquete = variacionPaquete,
+                EsSubidaPaquete = esSubidaPaquete
             };
         }).ToList();
 
@@ -864,6 +883,22 @@ public sealed class InsumoService : IInsumoService
                     ? null
                     : (bool?)(h.CostoNuevo > h.CostoAnterior));
 
+            decimal? diferenciaPaquete = null;
+            decimal? variacionPaquete = null;
+            var referenciaPaquete = anterior?.CostoNuevo;
+            if (referenciaPaquete is null && h.CostoAnterior != h.CostoNuevo)
+            {
+                referenciaPaquete = h.CostoAnterior;
+            }
+            if (referenciaPaquete.HasValue && referenciaPaquete.Value != 0)
+            {
+                diferenciaPaquete = h.CostoNuevo - referenciaPaquete.Value;
+                variacionPaquete = Math.Round((h.CostoNuevo - referenciaPaquete.Value) / referenciaPaquete.Value * 100, 2);
+            }
+            var esSubidaPaquete = diferenciaPaquete is null || diferenciaPaquete == 0
+                ? null
+                : (bool?)(diferenciaPaquete > 0);
+
             return new HistorialPrecioGeneralDto
             {
                 InsumoId = h.InsumoIdOriginal ?? 0,
@@ -876,7 +911,10 @@ public sealed class InsumoService : IInsumoService
                 VariacionPorcentual = variacion,
                 Diferencia = diferencia,
                 EsSubida = esSubida,
-                InsumoEliminado = true
+                InsumoEliminado = true,
+                DiferenciaPaquete = diferenciaPaquete,
+                VariacionPaquete = variacionPaquete,
+                EsSubidaPaquete = esSubidaPaquete
             };
         }).ToList();
     }
@@ -932,7 +970,7 @@ public sealed class InsumoService : IInsumoService
     private static string? NormalizarCategoria(string? valor)
     {
         var candidato = Normalizador.NormalizarCategoria(valor);
-        return CategoriasValidas.Contains(candidato) ? candidato : null;
+        return candidato is not null && CategoriasValidas.Contains(candidato) ? candidato : null;
     }
 
     private static decimal MaxCantidadPorUnidad(string? unidadMedida)
