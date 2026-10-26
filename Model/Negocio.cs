@@ -46,4 +46,6 @@ public partial class Negocio
     // Divisor único del negocio para repartir todos los costos fijos:
     // cantidad de preparaciones base (lotes completos) producidas al mes.
     public int? PreparacionesBaseMes { get; set; }
+
+    public string? LogoUrl { get; set; }
 }

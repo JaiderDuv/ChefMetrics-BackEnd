@@ -371,6 +371,9 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("(sysutcdatetime())");
 
+                    b.Property<string>("LogoUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int?>("PreparacionesBaseMes")
                         .HasColumnType("int");
 

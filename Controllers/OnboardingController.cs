@@ -130,7 +130,8 @@ public class OnboardingController : ControllerBase
             negocio?.Rues,
             negocio?.CorreoEmpresa,
             negocio?.TieneSitioFisico,
-            negocio?.Direccion
+            negocio?.Direccion,
+            negocio?.LogoUrl
         });
     }
 

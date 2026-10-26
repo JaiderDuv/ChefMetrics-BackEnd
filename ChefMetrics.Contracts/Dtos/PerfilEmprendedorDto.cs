@@ -66,6 +66,8 @@ public class PerfilEmprendedorDto
     public string Direccion { get; set; } = string.Empty;
 
     public List<EmpleadoDto> Empleados { get; set; } = new();
+
+    public string? LogoUrl { get; set; }
 }
 
 public class EmpleadoDto
