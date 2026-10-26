@@ -73,12 +73,6 @@ public partial class ChefMetricsContext : DbContext
                 .HasDefaultValue("Otros");
             entity.Property(e => e.MontoMensual).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.Nombre).HasMaxLength(150);
-            entity.Property(e => e.UnidadProrrateo)
-                .HasMaxLength(30)
-                .IsUnicode(false);
-            entity.Property(e => e.ValorDivisor)
-                .HasDefaultValue(100m)
-                .HasColumnType("decimal(12, 2)");
 
             entity.HasOne(d => d.Negocio).WithMany(p => p.CostoFijos)
                 .HasForeignKey(d => d.NegocioId)
@@ -255,6 +249,7 @@ public partial class ChefMetricsContext : DbContext
                 .HasMaxLength(20)
                 .IsUnicode(false);
             entity.Property(e => e.UmbralMargenMinimo).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.PreparacionesBaseMes);
 
             entity.HasOne(d => d.TipoEmprendimiento).WithMany(p => p.Negocios)
                 .HasForeignKey(d => d.TipoEmprendimientoId)

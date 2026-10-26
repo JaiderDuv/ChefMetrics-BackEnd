@@ -115,6 +115,7 @@ public sealed class CostoProductoService : ICostoProductoService
                 .ToDictionary(i => i.Id);
 
         var fijosConfigurados = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
+        var preparacionesBaseMes = await _costeo.ObtenerPreparacionesBaseMesAsync(negocioId);
         var advertenciasFijos = new List<string>();
         var fijosAplicados = fijosConfigurados.Count == 0
             ? new List<CostoFijo>()
@@ -123,7 +124,7 @@ public sealed class CostoProductoService : ICostoProductoService
         var dto = CalcularNucleo(
             productoId, nombre, precioVenta, recetas, directos,
             mapaRecetas, principales, mapaDirectos,
-            fijosConfigurados, fijosAplicados, advertenciasFijos);
+            preparacionesBaseMes, fijosConfigurados, fijosAplicados, advertenciasFijos);
 
         return dto is null
             ? ResultadoCosteo<CostoProductoDto>.Error("El producto necesita al menos una receta.")
@@ -138,6 +139,7 @@ public sealed class CostoProductoService : ICostoProductoService
         Dictionary<int, Receta> mapaRecetas,
         Dictionary<int, PrecioProveedorPrincipal> principales,
         Dictionary<int, Insumo> mapaDirectos,
+        int? preparacionesBaseMes,
         List<CostoFijo> fijosConfigurados,
         List<CostoFijo> fijosAplicados,
         IReadOnlyList<string> advertenciasFijos)
@@ -234,15 +236,22 @@ public sealed class CostoProductoService : ICostoProductoService
         {
             dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
         }
-        else
+        else if (fijosAplicados.Count > 0)
         {
-            var cuotaPorPreparacion = CalculadoraCostos.FijoProrrateado(
-                fijosAplicados.Select(c => (c.MontoMensual, c.ValorDivisor)));
-            fijoProrrateado = cuotaPorPreparacion * preparacionesEquivalentes;
-            if (fijosAplicados.Any(c => c.ValorDivisor < 10m))
-                dto.Advertencias.Add("Uno o más costos fijos tienen un valor divisor menor a 10: el prorrateo puede estar sobrestimado.");
-            if (cuotaPorPreparacion > 0 && preparacionesEquivalentes <= 0)
-                dto.Advertencias.Add("No se pudo determinar cuántas preparaciones equivalentes usa el producto; el costo fijo prorrateado es 0.");
+            if (preparacionesBaseMes is null or <= 0)
+            {
+                dto.Advertencias.Add("No has configurado las preparaciones base al mes; el costo fijo prorrateado es 0. Defínelas en 'Costos fijos'.");
+            }
+            else
+            {
+                var cuotaPorPreparacion = CalculadoraCostos.FijoProrrateado(
+                    fijosAplicados.Select(c => c.MontoMensual), preparacionesBaseMes.Value);
+                fijoProrrateado = cuotaPorPreparacion * preparacionesEquivalentes;
+                if (preparacionesBaseMes < 10)
+                    dto.Advertencias.Add("Las preparaciones base al mes son menores a 10; la cuota prorrateada puede quedar muy alta. Revisa el valor en 'Costos fijos'.");
+                if (cuotaPorPreparacion > 0 && preparacionesEquivalentes <= 0)
+                    dto.Advertencias.Add("No se pudo determinar cuántas preparaciones equivalentes usa el producto; el costo fijo prorrateado es 0.");
+            }
         }
 
         dto.PreparacionesEquivalentes = decimal.Round(preparacionesEquivalentes, 4);
@@ -312,6 +321,7 @@ public sealed class CostoProductoService : ICostoProductoService
                 .ToDictionary(i => i.Id);
 
         var fijosConfigurados = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
+        var preparacionesBaseMes = await _costeo.ObtenerPreparacionesBaseMesAsync(negocioId);
         var advertenciasFijos = new List<string>();
         var fijosAplicados = fijosConfigurados.Count == 0
             ? new List<CostoFijo>()
@@ -323,7 +333,7 @@ public sealed class CostoProductoService : ICostoProductoService
                 p.Id, p.Nombre, p.PrecioVenta,
                 recetasPorProducto[p.Id], directosPorProducto[p.Id],
                 mapaRecetas, principales, mapaDirectos,
-                fijosConfigurados, fijosAplicados, advertenciasFijos);
+                preparacionesBaseMes, fijosConfigurados, fijosAplicados, advertenciasFijos);
 
             if (dto is not null) resultado[p.Id] = dto;
         }

@@ -77,8 +77,6 @@ public sealed class CostoFijoDto
     public string Nombre { get; set; } = string.Empty;
     public string Categoria { get; set; } = "Otros";
     public decimal MontoMensual { get; set; }
-    public string UnidadProrrateo { get; set; } = string.Empty;
-    public decimal ValorDivisor { get; set; }
     public bool Activo { get; set; }
 }
 
@@ -95,17 +93,6 @@ public sealed class CrearCostoFijoDto
     [Range(0.01, 9999999999, ErrorMessage = "El monto mensual debe ser mayor a 0.")]
     public decimal MontoMensual { get; set; }
 
-    [Required(ErrorMessage = "La unidad de prorrateo es obligatoria.")]
-    [StringLength(30)]
-    public string UnidadProrrateo { get; set; } = "unidades_producidas";
-
-    // Obligatorio y sin valor por defecto: si se omite, el costo mensual completo
-    // se cargaría a cada receta. El mínimo es 1 preparación al mes; valores
-    // fraccionarios hacían explotar el prorrateo.
-    [Required(ErrorMessage = "El valor divisor es obligatorio.")]
-    [Range(1, 1000000, ErrorMessage = "El valor divisor debe estar entre 1 y 1.000.000.")]
-    public decimal? ValorDivisor { get; set; }
-
     public bool? Activo { get; set; }
 }
 
@@ -120,11 +107,20 @@ public sealed class ActualizarCostoFijoDto
     [Range(0.01, 9999999999, ErrorMessage = "El monto mensual debe ser mayor a 0.")]
     public decimal? MontoMensual { get; set; }
 
-    [StringLength(30)]
-    public string? UnidadProrrateo { get; set; }
-
-    [Range(1, 1000000, ErrorMessage = "El valor divisor debe estar entre 1 y 1.000.000.")]
-    public decimal? ValorDivisor { get; set; }
-
     public bool? Activo { get; set; }
+}
+
+// El divisor es único por negocio: todas las filas de CostoFijo usan el mismo
+// número de preparaciones base al mes.
+public sealed class ConfiguracionCostosFijosDto
+{
+    public int? PreparacionesBaseMes { get; set; }
+    public List<CostoFijoDto> Costos { get; set; } = new();
+}
+
+public sealed class ActualizarPreparacionesBaseMesDto
+{
+    // Null permite limpiar el valor; si se envía, debe ser un entero positivo.
+    [Range(1, 1000000, ErrorMessage = "Las preparaciones base al mes deben estar entre 1 y 1.000.000.")]
+    public int? PreparacionesBaseMes { get; set; }
 }

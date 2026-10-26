@@ -35,6 +35,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
             return ResultadoCosteo<CostoRecetaDto>.NoHallado("No se encontró la receta solicitada.");
 
         var dto = new CostoRecetaDto { RecetaId = receta.Id, Receta = receta.Nombre, PorcionesBase = receta.PorcionesBase };
+        var preparacionesBaseMes = await _repo.ObtenerPreparacionesBaseMesAsync(negocioId.Value);
 
         if (receta.RecetaInsumos.Count == 0)
             dto.Advertencias.Add("La receta no tiene ingredientes.");
@@ -77,8 +78,10 @@ public sealed class CostoRecetaService : ICostoRecetaService
         else
             fijos = FiltrarFijosSeleccionados(fijos, costosFijosIds, dto.Advertencias);
         dto.SinCostosFijos = fijos.Count == 0;
-        var fijoProrrateado = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
-        AdvertenciaDivisorBajo(fijos, dto.Advertencias);
+        var fijoProrrateado = preparacionesBaseMes is > 0
+            ? CalculadoraCostos.FijoProrrateado(fijos.Select(c => c.MontoMensual), preparacionesBaseMes.Value)
+            : 0m;
+        AdvertenciaPreparacionesBaseMes(preparacionesBaseMes, fijos, dto.Advertencias);
 
         // 3) Totales
         dto.CostoInsumos = decimal.Round(dto.Lineas.Sum(l => l.CostoInsumo), 2);
@@ -122,6 +125,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
             PorcionesDeseadas = porcionesDeseadas,
             FactorEscala = decimal.Round(factor, 4)
         };
+        var preparacionesBaseMes = await _repo.ObtenerPreparacionesBaseMesAsync(negocioId.Value);
 
         if (receta.RecetaInsumos.Count == 0)
             dto.Advertencias.Add("La receta no tiene ingredientes.");
@@ -165,9 +169,11 @@ public sealed class CostoRecetaService : ICostoRecetaService
 
         // La cuota es por preparación base. Al escalar a más porciones se consumen
         // "factor" preparaciones equivalentes (8 porciones de una base de 4 = 2).
-        var cuotaPorPreparacion = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
+        var cuotaPorPreparacion = preparacionesBaseMes is > 0
+            ? CalculadoraCostos.FijoProrrateado(fijos.Select(c => c.MontoMensual), preparacionesBaseMes.Value)
+            : 0m;
         var fijoProrrateado = cuotaPorPreparacion * factor;
-        AdvertenciaDivisorBajo(fijos, dto.Advertencias);
+        AdvertenciaPreparacionesBaseMes(preparacionesBaseMes, fijos, dto.Advertencias);
 
         dto.CostoInsumos = decimal.Round(dto.Lineas.Sum(l => l.CostoInsumo), 2);
         dto.CostoMermaAplicada = decimal.Round(dto.Lineas.Sum(l => l.MermaExtra), 2);
@@ -216,11 +222,16 @@ public sealed class CostoRecetaService : ICostoRecetaService
         return sel;
     }
 
-    // Sanity: un divisor muy bajo (< 10) hace que el prorrateo domine el costo
-    // (ej. divisor 1 carga el monto mensual COMPLETO a cada receta evaluada).
-    private static void AdvertenciaDivisorBajo(List<CostoFijo> fijos, List<string> advertencias)
+    // El divisor es único por negocio. Si falta, los fijos no se pueden repartir;
+    // si es muy bajo, la cuota por preparación puede quedar sobrestimada.
+    private static void AdvertenciaPreparacionesBaseMes(
+        int? preparacionesBaseMes, List<CostoFijo> fijos, List<string> advertencias)
     {
-        if (fijos.Any(c => c.ValorDivisor < 10m))
-            advertencias.Add("Uno o más costos fijos tienen un valor divisor menor a 10: el prorrateo puede estar sobrestimado. Revisa el valor divisor en 'Costos fijos'.");
+        if (fijos.Count == 0) return;
+
+        if (preparacionesBaseMes is null or <= 0)
+            advertencias.Add("No has configurado las preparaciones base al mes; el costo fijo prorrateado es 0. Defínelas en 'Costos fijos'.");
+        else if (preparacionesBaseMes < 10)
+            advertencias.Add("Las preparaciones base al mes son menores a 10; la cuota prorrateada puede quedar muy alta. Revisa el valor en 'Costos fijos'.");
     }
 }

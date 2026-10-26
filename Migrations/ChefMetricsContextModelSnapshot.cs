@@ -53,17 +53,6 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
-                    b.Property<string>("UnidadProrrateo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(30)");
-
-                    b.Property<decimal>("ValorDivisor")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(12, 2)")
-                        .HasDefaultValue(100m);
-
                     b.HasKey("Id")
                         .HasName("PK__CostoFij__3214EC0770A7B8C6");
 
@@ -318,7 +307,7 @@ namespace ChefMetrics_BackEnd.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Cantidad")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18, 2)");
 
                     b.Property<decimal>("Costo")
                         .HasColumnType("decimal(12, 2)");
@@ -382,6 +371,9 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("(sysutcdatetime())");
 
+                    b.Property<int?>("PreparacionesBaseMes")
+                        .HasColumnType("int");
+
                     b.Property<string>("Rues")
                         .HasMaxLength(50)
                         .IsUnicode(false)
@@ -400,7 +392,7 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("UmbralMargenMinimo")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18, 2)");
 
                     b.Property<int>("UsuarioId")
                         .HasColumnType("int");

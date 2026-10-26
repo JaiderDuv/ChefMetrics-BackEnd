@@ -42,7 +42,8 @@ public static class CalculadoraCostos
         };
     }
 
-    // Σ (monto mensual ÷ valor divisor) de los costos fijos activos.
-    public static decimal FijoProrrateado(IEnumerable<(decimal Monto, decimal Divisor)> activos) =>
-        activos.Where(c => c.Divisor > 0).Sum(c => c.Monto / c.Divisor);
+    // Σ montos ÷ preparaciones base al mes. El divisor es único para todo el
+    // negocio: no se guarda por costo fijo.
+    public static decimal FijoProrrateado(IEnumerable<decimal> montos, decimal divisor) =>
+        divisor > 0 ? montos.Sum() / divisor : 0;
 }

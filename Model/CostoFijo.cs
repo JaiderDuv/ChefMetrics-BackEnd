@@ -17,11 +17,7 @@ public partial class CostoFijo
 
     public decimal MontoMensual { get; set; }
 
-    public string UnidadProrrateo { get; set; } = null!;
-
     public bool Activo { get; set; }
-
-    public decimal ValorDivisor { get; set; }
 
     public virtual Negocio Negocio { get; set; } = null!;
 }

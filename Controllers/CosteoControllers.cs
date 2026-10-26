@@ -91,6 +91,33 @@ public sealed class CostosFijosController : ControllerBase
             : Ok(lista);
     }
 
+    // GET /api/costos-fijos/configuracion
+    // Devuelve el divisor global del negocio y la lista de costos en una sola llamada.
+    [HttpGet("configuracion")]
+    public async Task<IActionResult> ObtenerConfiguracion([FromQuery] bool incluirInactivos = true)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+        var r = await _servicio.ObtenerConfiguracionAsync(cuentaId, incluirInactivos);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
+        return Ok(r.Datos);
+    }
+
+    // PUT /api/costos-fijos/preparaciones-base-mes
+    // Un único valor para todos los costos fijos. Null limpia el valor.
+    [HttpPut("preparaciones-base-mes")]
+    public async Task<IActionResult> ActualizarPreparacionesBaseMes(
+        [FromBody] ActualizarPreparacionesBaseMesDto dto)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var r = await _servicio.ActualizarPreparacionesBaseMesAsync(cuentaId, dto);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
+        return Ok(r.Datos);
+    }
+
     // GET /api/costos-fijos/punto-equilibrio
     // Debe declararse antes de {id:int} por claridad; el constraint int evita ambigüedad.
     [HttpGet("punto-equilibrio")]

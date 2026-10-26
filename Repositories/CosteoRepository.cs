@@ -9,6 +9,8 @@ public interface ICosteoRepository
     Task<Receta?> ObtenerRecetaConInsumosAsync(int negocioId, int recetaId);
     Task<Dictionary<int, PrecioProveedorPrincipal>> ObtenerCostosProveedorPrincipalAsync(IEnumerable<int> insumoIds);
     Task<List<CostoFijo>> ListarCostosFijosAsync(int negocioId, bool soloActivos);
+    Task<int?> ObtenerPreparacionesBaseMesAsync(int negocioId);
+    Task<bool> ActualizarPreparacionesBaseMesAsync(int negocioId, int? preparacionesBaseMes);
     Task<CostoFijo?> ObtenerCostoFijoAsync(int negocioId, int id, bool conTracking);
     Task<bool> ExisteNombreCostoFijoAsync(int negocioId, string nombre, int? excluirId = null);
     Task<CostoFijo> CrearCostoFijoAsync(CostoFijo costo);
@@ -47,6 +49,22 @@ public sealed class CosteoRepository : ICosteoRepository
         _db.CostoFijos.AsNoTracking()
             .Where(c => c.NegocioId == negocioId && (!soloActivos || c.Activo))
             .OrderBy(c => c.Nombre).ToListAsync();
+
+    public Task<int?> ObtenerPreparacionesBaseMesAsync(int negocioId) =>
+        _db.Negocios.AsNoTracking()
+            .Where(n => n.Id == negocioId)
+            .Select(n => n.PreparacionesBaseMes)
+            .FirstOrDefaultAsync();
+
+    public async Task<bool> ActualizarPreparacionesBaseMesAsync(int negocioId, int? preparacionesBaseMes)
+    {
+        var negocio = await _db.Negocios.FirstOrDefaultAsync(n => n.Id == negocioId);
+        if (negocio is null) return false;
+
+        negocio.PreparacionesBaseMes = preparacionesBaseMes;
+        await _db.SaveChangesAsync();
+        return true;
+    }
 
     public Task<CostoFijo?> ObtenerCostoFijoAsync(int negocioId, int id, bool conTracking)
     {
