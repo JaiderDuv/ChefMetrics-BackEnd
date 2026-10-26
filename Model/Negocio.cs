@@ -42,4 +42,6 @@ public partial class Negocio
     public virtual UsuarioEmprendedor Usuario { get; set; } = null!;
 
     public decimal UmbralMargenMinimo { get; set; } = 20;
+
+    public string? LogoUrl { get; set; }
 }

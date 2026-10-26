@@ -7,7 +7,7 @@ using System.Security.Claims;
 namespace ChefMetrics_BackEnd.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/user")]
     [Authorize]
     public class UserControllers : ControllerBase
     {

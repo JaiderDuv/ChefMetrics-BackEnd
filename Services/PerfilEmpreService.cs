@@ -176,6 +176,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
                 Rues = rues,
                 CorreoEmpresa = dto.CorreoEmpresa.Trim().ToLowerInvariant(),
                 TieneSitioFisico = dto.TieneSitioFisico,
+                LogoUrl = NullIfWhiteSpace(dto.LogoUrl),
                 FechaActualizacion = DateTime.UtcNow
             });
         }
@@ -189,6 +190,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         negocio.Direccion = dto.TieneSitioFisico
             ? NullIfWhiteSpace(dto.Direccion)
             : null;
+        negocio.LogoUrl = NullIfWhiteSpace(dto.LogoUrl);
         negocio.FechaActualizacion = DateTime.UtcNow;
 
         var empleadosExistentes = negocio.Empleados.ToList();
@@ -306,7 +308,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         var usuario = cuenta.UsuarioEmprendedor;
         return new PerfilUsuarioDto
         {
-            FotoPerfilUrl = null,
+            FotoPerfilUrl = usuario.FotoPerfilUrl,
             TipoDocumento = usuario.TipoDocumento ?? string.Empty,
             NumeroDocumento = usuario.NumeroDocumento ?? string.Empty,
             TelefonoContacto = usuario.Negocio?.TelefonoContacto ?? string.Empty,
@@ -316,8 +318,8 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
     }
 
     public async Task<ActualizarPerfilResultadoDto> ActualizarPerfilUsuarioAsync(
-        int cuentaId,
-        PerfilUsuarioDto dto)
+    int cuentaId,
+    PerfilUsuarioDto dto)
     {
         var cuenta = await _perfilRepository.ObtenerPerfilCompletoAsync(cuentaId);
         if (cuenta?.UsuarioEmprendedor?.Negocio is null)
@@ -353,8 +355,9 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
 
         usuario.TipoDocumento = esFormalizado ? null : tipoDoc;
         usuario.NumeroDocumento = esFormalizado ? null : NullIfWhiteSpace(dto.NumeroDocumento);
-        usuario.Nombres = NullIfWhiteSpace(dto.Nombres);
-        usuario.Apellidos = NullIfWhiteSpace(dto.Apellidos);
+        usuario.Nombres = NullIfWhiteSpace(dto.Nombres) ?? string.Empty;
+        usuario.Apellidos = NullIfWhiteSpace(dto.Apellidos) ?? string.Empty;
+        usuario.FotoPerfilUrl = NullIfWhiteSpace(dto.FotoPerfilUrl);
         negocio.TelefonoContacto = telefono;
         negocio.FechaActualizacion = DateTime.UtcNow;
 
@@ -431,6 +434,7 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             CorreoEmpresa = negocio?.CorreoEmpresa ?? negocio?.CorreoContacto ?? string.Empty,
             TieneSitioFisico = negocio?.TieneSitioFisico ?? false,
             Direccion = negocio?.Direccion ?? string.Empty,
+            LogoUrl = negocio?.LogoUrl,
             Empleados = negocio?.Empleados
                 .OrderBy(e => e.CorreoInvitado)
                 .Select(e => new EmpleadoDto
