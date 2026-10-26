@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ChefMetrics_BackEnd.Dtos;
+namespace ChefMetrics.Contracts;
 
 public class CrearInsumoDto
 {
@@ -18,14 +18,11 @@ public class CrearInsumoDto
     [Required(ErrorMessage = "El costo unitario es obligatorio.")]
     public decimal CostoUnitario { get; set; }
 
-    [Required(ErrorMessage = "El porcentaje de merma es obligatorio.")]
-    public decimal PorcentajeMerma { get; set; }
-
     [Required(ErrorMessage = "El proveedor es obligatorio.")]
     [StringLength(150, ErrorMessage = "El proveedor no puede superar los 150 caracteres.")]
     public string? Proveedor { get; set; }
 
-    [Range(0, double.MaxValue, ErrorMessage = "La cantidad no puede ser negativa.")]
+    [Range(typeof(decimal), "0", "999999.99", ErrorMessage = "La cantidad no puede ser negativa.")]
     public decimal? Cantidad { get; set; }
 
     public bool? Activo { get; set; }
@@ -44,12 +41,10 @@ public class ActualizarInsumoDto
 
     public decimal? CostoUnitario { get; set; }
 
-    public decimal? PorcentajeMerma { get; set; }
-
     [StringLength(150, ErrorMessage = "El proveedor no puede superar los 150 caracteres.")]
     public string? Proveedor { get; set; }
 
-    [Range(0, double.MaxValue, ErrorMessage = "La cantidad no puede ser negativa.")]
+    [Range(typeof(decimal), "0", "999999.99", ErrorMessage = "La cantidad no puede ser negativa.")]
     public decimal? Cantidad { get; set; }
 
     public bool? Activo { get; set; }
@@ -62,7 +57,6 @@ public class InsumoDto
     public string UnidadMedida { get; set; } = string.Empty;
     public string Categoria { get; set; } = string.Empty;
     public decimal CostoUnitario { get; set; }
-    public decimal PorcentajeMerma { get; set; }
     public string? Proveedor { get; set; }
     public decimal? Cantidad { get; set; }
     public bool Activo { get; set; }

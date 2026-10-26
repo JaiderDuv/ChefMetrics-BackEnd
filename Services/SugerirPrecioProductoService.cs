@@ -1,12 +1,13 @@
-using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics.Contracts;
 
 namespace ChefMetrics_BackEnd.Services;
 
 public interface ISugerirPrecioProductoService
 {
-    // costosFijosIds: null = todos los fijos activos, lista vacía = ninguno
-    // (precio calculado con el costo directo). La interfaz usa lista vacía
-    // por defecto para no cargar todos los fijos al precio de un producto.
+    // costosFijosIds: null = todos los fijos activos; lista vacía = ninguno
+    // (precio calculado con el costo directo); lista con IDs = solo esos.
+    // La interfaz envía una selección explícita para no cargar todos los fijos
+    // al precio de un producto.
     Task<ResultadoCosteo<PrecioSugeridoProductoDto>> CalcularAsync(
         int cuentaId, int productoId, decimal margenDeseado, List<int>? costosFijosIds = null);
 

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ChefMetrics_BackEnd.Model;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -60,7 +61,8 @@ public class OnboardingController : ControllerBase
         });
     }
 
-
+    // Guarda la foto de perfil del emprendedor. Se acepta una data URL de imagen
+    // o un valor vacío para quitarla.
     [HttpPost("foto-perfil")]
     public async Task<IActionResult> GuardarFotoPerfil([FromBody] OnboardingFotoPerfilDto dto)
     {
@@ -80,10 +82,20 @@ public class OnboardingController : ControllerBase
             return NotFound(new { mensaje = "No se encontró el perfil." });
         }
 
-        usuario.FotoPerfilUrl = string.IsNullOrWhiteSpace(dto.FotoPerfilUrl) ? null : dto.FotoPerfilUrl;
+        if (!FotoPerfilHelper.TryNormalizar(dto.FotoPerfilUrl, out var foto, out var error))
+        {
+            return BadRequest(new { mensaje = error });
+        }
+
+        usuario.FotoPerfilUrl = foto;
         await _context.SaveChangesAsync();
 
-        return Ok(new { exito = true, mensaje = "Foto de perfil guardada." });
+        return Ok(new
+        {
+            exito = true,
+            fotoPerfilUrl = foto,
+            mensaje = foto is null ? "Foto de perfil eliminada." : "Foto de perfil guardada."
+        });
     }
 
     [HttpGet("datos-negocio")]

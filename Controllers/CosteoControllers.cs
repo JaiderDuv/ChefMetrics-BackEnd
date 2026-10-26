@@ -1,15 +1,17 @@
 ﻿using System.Security.Claims;
-using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Services;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ChefMetrics_BackEnd.Controllers;
 
 // GET /api/recetas/{id}/costo
-// Sin costosFijosIds en la query, el binding entrega una lista vacía:
-// el cálculo usa el costo directo (ningún fijo). Para incluir fijos,
-// enviar sus IDs como parámetros repetidos (?costosFijosIds=1&costosFijosIds=2).
+// Semántica de costosFijosIds (igual en todos los endpoints):
+// - sin el parámetro: todos los costos fijos activos;
+// - ?costosFijosIds= (vacío): ningún costo fijo (costo directo);
+// - ?costosFijosIds=1&costosFijosIds=2: solo esos costos fijos.
 [ApiController]
 [Route("api/recetas/{id:int}/costo")]
 [Authorize]
@@ -19,10 +21,11 @@ public sealed class CostoRecetaController : ControllerBase
     public CostoRecetaController(ICostoRecetaService servicio) => _servicio = servicio;
 
     [HttpGet]
-    public async Task<IActionResult> Obtener([FromRoute] int id, [FromQuery] List<int>? costosFijosIds)
+    public async Task<IActionResult> Obtener([FromRoute] int id, [FromQuery] string[]? costosFijosIds)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
-        var r = await _servicio.CalcularAsync(cuentaId, id, costosFijosIds);
+        var ids = Request.LeerCostosFijosIds(costosFijosIds);
+        var r = await _servicio.CalcularAsync(cuentaId, id, ids);
         return r.NoEncontrado ? NotFound(new { mensaje = r.Mensaje }) : Ok(r.Datos);
     }
 
@@ -38,18 +41,19 @@ public sealed class CostoRecetaController : ControllerBase
 [Authorize]
 public sealed class EscaladoRecetaController : ControllerBase
 {
-    // Igual que el costo: sin costosFijosIds se usa el costo directo.
-    // Para incluir fijos, enviar sus IDs como parámetros repetidos.
+    // Misma semántica que el costo: sin parámetro = todos; vacío = ninguno;
+    // IDs repetidos = solo esos.
     private readonly ICostoRecetaService _servicio;
     public EscaladoRecetaController(ICostoRecetaService servicio) => _servicio = servicio;
 
     [HttpGet]
-    public async Task<IActionResult> Obtener([FromRoute] int id, [FromQuery] int porciones, [FromQuery] List<int>? costosFijosIds)
+    public async Task<IActionResult> Obtener([FromRoute] int id, [FromQuery] int porciones, [FromQuery] string[]? costosFijosIds)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
         if (porciones <= 0) return BadRequest(new { mensaje = "Las porciones deseadas deben ser mayores a 0." });
 
-        var r = await _servicio.CalcularEscaladoAsync(cuentaId, id, porciones, costosFijosIds);
+        var ids = Request.LeerCostosFijosIds(costosFijosIds);
+        var r = await _servicio.CalcularEscaladoAsync(cuentaId, id, porciones, ids);
         if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
         if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
         return Ok(r.Datos);
@@ -85,6 +89,33 @@ public sealed class CostosFijosController : ControllerBase
         return lista is null
             ? NotFound(new { mensaje = "Aún no tienes un negocio registrado para administrar costos fijos." })
             : Ok(lista);
+    }
+
+    // GET /api/costos-fijos/configuracion
+    // Devuelve el divisor global del negocio y la lista de costos en una sola llamada.
+    [HttpGet("configuracion")]
+    public async Task<IActionResult> ObtenerConfiguracion([FromQuery] bool incluirInactivos = true)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+        var r = await _servicio.ObtenerConfiguracionAsync(cuentaId, incluirInactivos);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
+        return Ok(r.Datos);
+    }
+
+    // PUT /api/costos-fijos/preparaciones-base-mes
+    // Un único valor para todos los costos fijos. Null limpia el valor.
+    [HttpPut("preparaciones-base-mes")]
+    public async Task<IActionResult> ActualizarPreparacionesBaseMes(
+        [FromBody] ActualizarPreparacionesBaseMesDto dto)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var r = await _servicio.ActualizarPreparacionesBaseMesAsync(cuentaId, dto);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
+        return Ok(r.Datos);
     }
 
     // GET /api/costos-fijos/punto-equilibrio

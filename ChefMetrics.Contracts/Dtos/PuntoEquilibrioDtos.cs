@@ -1,4 +1,4 @@
-namespace ChefMetrics_BackEnd.Dtos;
+namespace ChefMetrics.Contracts;
 
 // Punto de equilibrio mensual: cuánto hay que vender para cubrir los costos
 // fijos, usando el margen de contribución de los productos (precio − costo

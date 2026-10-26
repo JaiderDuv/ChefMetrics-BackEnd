@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Model; // Contiene la clase ChefMetricsContext
 using ChefMetrics_BackEnd.Repositories;
 using ChefMetrics_BackEnd.Utilities;

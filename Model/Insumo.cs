@@ -17,8 +17,6 @@ public partial class Insumo
 
     public decimal CostoUnitario { get; set; }
 
-    public decimal PorcentajeMerma { get; set; }
-
     public string? Proveedor { get; set; }
 
     public bool Activo { get; set; }

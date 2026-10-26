@@ -73,12 +73,6 @@ public partial class ChefMetricsContext : DbContext
                 .HasDefaultValue("Otros");
             entity.Property(e => e.MontoMensual).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.Nombre).HasMaxLength(150);
-            entity.Property(e => e.UnidadProrrateo)
-                .HasMaxLength(30)
-                .IsUnicode(false);
-            entity.Property(e => e.ValorDivisor)
-                .HasDefaultValue(100m)
-                .HasColumnType("decimal(12, 2)");
 
             entity.HasOne(d => d.Negocio).WithMany(p => p.CostoFijos)
                 .HasForeignKey(d => d.NegocioId)
@@ -195,7 +189,6 @@ public partial class ChefMetricsContext : DbContext
             entity.Property(e => e.Cantidad).HasColumnType("decimal(38, 2)");
             entity.Property(e => e.FechaActualizacion).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.Nombre).HasMaxLength(150);
-            entity.Property(e => e.PorcentajeMerma).HasColumnType("decimal(5, 2)");
             entity.Property(e => e.Proveedor).HasMaxLength(150);
             entity.Property(e => e.UnidadMedida)
                 .HasMaxLength(10)
@@ -220,6 +213,7 @@ public partial class ChefMetricsContext : DbContext
                 .IsUnique()
                 .HasFilter("([EsPrincipal]=(1))");
 
+            entity.Property(e => e.Cantidad).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Costo).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.FechaActualizacion).HasDefaultValueSql("(sysutcdatetime())");
 
@@ -254,6 +248,8 @@ public partial class ChefMetricsContext : DbContext
             entity.Property(e => e.TelefonoContacto)
                 .HasMaxLength(20)
                 .IsUnicode(false);
+            entity.Property(e => e.UmbralMargenMinimo).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.PreparacionesBaseMes);
 
             entity.HasOne(d => d.TipoEmprendimiento).WithMany(p => p.Negocios)
                 .HasForeignKey(d => d.TipoEmprendimientoId)
@@ -391,6 +387,9 @@ public partial class ChefMetricsContext : DbContext
             entity.HasIndex(e => new { e.RecetaId, e.InsumoId }, "UQ_RecetaInsumo").IsUnique();
 
             entity.Property(e => e.Cantidad).HasColumnType("decimal(12, 3)");
+            entity.Property(e => e.PorcentajeMerma)
+                .HasColumnType("decimal(5, 2)")
+                .HasDefaultValue(0m);
             entity.Property(e => e.UnidadMedida)
                 .HasMaxLength(10)
                 .IsUnicode(false);
@@ -475,6 +474,7 @@ public partial class ChefMetricsContext : DbContext
                 .HasMaxLength(100)
                 .HasDefaultValue("");
             entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.FotoPerfilUrl).HasColumnType("nvarchar(max)");
             entity.Property(e => e.Nit)
                 .HasMaxLength(20)
                 .IsUnicode(false)

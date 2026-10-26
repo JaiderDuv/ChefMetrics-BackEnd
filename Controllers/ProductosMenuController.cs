@@ -1,6 +1,7 @@
 using System.Security.Claims;
-using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Services;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -97,11 +98,13 @@ public sealed class ProductosMenuController : ControllerBase
     }
 
     // GET /api/productos-menu/{id}/costo?costosFijosIds=
+    // Sin parámetro = todos los fijos activos; vacío = ninguno; IDs = selección.
     [HttpGet("{id:int}/costo")]
-    public async Task<IActionResult> ObtenerCosto([FromRoute] int id, [FromQuery] List<int>? costosFijosIds)
+    public async Task<IActionResult> ObtenerCosto([FromRoute] int id, [FromQuery] string[]? costosFijosIds)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
-        var r = await _costos.CalcularAsync(cuentaId, id, null, costosFijosIds);
+        var ids = Request.LeerCostosFijosIds(costosFijosIds);
+        var r = await _costos.CalcularAsync(cuentaId, id, null, ids);
         if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
         if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
         return Ok(r.Datos);

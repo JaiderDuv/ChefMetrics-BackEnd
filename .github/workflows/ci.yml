@@ -1,0 +1,61 @@
+name: CI Backend
+
+on:
+  push:
+    branches:
+      - Inconsistencias
+      - develop
+      - main
+  pull_request:
+    branches:
+      - Inconsistencias
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-backend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Compilar y ejecutar pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restaurar dependencias
+        run: dotnet restore ChefMetrics-BackEnd.sln
+
+      - name: Compilar
+        run: dotnet build ChefMetrics-BackEnd.sln --configuration Release --no-restore
+
+      - name: Ejecutar pruebas
+        run: >-
+          dotnet test ChefMetrics-BackEnd.sln
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Publicar resultados de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: TestResults
+          if-no-files-found: ignore
+          retention-days: 7

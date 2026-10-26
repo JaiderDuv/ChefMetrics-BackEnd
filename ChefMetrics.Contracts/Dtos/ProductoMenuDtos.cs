@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ChefMetrics_BackEnd.Dtos;
+namespace ChefMetrics.Contracts;
 
 // ---------- Ítems del producto ----------
 // Un producto se compone de recetas (mínimo una) y opcionalmente de
@@ -93,12 +93,11 @@ public sealed class PatchProductoMenuDto
 
     public bool? Activo { get; set; }
 
-    [MinLength(1, ErrorMessage = "El producto necesita al menos una receta.")]
-    [MaxLength(50, ErrorMessage = "Máximo 50 recetas por producto.")]
+    // La validación de mínimo/máximo se hace en ProductoMenuService para no
+    // romper la generación del esquema OpenAPI de las listas anulables.
     public List<RecetaEnProductoDto>? Recetas { get; set; }
 
     // null = no cambia los empaques guardados; lista (aunque vacía) = reemplaza.
-    [MaxLength(50, ErrorMessage = "Máximo 50 insumos directos por producto.")]
     public List<InsumoDirectoDto>? InsumosDirectos { get; set; }
 }
 
@@ -186,7 +185,10 @@ public sealed class CostoProductoDto
     // Margen sobre el precio de venta usando solo el costo directo (sin fijos).
     public decimal? MargenDirecto { get; set; }
 
+    // SinCostosFijos = no se aplicó ningún fijo al cálculo.
+    // HayCostosFijosConfigurados = el negocio tiene fijos activos configurados.
     public bool SinCostosFijos { get; set; }
+    public bool HayCostosFijosConfigurados { get; set; }
     public List<RecetaDetalleProductoDto> Recetas { get; set; } = new();
     public List<InsumoDirectoDetalleDto> InsumosDirectos { get; set; } = new();
     public List<string> Advertencias { get; set; } = new();
@@ -204,10 +206,9 @@ public sealed class SugerirPrecioProductoDto
 {
     public decimal MargenDeseado { get; set; }
 
-    // Si se indica, el costo base usa solo estos costos fijos;
-    // null = todos los activos, lista vacía = ninguno (costo directo).
-    // La interfaz envía una lista vacía por defecto para no cargar todos
-    // los fijos al precio de un solo producto.
+    // null = todos los activos, lista vacía = ninguno (costo directo),
+    // lista con IDs = solo esos costos fijos. La interfaz envía una
+    // selección explícita para no cargar todos los fijos por accidente.
     public List<int>? CostosFijosIds { get; set; }
 }
 

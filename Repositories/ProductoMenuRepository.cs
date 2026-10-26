@@ -27,6 +27,7 @@ public sealed class ProductoMenuRepository : IProductoMenuRepository
     {
         var q = _db.ProductoMenus.AsNoTracking()
             .Include(p => p.ProductoMenuReceta).ThenInclude(pr => pr.Receta)
+            .Include(p => p.ProductoMenuInsumos)
             .Where(p => p.NegocioId == negocioId && (incluirInactivos || p.Activo));
 
         if (!string.IsNullOrWhiteSpace(busqueda))
