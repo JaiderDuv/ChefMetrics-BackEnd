@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

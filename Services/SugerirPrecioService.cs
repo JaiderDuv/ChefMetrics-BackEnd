@@ -1,10 +1,13 @@
-﻿using ChefMetrics_BackEnd.Dtos;
+﻿using ChefMetrics.Contracts;
 
 namespace ChefMetrics_BackEnd.Services;
 
 public interface ISugerirPrecioService
 {
-    Task<ResultadoCosteo<PrecioSugeridoDto>> CalcularAsync(int cuentaId, int recetaId, decimal margenDeseado);
+    // costosFijosIds: null = todos los fijos activos; lista vacía = ninguno;
+    // lista con IDs = solo esos costos fijos.
+    Task<ResultadoCosteo<PrecioSugeridoDto>> CalcularAsync(
+        int cuentaId, int recetaId, decimal margenDeseado, List<int>? costosFijosIds = null);
 }
 
 public sealed class SugerirPrecioService : ISugerirPrecioService
@@ -16,9 +19,10 @@ public sealed class SugerirPrecioService : ISugerirPrecioService
         _costoRecetaService = costoRecetaService;
     }
 
-    public async Task<ResultadoCosteo<PrecioSugeridoDto>> CalcularAsync(int cuentaId, int recetaId, decimal margenDeseado)
+    public async Task<ResultadoCosteo<PrecioSugeridoDto>> CalcularAsync(
+        int cuentaId, int recetaId, decimal margenDeseado, List<int>? costosFijosIds = null)
     {
-        var costo = await _costoRecetaService.CalcularAsync(cuentaId, recetaId);
+        var costo = await _costoRecetaService.CalcularAsync(cuentaId, recetaId, costosFijosIds);
         if (costo.NoEncontrado)
             return ResultadoCosteo<PrecioSugeridoDto>.NoHallado(costo.Mensaje);
         if (!costo.Exito || costo.Datos is null)
@@ -29,6 +33,9 @@ public sealed class SugerirPrecioService : ISugerirPrecioService
         {
             RecetaId = datosCosto.RecetaId,
             Receta = datosCosto.Receta,
+            CostoDirectoPorPorcion = datosCosto.PorcionesBase > 0
+                ? decimal.Round(datosCosto.CostoInsumos / datosCosto.PorcionesBase, 2)
+                : 0,
             CostoPorPorcion = datosCosto.CostoPorPorcion,
             MargenDeseado = margenDeseado,
             Advertencias = new List<string>(datosCosto.Advertencias)

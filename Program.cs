@@ -5,7 +5,16 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
 using System.Text;
+
+// El documento OpenAPI se serializa con la cultura del proceso. En equipos
+// configurados con coma decimal eso produce JSON inválido (por ejemplo,
+// "maximum": 999999,99), así que el backend usa una cultura invariante.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
+CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +36,8 @@ builder.Services.AddScoped<IPerfilEmpreService, PerfilEmpreService>();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.AddScoped<IUmbralMargenRepository, UmbralMargenRepository>();
+builder.Services.AddScoped<IEvaluacionMenuService, EvaluacionMenuService>();
 builder.Services.AddMemoryCache();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
@@ -47,9 +58,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = jwtSettings.Issuer,
             ValidateAudience = true,
             ValidAudience = jwtSettings.Audience,
-            // La sesión no expira por tiempo: los tokens no llevan expiración.
-            ValidateLifetime = false,
-            ClockSkew = TimeSpan.Zero
+            RequireExpirationTime = true,
+            ValidateLifetime = true,
+            // Tolerancia mínima para diferencias de reloj entre servidores.
+            ClockSkew = TimeSpan.FromSeconds(30)
         };
     });
 
@@ -80,11 +92,12 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-app.UseCors("Frontend");
-
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    // La política de autorización de respaldo también cubre los endpoints
+    // generados por MapOpenApi. El documento solo se expone en Development,
+    // pero debe ser anónimo para que Swagger UI pueda cargarlo.
+    app.MapOpenApi().AllowAnonymous();
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/openapi/v1.json", "ChefMetrics BackEnd API v1");

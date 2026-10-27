@@ -1,4 +1,4 @@
-using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
 using ChefMetrics_BackEnd.Utilities;
@@ -48,7 +48,6 @@ public sealed class InsumoService : IInsumoService
             nombre,
             dto.UnidadMedida,
             dto.CostoUnitario,
-            dto.PorcentajeMerma,
             dto.Proveedor,
             out var unidadNormalizada,
             out var proveedorNormalizado);
@@ -80,7 +79,6 @@ public sealed class InsumoService : IInsumoService
                 UnidadMedida = unidadNormalizada!,
                 Categoria = categoria,
                 CostoUnitario = dto.CostoUnitario,
-                PorcentajeMerma = dto.PorcentajeMerma,
                 Proveedor = proveedorNormalizado,
                 Cantidad = dto.Cantidad,
                 Activo = dto.Activo ?? true,
@@ -139,7 +137,7 @@ public sealed class InsumoService : IInsumoService
         }
 
         var ordenarPor = (filtros.OrdenarPor ?? "nombre").Trim().ToLowerInvariant();
-        if (ordenarPor is not ("nombre" or "costo" or "merma" or "cantidad"))
+        if (ordenarPor is not ("nombre" or "costo" or "cantidad"))
         {
             ordenarPor = "nombre";
         }
@@ -252,16 +250,6 @@ public sealed class InsumoService : IInsumoService
                     "La categoría no es válida. Valores permitidos: materia_prima, empaque, otro.");
             }
             insumo.Categoria = categoria;
-            hayCambios = true;
-        }
-
-        if (dto.PorcentajeMerma.HasValue)
-        {
-            if (dto.PorcentajeMerma.Value < 0 || dto.PorcentajeMerma.Value > 100)
-            {
-                return ResultadoInsumoDto.Error("El porcentaje de merma debe estar entre 0 y 100.");
-            }
-            insumo.PorcentajeMerma = dto.PorcentajeMerma.Value;
             hayCambios = true;
         }
 
@@ -503,7 +491,6 @@ public sealed class InsumoService : IInsumoService
             UnidadMedida = unidad,
             Categoria = "otro",
             CostoUnitario = ultimo.CostoNuevo,
-            PorcentajeMerma = 0,
             Cantidad = ultimo.Cantidad,
             Proveedor = ultimo.ProveedorNombre,
             Activo = true
@@ -760,6 +747,22 @@ public sealed class InsumoService : IInsumoService
                     ? null
                     : (bool?)(h.CostoNuevo > h.CostoAnterior));
 
+            decimal? diferenciaPaquete = null;
+            decimal? variacionPaquete = null;
+            var referenciaPaquete = anterior?.CostoNuevo;
+            if (referenciaPaquete is null && h.CostoAnterior != h.CostoNuevo)
+            {
+                referenciaPaquete = h.CostoAnterior;
+            }
+            if (referenciaPaquete.HasValue && referenciaPaquete.Value != 0)
+            {
+                diferenciaPaquete = h.CostoNuevo - referenciaPaquete.Value;
+                variacionPaquete = Math.Round((h.CostoNuevo - referenciaPaquete.Value) / referenciaPaquete.Value * 100, 2);
+            }
+            var esSubidaPaquete = diferenciaPaquete is null || diferenciaPaquete == 0
+                ? null
+                : (bool?)(diferenciaPaquete > 0);
+
             return new HistorialPrecioGeneralDto
             {
                 InsumoId = h.InsumoProveedor.InsumoId,
@@ -771,7 +774,10 @@ public sealed class InsumoService : IInsumoService
                 PrecioUnitario = unitarioNuevo,
                 VariacionPorcentual = variacion,
                 Diferencia = diferencia,
-                EsSubida = esSubida
+                EsSubida = esSubida,
+                DiferenciaPaquete = diferenciaPaquete,
+                VariacionPaquete = variacionPaquete,
+                EsSubidaPaquete = esSubidaPaquete
             };
         }).ToList();
 
@@ -864,6 +870,22 @@ public sealed class InsumoService : IInsumoService
                     ? null
                     : (bool?)(h.CostoNuevo > h.CostoAnterior));
 
+            decimal? diferenciaPaquete = null;
+            decimal? variacionPaquete = null;
+            var referenciaPaquete = anterior?.CostoNuevo;
+            if (referenciaPaquete is null && h.CostoAnterior != h.CostoNuevo)
+            {
+                referenciaPaquete = h.CostoAnterior;
+            }
+            if (referenciaPaquete.HasValue && referenciaPaquete.Value != 0)
+            {
+                diferenciaPaquete = h.CostoNuevo - referenciaPaquete.Value;
+                variacionPaquete = Math.Round((h.CostoNuevo - referenciaPaquete.Value) / referenciaPaquete.Value * 100, 2);
+            }
+            var esSubidaPaquete = diferenciaPaquete is null || diferenciaPaquete == 0
+                ? null
+                : (bool?)(diferenciaPaquete > 0);
+
             return new HistorialPrecioGeneralDto
             {
                 InsumoId = h.InsumoIdOriginal ?? 0,
@@ -876,7 +898,10 @@ public sealed class InsumoService : IInsumoService
                 VariacionPorcentual = variacion,
                 Diferencia = diferencia,
                 EsSubida = esSubida,
-                InsumoEliminado = true
+                InsumoEliminado = true,
+                DiferenciaPaquete = diferenciaPaquete,
+                VariacionPaquete = variacionPaquete,
+                EsSubidaPaquete = esSubidaPaquete
             };
         }).ToList();
     }
@@ -885,7 +910,6 @@ public sealed class InsumoService : IInsumoService
         string nombre,
         string unidadMedida,
         decimal costoUnitario,
-        decimal porcentajeMerma,
         string? proveedor,
         out string? unidadNormalizada,
         out string? proveedorNormalizado)
@@ -913,10 +937,6 @@ public sealed class InsumoService : IInsumoService
         {
             return "El costo no puede superar 999999.99 (6 enteros y 2 decimales).";
         }
-        if (porcentajeMerma < 0 || porcentajeMerma > 100)
-        {
-            return "El porcentaje de merma debe estar entre 0 y 100.";
-        }
         if (proveedorNormalizado is null)
         {
             return "El proveedor es obligatorio.";
@@ -932,7 +952,7 @@ public sealed class InsumoService : IInsumoService
     private static string? NormalizarCategoria(string? valor)
     {
         var candidato = Normalizador.NormalizarCategoria(valor);
-        return CategoriasValidas.Contains(candidato) ? candidato : null;
+        return candidato is not null && CategoriasValidas.Contains(candidato) ? candidato : null;
     }
 
     private static decimal MaxCantidadPorUnidad(string? unidadMedida)
@@ -976,7 +996,6 @@ public sealed class InsumoService : IInsumoService
             UnidadMedida = insumo.UnidadMedida,
             Categoria = insumo.Categoria,
             CostoUnitario = insumo.CostoUnitario,
-            PorcentajeMerma = insumo.PorcentajeMerma,
             Proveedor = proveedorPrincipal,
             Cantidad = insumo.Cantidad,
             Activo = insumo.Activo,

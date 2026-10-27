@@ -1,7 +1,6 @@
-using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
-using ChefMetrics_BackEnd.Utilities;
 
 namespace ChefMetrics_BackEnd.Services;
 
@@ -14,6 +13,12 @@ public interface ICostoProductoService
 
     Task<ResultadoCosteo<CostoProductoDto>> CalcularPreviewAsync(
         int cuentaId, PreviewCostoProductoDto dto);
+
+    // Calcula el costo de varios productos con una sola carga de datos.
+    // Evita el N+1 del listado de menú y de los reportes que lo consumen.
+    Task<Dictionary<int, CostoProductoDto>> CalcularLoteAsync(
+        int negocioId, IReadOnlyCollection<ProductoMenu> productos,
+        List<int>? costosFijosIds = null);
 }
 
 public sealed class CostoProductoService : ICostoProductoService
@@ -49,9 +54,20 @@ public sealed class CostoProductoService : ICostoProductoService
             .Select(pr => new RecetaEnProductoDto { RecetaId = pr.RecetaId, Cantidad = pr.Cantidad })
             .ToList();
 
+        // Si no llegan insumos directos explícitos (preview), se usan los
+        // empaques guardados del producto.
+        var directos = insumosDirectos ?? producto.ProductoMenuInsumos
+            .Select(pi => new InsumoDirectoDto
+            {
+                InsumoId = pi.InsumoId,
+                Cantidad = pi.Cantidad,
+                UnidadMedida = pi.UnidadMedida
+            })
+            .ToList();
+
         return await CalcularNucleoAsync(
             negocioId.Value, producto.Id, producto.Nombre, producto.PrecioVenta,
-            recetas, insumosDirectos ?? new(), costosFijosIds);
+            recetas, directos, costosFijosIds);
     }
 
     public async Task<ResultadoCosteo<CostoProductoDto>> CalcularPreviewAsync(
@@ -71,22 +87,14 @@ public sealed class CostoProductoService : ICostoProductoService
     }
 
     // ---------- Núcleo reutilizable ----------
-    // Por cada receta: costo total HU8.1 (insumos con conversión, merma,
-    // proveedor principal y fijos prorrateados) × cantidad en el producto.
-    // Insumos directos (empaques): mismo tratamiento de merma y proveedor.
-    // costoTotalProducto = Σ (costoReceta × cantidad) + Σ (costo insumo directo)
+    // Por cada receta: (costo de insumos de la receta ÷ porciones base) × porciones
+    // del producto. Insumos directos (empaques): se costean con proveedor, sin merma de receta.
+    // costoTotalProducto = Σ (costoPorPorcion × porciones) + Σ (costo insumo directo) + fijos prorrateados
     private async Task<ResultadoCosteo<CostoProductoDto>> CalcularNucleoAsync(
         int negocioId, int productoId, string nombre, decimal? precioVenta,
         List<RecetaEnProductoDto> recetas, List<InsumoDirectoDto> directos,
         List<int>? costosFijosIds)
     {
-        var dto = new CostoProductoDto
-        {
-            ProductoId = productoId,
-            Producto = nombre,
-            PrecioVenta = precioVenta
-        };
-
         if (recetas.Count == 0)
             return ResultadoCosteo<CostoProductoDto>.Error("El producto necesita al menos una receta.");
 
@@ -106,7 +114,50 @@ public sealed class CostoProductoService : ICostoProductoService
             : (await _productos.ObtenerInsumosActivosAsync(negocioId, idsDirectos.Distinct()))
                 .ToDictionary(i => i.Id);
 
-        // 1) Recetas: cada una a costo total HU8.1 (sin fijos aquí; los fijos se prorratean una vez a nivel producto).
+        var fijosConfigurados = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
+        var preparacionesBaseMes = await _costeo.ObtenerPreparacionesBaseMesAsync(negocioId);
+        var advertenciasFijos = new List<string>();
+        var fijosAplicados = fijosConfigurados.Count == 0
+            ? new List<CostoFijo>()
+            : SeleccionarFijos(fijosConfigurados, costosFijosIds, advertenciasFijos);
+
+        var dto = CalcularNucleo(
+            productoId, nombre, precioVenta, recetas, directos,
+            mapaRecetas, principales, mapaDirectos,
+            preparacionesBaseMes, fijosConfigurados, fijosAplicados, advertenciasFijos);
+
+        return dto is null
+            ? ResultadoCosteo<CostoProductoDto>.Error("El producto necesita al menos una receta.")
+            : ResultadoCosteo<CostoProductoDto>.Ok(dto);
+    }
+
+    // Cálculo síncrono con los datos ya precargados. Se usa tanto para un
+    // producto como para el lote del listado de menú.
+    private static CostoProductoDto? CalcularNucleo(
+        int productoId, string nombre, decimal? precioVenta,
+        List<RecetaEnProductoDto> recetas, List<InsumoDirectoDto> directos,
+        Dictionary<int, Receta> mapaRecetas,
+        Dictionary<int, PrecioProveedorPrincipal> principales,
+        Dictionary<int, Insumo> mapaDirectos,
+        int? preparacionesBaseMes,
+        List<CostoFijo> fijosConfigurados,
+        List<CostoFijo> fijosAplicados,
+        IReadOnlyList<string> advertenciasFijos)
+    {
+        if (recetas.Count == 0) return null;
+
+        var dto = new CostoProductoDto
+        {
+            ProductoId = productoId,
+            Producto = nombre,
+            PrecioVenta = precioVenta
+        };
+        dto.Advertencias.AddRange(advertenciasFijos);
+
+        // 1) Recetas: cada una a costo total HU8.1 (sin fijos aquí).
+        // Además se acumulan las preparaciones equivalentes que consume el producto:
+        // una receta completa = 1 preparación; media receta = 0,5 preparaciones.
+        decimal preparacionesEquivalentes = 0;
         foreach (var item in recetas)
         {
             if (!mapaRecetas.TryGetValue(item.RecetaId, out var receta))
@@ -115,14 +166,23 @@ public sealed class CostoProductoService : ICostoProductoService
                 continue;
             }
 
-            var costoReceta = CostoRecetaSinFijos(receta, principales, dto.Advertencias);
-            var aportado = decimal.Round(costoReceta * item.Cantidad, 2);
+            var costoRecetaSinFijos = CostoRecetaSinFijos(receta, principales, dto.Advertencias);
+            if (receta.PorcionesBase <= 0)
+            {
+                dto.Advertencias.Add($"La receta '{receta.Nombre}' no tiene porciones base; no se pudo costear.");
+                continue;
+            }
+
+            // Cantidad = porciones de esta receta dentro del producto.
+            var costoPorPorcion = costoRecetaSinFijos / receta.PorcionesBase;
+            preparacionesEquivalentes += item.Cantidad / receta.PorcionesBase;
+            var aportado = decimal.Round(costoPorPorcion * item.Cantidad, 2);
             dto.Recetas.Add(new RecetaDetalleProductoDto
             {
                 RecetaId = receta.Id,
                 Nombre = receta.Nombre,
                 Cantidad = item.Cantidad,
-                CostoUnitario = decimal.Round(costoReceta, 2),
+                CostoUnitario = decimal.Round(costoPorPorcion, 2),
                 CostoAportado = aportado
             });
         }
@@ -144,9 +204,10 @@ public sealed class CostoProductoService : ICostoProductoService
             }
 
             var cpu = CostoInsumoPorUnidad(insumo, principales, dto.Advertencias);
+            // Los empaques/insumos directos no son una preparación: no tienen merma propia.
             var linea = CalculadoraCostos.Linea(
                 insumo.Id, insumo.Nombre, d.Cantidad, unidad,
-                insumo.UnidadMedida, insumo.PorcentajeMerma, cpu, FuenteDe(insumo, principales));
+                insumo.UnidadMedida, 0m, cpu, FuenteDe(insumo, principales));
             var aportado = decimal.Round(linea.CostoInsumo, 2);
             dto.InsumosDirectos.Add(new InsumoDirectoDetalleDto
             {
@@ -162,33 +223,126 @@ public sealed class CostoProductoService : ICostoProductoService
 
         dto.CostoRecetas = decimal.Round(dto.Recetas.Sum(r => r.CostoAportado), 2);
         dto.CostoInsumosDirectos = decimal.Round(dto.InsumosDirectos.Sum(i => i.CostoAportado), 2);
+        dto.CostoDirecto = decimal.Round(dto.CostoRecetas + dto.CostoInsumosDirectos, 2);
 
-        // 3) Fijos prorrateados UNA vez a nivel producto (no por receta, para no multiplicarlos).
-        var fijos = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
-        dto.SinCostosFijos = fijos.Count == 0;
+        // 3) Fijos: la cuota es por preparación completa de receta. El producto
+        // consume Σ (porciones usadas ÷ porciones base) preparaciones equivalentes,
+        // así que se le asigna esa fracción de la cuota (reparto fino).
+        dto.HayCostosFijosConfigurados = fijosConfigurados.Count > 0;
+        dto.SinCostosFijos = fijosAplicados.Count == 0;
         decimal fijoProrrateado = 0;
-        if (dto.SinCostosFijos)
+
+        if (!dto.HayCostosFijosConfigurados)
         {
             dto.Advertencias.Add("No hay costos fijos configurados; el costo fijo prorrateado es 0.");
         }
-        else
+        else if (fijosAplicados.Count > 0)
         {
-            fijos = FiltrarFijos(fijos, costosFijosIds, dto.Advertencias);
-            fijoProrrateado = CalculadoraCostos.FijoProrrateado(fijos.Select(c => (c.MontoMensual, c.ValorDivisor)));
-            if (fijos.Any(c => c.ValorDivisor < 10m))
-                dto.Advertencias.Add("Uno o más costos fijos tienen un valor divisor menor a 10: el prorrateo puede estar sobrestimado.");
+            if (preparacionesBaseMes is null or <= 0)
+            {
+                dto.Advertencias.Add("No has configurado las preparaciones base al mes; el costo fijo prorrateado es 0. Defínelas en 'Costos fijos'.");
+            }
+            else
+            {
+                var cuotaPorPreparacion = CalculadoraCostos.FijoProrrateado(
+                    fijosAplicados.Select(c => c.MontoMensual), preparacionesBaseMes.Value);
+                fijoProrrateado = cuotaPorPreparacion * preparacionesEquivalentes;
+                if (preparacionesBaseMes < 10)
+                    dto.Advertencias.Add("Las preparaciones base al mes son menores a 10; la cuota prorrateada puede quedar muy alta. Revisa el valor en 'Costos fijos'.");
+                if (cuotaPorPreparacion > 0 && preparacionesEquivalentes <= 0)
+                    dto.Advertencias.Add("No se pudo determinar cuántas preparaciones equivalentes usa el producto; el costo fijo prorrateado es 0.");
+            }
         }
 
-        dto.CostoTotal = decimal.Round(dto.CostoRecetas + dto.CostoInsumosDirectos + fijoProrrateado, 2);
+        dto.PreparacionesEquivalentes = decimal.Round(preparacionesEquivalentes, 4);
+        dto.CostoFijoProrrateado = decimal.Round(fijoProrrateado, 2);
+        dto.CostoTotal = decimal.Round(dto.CostoDirecto + dto.CostoFijoProrrateado, 2);
 
-        // Margen real coherente con el precio por suma: (precio − costo) ÷ costo × 100.
+        // Margen directo: precio contra recetas + empaques, sin fijos.
+        // Es la base del menú y de la sugerencia de precio por defecto.
+        if (dto.PrecioVenta.HasValue && dto.PrecioVenta.Value > 0 && dto.CostoDirecto > 0)
+            dto.MargenDirecto = decimal.Round((dto.PrecioVenta.Value - dto.CostoDirecto) / dto.PrecioVenta.Value * 100m, 2);
+
+        // Margen real con costo completo: (precio − costo total) ÷ precio × 100.
+        // Se conserva para el análisis y el detalle del producto.
         if (dto.PrecioVenta.HasValue && dto.PrecioVenta.Value > 0 && dto.CostoTotal > 0)
-            dto.MargenReal = decimal.Round((dto.PrecioVenta.Value - dto.CostoTotal) / dto.CostoTotal * 100m, 2);
+            dto.MargenReal = decimal.Round((dto.PrecioVenta.Value - dto.CostoTotal) / dto.PrecioVenta.Value * 100m, 2);
 
-        return ResultadoCosteo<CostoProductoDto>.Ok(dto);
+        return dto;
     }
 
-    // Costo total de UNA receta sin fijos (los fijos se suman una vez a nivel producto).
+    public async Task<Dictionary<int, CostoProductoDto>> CalcularLoteAsync(
+        int negocioId, IReadOnlyCollection<ProductoMenu> productos,
+        List<int>? costosFijosIds = null)
+    {
+        var resultado = new Dictionary<int, CostoProductoDto>();
+        if (productos.Count == 0) return resultado;
+
+        var recetasPorProducto = productos.ToDictionary(
+            p => p.Id,
+            p => p.ProductoMenuReceta.Select(pr => new RecetaEnProductoDto
+            {
+                RecetaId = pr.RecetaId,
+                Cantidad = pr.Cantidad
+            }).ToList());
+
+        var directosPorProducto = productos.ToDictionary(
+            p => p.Id,
+            p => p.ProductoMenuInsumos.Select(pi => new InsumoDirectoDto
+            {
+                InsumoId = pi.InsumoId,
+                Cantidad = pi.Cantidad,
+                UnidadMedida = pi.UnidadMedida
+            }).ToList());
+
+        // Una sola consulta para todas las recetas y otra para todos los insumos.
+        var recetaIds = recetasPorProducto.Values
+            .SelectMany(r => r)
+            .Select(r => r.RecetaId)
+            .Distinct()
+            .ToList();
+        var mapaRecetas = (await _productos.ObtenerRecetasConInsumosAsync(negocioId, recetaIds))
+            .ToDictionary(r => r.Id);
+
+        var idsDirectos = directosPorProducto.Values
+            .SelectMany(d => d)
+            .Select(d => d.InsumoId)
+            .Distinct()
+            .ToList();
+        var idsDeRecetas = mapaRecetas.Values
+            .SelectMany(r => r.RecetaInsumos)
+            .Select(ri => ri.InsumoId);
+        var principales = await _costeo.ObtenerCostosProveedorPrincipalAsync(
+            idsDirectos.Concat(idsDeRecetas).Distinct());
+
+        var mapaDirectos = idsDirectos.Count == 0
+            ? new Dictionary<int, Insumo>()
+            : (await _productos.ObtenerInsumosActivosAsync(negocioId, idsDirectos))
+                .ToDictionary(i => i.Id);
+
+        var fijosConfigurados = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
+        var preparacionesBaseMes = await _costeo.ObtenerPreparacionesBaseMesAsync(negocioId);
+        var advertenciasFijos = new List<string>();
+        var fijosAplicados = fijosConfigurados.Count == 0
+            ? new List<CostoFijo>()
+            : SeleccionarFijos(fijosConfigurados, costosFijosIds, advertenciasFijos);
+
+        foreach (var p in productos)
+        {
+            var dto = CalcularNucleo(
+                p.Id, p.Nombre, p.PrecioVenta,
+                recetasPorProducto[p.Id], directosPorProducto[p.Id],
+                mapaRecetas, principales, mapaDirectos,
+                preparacionesBaseMes, fijosConfigurados, fijosAplicados, advertenciasFijos);
+
+            if (dto is not null) resultado[p.Id] = dto;
+        }
+
+        return resultado;
+    }
+
+    // Costo total de UNA receta sin fijos. Los fijos se reparten aparte,
+    // según las preparaciones equivalentes que consume el producto.
     private static decimal CostoRecetaSinFijos(
         Receta receta,
         Dictionary<int, PrecioProveedorPrincipal> principales,
@@ -206,7 +360,7 @@ public sealed class CostoProductoService : ICostoProductoService
 
             var cpu = CostoInsumoPorUnidad(i, principales, advertencias, receta.Nombre);
             total += ConversorUnidades.CostoLinea(
-                ri.Cantidad, ri.UnidadMedida, i.UnidadMedida, cpu, i.PorcentajeMerma);
+                ri.Cantidad, ri.UnidadMedida, i.UnidadMedida, cpu, ri.PorcentajeMerma);
         }
         return decimal.Round(total, 2);
     }
@@ -244,7 +398,7 @@ public sealed class CostoProductoService : ICostoProductoService
     private static decimal CostoRespaldoPorUnidad(Insumo i) =>
         i.Cantidad.HasValue && i.Cantidad.Value > 0 ? i.CostoUnitario / i.Cantidad.Value : i.CostoUnitario;
 
-    private static List<CostoFijo> FiltrarFijos(List<CostoFijo> fijos, List<int>? ids, List<string> advertencias)
+    private static List<CostoFijo> SeleccionarFijos(List<CostoFijo> fijos, List<int>? ids, List<string> advertencias)
     {
         if (ids is null) return fijos;
         if (ids.Count == 0)

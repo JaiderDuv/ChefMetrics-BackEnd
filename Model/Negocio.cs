@@ -40,4 +40,12 @@ public partial class Negocio
     public virtual TipoEmprendimiento TipoEmprendimiento { get; set; } = null!;
 
     public virtual UsuarioEmprendedor Usuario { get; set; } = null!;
+
+    public decimal UmbralMargenMinimo { get; set; } = 20;
+
+    // Divisor único del negocio para repartir todos los costos fijos:
+    // cantidad de preparaciones base (lotes completos) producidas al mes.
+    public int? PreparacionesBaseMes { get; set; }
+
+    public string? LogoUrl { get; set; }
 }

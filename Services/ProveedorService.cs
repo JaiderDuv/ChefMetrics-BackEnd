@@ -1,4 +1,4 @@
-﻿using ChefMetrics_BackEnd.Dtos;
+﻿using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
 
@@ -63,15 +63,29 @@ public sealed class ProveedorService : IProveedorService
         var validacion = await ValidarInsumoDelNegocioAsync(cuentaId, insumoId);
         if (validacion != null) return validacion;
 
+        var negocioId = await _repository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        var unidadInsumo = negocioId is null
+            ? null
+            : await _repository.ObtenerUnidadInsumoAsync(negocioId.Value, insumoId);
+
         var asociaciones = await _repository.ListarPorInsumoAsync(insumoId);
 
-        // "más barato" se basa en PrecioUnitario (Costo / Cantidad)
+        // "más barato" compara el precio por unidad base del insumo, no el precio
+        // total del paquete; paquetes en otra familia no se comparan.
         var masBaratoId = asociaciones
             .Where(a => a.Cantidad > 0)
-            .OrderBy(a => a.Costo / a.Cantidad)
+            .Select(a => new
+            {
+                a.ProveedorId,
+                Unidad = ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida, unidadInsumo ?? string.Empty)
+            })
+            .Where(x => x.Unidad.HasValue)
+            .OrderBy(x => x.Unidad!.Value)
             .FirstOrDefault()?.ProveedorId;
 
-        var filas = asociaciones.Select(a => MapearFila(a, masBaratoId)).ToList();
+        var filas = asociaciones
+            .Select(a => MapearFila(a, masBaratoId, unidadInsumo))
+            .ToList();
         return ResultadoProveedorDto.Ok(filas, "Proveedores del insumo.");
     }
 
@@ -107,8 +121,9 @@ public sealed class ProveedorService : IProveedorService
         var asociacion = await _repository.AsociarAsync(
             insumoId, dto.ProveedorId, dto.Costo, dto.Cantidad, dto.UnidadMedida);
         await _repository.SincronizarInsumoConPrincipalAsync(insumoId);
+        var unidadInsumo = await UnidadInsumoActualAsync(cuentaId, insumoId);
         return ResultadoProveedorDto.Ok(
-            MapearFilaConProveedor(asociacion, proveedor, asociacion.ProveedorId),
+            MapearFilaConProveedor(asociacion, proveedor, asociacion.ProveedorId, unidadInsumo),
             "Proveedor asociado correctamente.");
     }
 
@@ -136,8 +151,9 @@ public sealed class ProveedorService : IProveedorService
         var asociacion = await _repository.AsociarAsync(
             insumoId, proveedor.Id, dto.Costo, dto.Cantidad, dto.UnidadMedida);
         await _repository.SincronizarInsumoConPrincipalAsync(insumoId);
+        var unidadInsumo = await UnidadInsumoActualAsync(cuentaId, insumoId);
         return ResultadoProveedorDto.Ok(
-            MapearFilaConProveedor(asociacion, proveedor, proveedor.Id),
+            MapearFilaConProveedor(asociacion, proveedor, proveedor.Id, unidadInsumo),
             "Proveedor creado y asociado correctamente.");
     }
 
@@ -275,7 +291,7 @@ public sealed class ProveedorService : IProveedorService
         Correo = p.Correo
     };
 
-    private static InsumoProveedorDto MapearFila(InsumoProveedor a, int? masBaratoId) => new()
+    private static InsumoProveedorDto MapearFila(InsumoProveedor a, int? masBaratoId, string? unidadInsumo) => new()
     {
         ProveedorId = a.ProveedorId,
         Nombre = a.Proveedor.Nombre,
@@ -284,12 +300,13 @@ public sealed class ProveedorService : IProveedorService
         Costo = a.Costo,
         Cantidad = a.Cantidad,
         UnidadMedida = a.UnidadMedida,
-        PrecioUnitario = a.Cantidad > 0 ? Math.Round(a.Costo / a.Cantidad, 2) : null,
+        PrecioUnitario = ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida, unidadInsumo ?? string.Empty) is { } p
+            ? Math.Round(p, 2) : (decimal?)null,
         EsPrincipal = a.EsPrincipal,
         EsMasBarato = a.ProveedorId == masBaratoId
     };
 
-    private static InsumoProveedorDto MapearFilaConProveedor(InsumoProveedor a, Proveedor p, int? masBaratoId) => new()
+    private static InsumoProveedorDto MapearFilaConProveedor(InsumoProveedor a, Proveedor p, int? masBaratoId, string? unidadInsumo) => new()
     {
         ProveedorId = p.Id,
         Nombre = p.Nombre,
@@ -298,8 +315,15 @@ public sealed class ProveedorService : IProveedorService
         Costo = a.Costo,
         Cantidad = a.Cantidad,
         UnidadMedida = a.UnidadMedida,
-        PrecioUnitario = a.Cantidad > 0 ? Math.Round(a.Costo / a.Cantidad, 2) : null,
+        PrecioUnitario = ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida, unidadInsumo ?? string.Empty) is { } pr
+            ? Math.Round(pr, 2) : (decimal?)null,
         EsPrincipal = a.EsPrincipal,
         EsMasBarato = p.Id == masBaratoId
     };
+
+    private async Task<string?> UnidadInsumoActualAsync(int cuentaId, int insumoId)
+    {
+        var negocioId = await _repository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        return negocioId is null ? null : await _repository.ObtenerUnidadInsumoAsync(negocioId.Value, insumoId);
+    }
 }

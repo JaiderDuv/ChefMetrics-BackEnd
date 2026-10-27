@@ -1,4 +1,4 @@
-﻿using ChefMetrics_BackEnd.Dtos;
+﻿using ChefMetrics.Contracts;
 namespace ChefMetrics_BackEnd.Services;
 
 public interface IProveedorService

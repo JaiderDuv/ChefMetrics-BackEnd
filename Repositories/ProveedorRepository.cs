@@ -1,4 +1,5 @@
-﻿using ChefMetrics_BackEnd.Model;
+﻿using ChefMetrics.Contracts;
+using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 namespace ChefMetrics_BackEnd.Repositories;
@@ -33,6 +34,14 @@ public sealed class ProveedorRepository : IProveedorRepository
         return await _context.Insumos.AnyAsync(i => i.Id == insumoId && i.NegocioId == negocioId);
     }
 
+    public async Task<string?> ObtenerUnidadInsumoAsync(int negocioId, int insumoId)
+    {
+        return await _context.Insumos
+            .Where(i => i.Id == insumoId && i.NegocioId == negocioId)
+            .Select(i => i.UnidadMedida)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<List<Proveedor>> ListarPorNegocioAsync(int negocioId)
     {
         return await _context.Proveedors
@@ -44,11 +53,12 @@ public sealed class ProveedorRepository : IProveedorRepository
 
     public async Task<List<Proveedor>> BuscarPorNombreAsync(int negocioId, string termino, int limite)
     {
-        var prefijo = termino.Trim().ToLower();
+        var texto = termino.Trim();
         var top = limite < 1 ? 8 : Math.Min(limite, 20);
         return await _context.Proveedors
             .AsNoTracking()
-            .Where(p => p.NegocioId == negocioId && p.Nombre.ToLower().StartsWith(prefijo))
+            .Where(p => p.NegocioId == negocioId &&
+                EF.Functions.Collate(p.Nombre, Normalizador.CollationInsensible).Contains(texto))
             .OrderBy(p => p.Nombre)
             .Take(top)
             .ToListAsync();
@@ -376,18 +386,19 @@ public sealed class ProveedorRepository : IProveedorRepository
 
     public async Task GuardarCambiosAsync() => await _context.SaveChangesAsync();
 
-    private static readonly HashSet<string> UnidadesValidas = new(StringComparer.OrdinalIgnoreCase)
-{
-    "g", "kg", "l", "ml", "oz", "lb", "unidad", "taza"
-};
-
     public async Task SincronizarInsumoConPrincipalAsync(int insumoId)
     {
+        // La unidad base del insumo NO se cambia: cambiarla dejaba incompatibles
+        // las líneas de receta existentes y las excluía del costo.
+        // Se copia el paquete del proveedor principal convertido a la unidad base
+        // (cuando es compatible): CostoUnitario sigue siendo el total del paquete
+        // y Cantidad queda expresada en la unidad base del insumo.
         var unidadActual = await _context.Insumos
             .Where(i => i.Id == insumoId)
-            .Select(i => i.UnidadMedida)
+            .Select(i => new { i.UnidadMedida })
             .FirstOrDefaultAsync();
         if (unidadActual is null) return; // el insumo no existe
+        var unidadBase = unidadActual.UnidadMedida;
 
         var asociaciones = await _context.InsumoProveedors
             .AsNoTracking()
@@ -413,37 +424,59 @@ public sealed class ProveedorRepository : IProveedorRepository
             return;
         }
 
-        var principal = asociaciones.FirstOrDefault(a => a.EsPrincipal);
-        if (principal is null)
+        var marcado = asociaciones.FirstOrDefault(a => a.EsPrincipal);
+        if (marcado is null)
         {
-            principal = asociaciones
-                .OrderBy(a => a.Cantidad > 0 ? a.Costo / a.Cantidad : decimal.MaxValue)
-                .First();
+            // Empata por precio por unidad de la MISMA familia del insumo; si no se
+            // puede comparar, se mantiene el primero en lugar de elegir mal.
+            marcado = asociaciones
+                .Select(a => new
+                {
+                    Fila = a,
+                    Unidad = a.Cantidad > 0
+                        ? ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida, unidadBase)
+                        : null
+                })
+                .Where(x => x.Unidad.HasValue)
+                .OrderBy(x => x.Unidad!.Value)
+                .Select(x => x.Fila)
+                .FirstOrDefault() ?? asociaciones[0];
 
-            var idPrincipal = principal.Id;
+            var idPrincipal = marcado.Id;
             await _context.InsumoProveedors
                 .Where(a => a.Id == idPrincipal)
                 .ExecuteUpdateAsync(s => s.SetProperty(a => a.EsPrincipal, true));
         }
 
-        // Solo se copia la unidad si es una de las permitidas por CK_Insumo_UnidadMedida.
-        var unidadPrincipal = principal.UnidadMedida?.Trim() ?? string.Empty;
-        var unidad = UnidadesValidas.Contains(unidadPrincipal)
-            ? unidadPrincipal.ToLowerInvariant()
-            : unidadActual;
-
+        var principal = marcado;
         var costo = principal.Costo;
-        var cantidad = (decimal?)principal.Cantidad;
         var nombre = principal.Nombre;
 
-        await _context.Insumos
-            .Where(i => i.Id == insumoId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(i => i.CostoUnitario, costo)
-                .SetProperty(i => i.Cantidad, cantidad)
-                .SetProperty(i => i.UnidadMedida, unidad)
-                .SetProperty(i => i.Proveedor, nombre)
-                .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
+        // Cantidad del paquete convertida a la unidad base del insumo.
+        decimal? cantidadEnBase = principal.Cantidad > 0
+            ? ConversorUnidades.Convertir(principal.Cantidad, principal.UnidadMedida ?? string.Empty, unidadBase)
+            : null;
+
+        if (cantidadEnBase is > 0)
+        {
+            await _context.Insumos
+                .Where(i => i.Id == insumoId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(i => i.CostoUnitario, costo)
+                    .SetProperty(i => i.Cantidad, cantidadEnBase)
+                    .SetProperty(i => i.Proveedor, nombre)
+                    .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
+        }
+        else
+        {
+            // Paquete en otra familia (o sin cantidad útil): solo se actualiza el
+            // proveedor; costo y cantidad del insumo quedan como los editó el usuario.
+            await _context.Insumos
+                .Where(i => i.Id == insumoId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(i => i.Proveedor, nombre)
+                    .SetProperty(i => i.FechaActualizacion, DateTime.UtcNow));
+        }
     }
 
 }

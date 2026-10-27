@@ -1,4 +1,4 @@
-using ChefMetrics_BackEnd.Dtos;
+using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -41,26 +41,33 @@ public sealed class ProductoMenuService : IProductoMenuService
         if (!negocioId.HasValue) return null;
 
         var productos = await _repo.ListarAsync(negocioId.Value, busqueda, incluirInactivos);
-        var lista = new List<ProductoMenuDto>();
-        foreach (var p in productos)
+
+        // Un solo cálculo por lote: se cargan recetas, proveedores y fijos una vez,
+        // en lugar de repetir 4-5 consultas por cada producto.
+        var costos = await _costos.CalcularLoteAsync(negocioId.Value, productos);
+        var lista = productos.Select(p =>
         {
-            // Costo resumido por producto (recetas almacenadas; sin insumos directos
-            // transitorios porque no se persisten sin cambios de BD).
-            var costo = await _costos.CalcularAsync(cuentaId, p.Id);
-            var total = costo.Exito && costo.Datos is not null ? costo.Datos.CostoTotal : 0;
-            lista.Add(new ProductoMenuDto
+            costos.TryGetValue(p.Id, out var costo);
+            var total = costo?.CostoTotal ?? 0;
+            var directo = costo?.CostoDirecto ?? 0;
+            var fijo = costo?.CostoFijoProrrateado ?? 0;
+            return new ProductoMenuDto
             {
                 Id = p.Id,
                 Nombre = p.Nombre,
                 PrecioVenta = p.PrecioVenta,
                 CostoTotal = total,
+                CostoDirecto = directo,
+                CostoFijoProrrateado = fijo,
                 MargenReal = Margen(p.PrecioVenta, total),
+                MargenDirecto = Margen(p.PrecioVenta, directo),
                 NumRecetas = p.ProductoMenuReceta.Count,
                 Activo = p.Activo,
                 FechaCreacion = p.FechaCreacion
-            });
-        }
-        return lista.OrderBy(p => p.Nombre).ToList();
+            };
+        }).OrderBy(p => p.Nombre).ToList();
+
+        return lista;
     }
 
     public async Task<ResultadoProductoMenuDto> ObtenerAsync(int cuentaId, int id)
@@ -80,7 +87,10 @@ public sealed class ProductoMenuService : IProductoMenuService
             Nombre = c.Producto,
             PrecioVenta = c.PrecioVenta,
             CostoTotal = c.CostoTotal,
+            CostoDirecto = c.CostoDirecto,
+            CostoFijoProrrateado = c.CostoFijoProrrateado,
             MargenReal = c.MargenReal,
+            MargenDirecto = c.MargenDirecto,
             NumRecetas = c.Recetas.Count,
             Activo = producto!.Activo,
             FechaCreacion = producto.FechaCreacion,
@@ -113,6 +123,9 @@ public sealed class ProductoMenuService : IProductoMenuService
         if (recetas.Count != dto.Recetas.Select(r => r.RecetaId).Distinct().Count())
             return ResultadoProductoMenuDto.Error("Alguna de las recetas no existe en tu negocio.");
 
+        error = await ValidarDirectosAsync(negocioId.Value, dto.InsumosDirectos);
+        if (error is not null) return ResultadoProductoMenuDto.Error(error);
+
         try
         {
             var creado = await _repo.CrearAsync(new ProductoMenu
@@ -126,6 +139,12 @@ public sealed class ProductoMenuService : IProductoMenuService
                 {
                     RecetaId = r.RecetaId,
                     Cantidad = r.Cantidad
+                }).ToList(),
+                ProductoMenuInsumos = dto.InsumosDirectos.Select(d => new ProductoMenuInsumo
+                {
+                    InsumoId = d.InsumoId,
+                    Cantidad = d.Cantidad,
+                    UnidadMedida = d.UnidadMedida.Trim()
                 }).ToList()
             });
             return await ObtenerAsync(cuentaId, creado.Id);
@@ -161,6 +180,9 @@ public sealed class ProductoMenuService : IProductoMenuService
         if (recetas.Count != dto.Recetas.Select(r => r.RecetaId).Distinct().Count())
             return ResultadoProductoMenuDto.Error("Alguna de las recetas no existe en tu negocio.");
 
+        error = await ValidarDirectosAsync(negocioId.Value, dto.InsumosDirectos);
+        if (error is not null) return ResultadoProductoMenuDto.Error(error);
+
         producto.Nombre = nombre;
         producto.PrecioVenta = NormalizarPrecio(dto.PrecioVenta);
         producto.Activo = dto.Activo;
@@ -168,6 +190,12 @@ public sealed class ProductoMenuService : IProductoMenuService
         {
             RecetaId = r.RecetaId,
             Cantidad = r.Cantidad
+        }));
+        _repo.ReemplazarInsumos(producto, dto.InsumosDirectos.Select(d => new ProductoMenuInsumo
+        {
+            InsumoId = d.InsumoId,
+            Cantidad = d.Cantidad,
+            UnidadMedida = d.UnidadMedida.Trim()
         }));
 
         try { await _repo.GuardarCambiosAsync(); }
@@ -231,6 +259,19 @@ public sealed class ProductoMenuService : IProductoMenuService
             hayCambios = true;
         }
 
+        if (dto.InsumosDirectos is not null)
+        {
+            var error = await ValidarDirectosAsync(negocioId.Value, dto.InsumosDirectos);
+            if (error is not null) return ResultadoProductoMenuDto.Error(error);
+            _repo.ReemplazarInsumos(producto, dto.InsumosDirectos.Select(d => new ProductoMenuInsumo
+            {
+                InsumoId = d.InsumoId,
+                Cantidad = d.Cantidad,
+                UnidadMedida = d.UnidadMedida.Trim()
+            }));
+            hayCambios = true;
+        }
+
         if (!hayCambios)
             return ResultadoProductoMenuDto.Error("Debes enviar al menos un campo para actualizar.");
 
@@ -271,9 +312,10 @@ public sealed class ProductoMenuService : IProductoMenuService
         return null;
     }
 
-    // Toda fracción, unidad o decena se aproxima hacia arriba a la centena (143 → 200).
+    // Precio de venta tal como lo escribe el usuario (máximo 2 decimales).
+    // Se quitó el redondeo forzado a la centena: distorsionaba el margen pedido.
     private static decimal? NormalizarPrecio(decimal? precio) =>
-        precio.HasValue ? decimal.Ceiling(precio.Value / 100m) * 100 : null;
+        precio.HasValue ? decimal.Round(precio.Value, 2) : null;
 
     private static string? ValidarRecetas(List<RecetaEnProductoDto> recetas)
     {
@@ -292,9 +334,34 @@ public sealed class ProductoMenuService : IProductoMenuService
         return null;
     }
 
-    // Margen real coherente con el precio por suma: (precio − costo) ÷ costo × 100.
+    // Margen real sobre el precio de venta: (precio − costo) ÷ precio × 100.
     private static decimal? Margen(decimal? precio, decimal costo) =>
         precio.HasValue && precio.Value > 0 && costo > 0
-            ? decimal.Round((precio.Value - costo) / costo * 100m, 2)
+            ? decimal.Round((precio.Value - costo) / precio.Value * 100m, 2)
             : null;
+
+    // Valida los empaques de un producto: activos, sin repetidos, cantidades
+    // válidas y unidades soportadas. La lista vacía es válida (empaques opcionales).
+    private async Task<string?> ValidarDirectosAsync(int negocioId, List<InsumoDirectoDto> directos)
+    {
+        if (directos.Count == 0) return null;
+        if (directos.Count > 50) return "Máximo 50 insumos directos por producto.";
+
+        var ids = directos.Select(d => d.InsumoId).ToList();
+        if (ids.Any(i => i <= 0)) return "Selecciona un insumo directo válido.";
+        if (ids.Distinct().Count() != ids.Count) return "Hay insumos directos repetidos.";
+
+        foreach (var d in directos)
+        {
+            if (d.Cantidad <= 0) return "La cantidad de cada insumo directo debe ser mayor a 0.";
+            if (!ConversorUnidades.EsValida(d.UnidadMedida?.Trim()))
+                return "La unidad del insumo directo no es válida.";
+        }
+
+        var activos = await _repo.ObtenerInsumosActivosAsync(negocioId, ids.Distinct());
+        if (activos.Count != ids.Distinct().Count())
+            return "Alguno de los insumos directos no existe en tu negocio o está inactivo.";
+
+        return null;
+    }
 }
