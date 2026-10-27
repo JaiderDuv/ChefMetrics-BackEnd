@@ -187,6 +187,7 @@ public partial class ChefMetricsContext : DbContext
                 .HasDefaultValue("otro");
             entity.Property(e => e.CostoUnitario).HasColumnType("decimal(12, 2)");
             entity.Property(e => e.Cantidad).HasColumnType("decimal(38, 2)");
+            entity.Property(e => e.DensidadGPorMl).HasColumnType("decimal(10, 4)");
             entity.Property(e => e.FechaActualizacion).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.Nombre).HasMaxLength(150);
             entity.Property(e => e.Proveedor).HasMaxLength(150);

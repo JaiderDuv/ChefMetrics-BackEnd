@@ -197,7 +197,7 @@ public sealed class CostoProductoService : ICostoProductoService
             }
 
             var unidad = d.UnidadMedida.Trim().ToLowerInvariant();
-            if (!ConversorUnidades.Compatibles(unidad, insumo.UnidadMedida))
+            if (!ConversorUnidades.Compatibles(unidad, insumo.UnidadMedida, insumo.DensidadGPorMl))
             {
                 dto.Advertencias.Add($"'{insumo.Nombre}': la unidad '{d.UnidadMedida}' no es compatible con '{insumo.UnidadMedida}'. No se costeó.");
                 continue;
@@ -207,7 +207,8 @@ public sealed class CostoProductoService : ICostoProductoService
             // Los empaques/insumos directos no son una preparación: no tienen merma propia.
             var linea = CalculadoraCostos.Linea(
                 insumo.Id, insumo.Nombre, d.Cantidad, unidad,
-                insumo.UnidadMedida, 0m, cpu, FuenteDe(insumo, principales));
+                insumo.UnidadMedida, 0m, cpu, FuenteDe(insumo, principales),
+                insumo.DensidadGPorMl);
             var aportado = decimal.Round(linea.CostoInsumo, 2);
             dto.InsumosDirectos.Add(new InsumoDirectoDetalleDto
             {
@@ -352,7 +353,7 @@ public sealed class CostoProductoService : ICostoProductoService
         foreach (var ri in receta.RecetaInsumos)
         {
             var i = ri.Insumo;
-            if (!ConversorUnidades.Compatibles(ri.UnidadMedida, i.UnidadMedida))
+            if (!ConversorUnidades.Compatibles(ri.UnidadMedida, i.UnidadMedida, i.DensidadGPorMl))
             {
                 advertencias.Add($"'{i.Nombre}' (receta '{receta.Nombre}'): unidad incompatible. No se costeó.");
                 continue;
@@ -360,7 +361,8 @@ public sealed class CostoProductoService : ICostoProductoService
 
             var cpu = CostoInsumoPorUnidad(i, principales, advertencias, receta.Nombre);
             total += ConversorUnidades.CostoLinea(
-                ri.Cantidad, ri.UnidadMedida, i.UnidadMedida, cpu, ri.PorcentajeMerma);
+                ri.Cantidad, ri.UnidadMedida, i.UnidadMedida, cpu, ri.PorcentajeMerma,
+                i.DensidadGPorMl);
         }
         return decimal.Round(total, 2);
     }
@@ -372,7 +374,7 @@ public sealed class CostoProductoService : ICostoProductoService
         string? contexto = null)
     {
         if (principales.TryGetValue(insumo.Id, out var pp) &&
-            CostoPorUnidadProveedor(pp, insumo.UnidadMedida) is { } cpu)
+            CostoPorUnidadProveedor(pp, insumo.UnidadMedida, insumo.DensidadGPorMl) is { } cpu)
             return cpu;
 
         if (principales.ContainsKey(insumo.Id))
@@ -385,13 +387,14 @@ public sealed class CostoProductoService : ICostoProductoService
 
     private static string FuenteDe(Insumo insumo, Dictionary<int, PrecioProveedorPrincipal> principales) =>
         principales.TryGetValue(insumo.Id, out var pp) &&
-        CostoPorUnidadProveedor(pp, insumo.UnidadMedida) is not null
+        CostoPorUnidadProveedor(pp, insumo.UnidadMedida, insumo.DensidadGPorMl) is not null
             ? "proveedor_principal" : "costo_unitario_respaldo";
 
-    private static decimal? CostoPorUnidadProveedor(PrecioProveedorPrincipal pp, string unidadInsumo)
+    private static decimal? CostoPorUnidadProveedor(PrecioProveedorPrincipal pp, string unidadInsumo,
+        decimal? densidadGPorMl)
     {
         if (pp.Cantidad <= 0 || string.IsNullOrWhiteSpace(pp.UnidadMedida)) return null;
-        var factor = ConversorUnidades.Convertir(1m, pp.UnidadMedida, unidadInsumo);
+        var factor = ConversorUnidades.Convertir(1m, pp.UnidadMedida, unidadInsumo, densidadGPorMl);
         return factor is null or 0 ? null : pp.Costo / pp.Cantidad / factor;
     }
 

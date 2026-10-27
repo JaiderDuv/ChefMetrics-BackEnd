@@ -58,7 +58,59 @@ public sealed class CostoRecetaServiceTests
         Assert.DoesNotContain(dto.Advertencias, a => a.Contains("No has configurado las preparaciones base al mes"));
     }
 
-    private static (ICostoRecetaService Servicio, Mock<ICosteoRepository> Repo) CrearServicio(int? preparacionesBaseMes)
+    [Fact]
+    public async Task La_merma_aumenta_la_cantidad_que_se_debe_comprar()
+    {
+        var (servicio, _) = CrearServicio(preparacionesBaseMes: 60, merma: 10m);
+
+        var resultado = await servicio.CalcularAsync(CuentaId, RecetaId, new List<int>());
+
+        Assert.True(resultado.Exito);
+        var dto = resultado.Datos!;
+        Assert.Equal(555.56m, dto.CostoInsumos);
+        Assert.Equal(55.56m, dto.CostoMermaAplicada);
+        Assert.Equal(555.5556m, dto.Lineas.Single().CantidadParaComprar);
+    }
+
+    [Fact]
+    public async Task El_escalado_mantiene_el_costo_por_porcion()
+    {
+        var (servicio, _) = CrearServicio(preparacionesBaseMes: 60);
+
+        var resultado = await servicio.CalcularEscaladoAsync(
+            CuentaId, RecetaId, porcionesDeseadas: 8, costosFijosIds: new List<int>());
+
+        Assert.True(resultado.Exito);
+        var dto = resultado.Datos!;
+        Assert.Equal(2m, dto.FactorEscala);
+        Assert.Equal(1_000m, dto.CostoInsumos);
+        Assert.Equal(1_000m, dto.CostoTotal);
+        Assert.Equal(125m, dto.CostoPorPorcion);
+    }
+
+    [Fact]
+    public async Task Costea_una_receta_en_tazas_usando_la_densidad_del_insumo()
+    {
+        var (servicio, _) = CrearServicio(
+            preparacionesBaseMes: 60,
+            cantidad: 1m,
+            unidad: "taza",
+            densidad: 0.53m);
+
+        var resultado = await servicio.CalcularAsync(CuentaId, RecetaId, new List<int>());
+
+        Assert.True(resultado.Exito);
+        var dto = resultado.Datos!;
+        Assert.Equal(127.2m, dto.Lineas.Single().CantidadConvertida);
+        Assert.Equal(127.2m, dto.CostoInsumos);
+    }
+
+    private static (ICostoRecetaService Servicio, Mock<ICosteoRepository> Repo) CrearServicio(
+        int? preparacionesBaseMes,
+        decimal cantidad = 500m,
+        string unidad = "g",
+        decimal merma = 0m,
+        decimal? densidad = null)
     {
         var insumo = new Insumo
         {
@@ -69,6 +121,7 @@ public sealed class CostoRecetaServiceTests
             Categoria = "Insumos",
             CostoUnitario = 1_000m,
             Cantidad = 1_000m,
+            DensidadGPorMl = densidad,
             Activo = true
         };
         var receta = new Receta
@@ -84,9 +137,9 @@ public sealed class CostoRecetaServiceTests
             RecetaId = RecetaId,
             InsumoId = insumo.Id,
             Insumo = insumo,
-            Cantidad = 500m,
-            UnidadMedida = "g",
-            PorcentajeMerma = 0m
+            Cantidad = cantidad,
+            UnidadMedida = unidad,
+            PorcentajeMerma = merma
         });
 
         var repo = new Mock<ICosteoRepository>(MockBehavior.Strict);

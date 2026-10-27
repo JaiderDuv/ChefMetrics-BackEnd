@@ -10,10 +10,15 @@ public class CrearInsumoDto
 
     [Required(ErrorMessage = "La unidad de medida es obligatoria.")]
     [StringLength(10, ErrorMessage = "La unidad de medida no puede superar los 10 caracteres.")]
+    [RegularExpression(ConversorUnidades.PatronUnidades, ErrorMessage = "La unidad de medida no es válida.")]
     public string UnidadMedida { get; set; } = string.Empty;
 
     [StringLength(20, ErrorMessage = "La categoría no puede superar los 20 caracteres.")]
     public string? Categoria { get; set; }
+
+    // g/ml. 0 o null significa "sin densidad" y desactiva la conversión masa <-> volumen.
+    [Range(typeof(decimal), "0", "20", ErrorMessage = "La densidad debe estar entre 0 y 20 g/ml.")]
+    public decimal? DensidadGPorMl { get; set; }
 
     [Required(ErrorMessage = "El costo unitario es obligatorio.")]
     public decimal CostoUnitario { get; set; }
@@ -34,10 +39,15 @@ public class ActualizarInsumoDto
     public string? Nombre { get; set; }
 
     [StringLength(10, ErrorMessage = "La unidad de medida no puede superar los 10 caracteres.")]
+    [RegularExpression(ConversorUnidades.PatronUnidades, ErrorMessage = "La unidad de medida no es válida.")]
     public string? UnidadMedida { get; set; }
 
     [StringLength(20, ErrorMessage = "La categoría no puede superar los 20 caracteres.")]
     public string? Categoria { get; set; }
+
+    // g/ml. Enviar 0 limpia la densidad; null significa "no modificar".
+    [Range(typeof(decimal), "0", "20", ErrorMessage = "La densidad debe estar entre 0 y 20 g/ml.")]
+    public decimal? DensidadGPorMl { get; set; }
 
     public decimal? CostoUnitario { get; set; }
 
@@ -59,6 +69,7 @@ public class InsumoDto
     public decimal CostoUnitario { get; set; }
     public string? Proveedor { get; set; }
     public decimal? Cantidad { get; set; }
+    public decimal? DensidadGPorMl { get; set; }
     public bool Activo { get; set; }
     public DateTime FechaActualizacion { get; set; }
 

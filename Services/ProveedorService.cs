@@ -67,6 +67,9 @@ public sealed class ProveedorService : IProveedorService
         var unidadInsumo = negocioId is null
             ? null
             : await _repository.ObtenerUnidadInsumoAsync(negocioId.Value, insumoId);
+        var densidadInsumo = negocioId is null
+            ? null
+            : await _repository.ObtenerDensidadInsumoAsync(negocioId.Value, insumoId);
 
         var asociaciones = await _repository.ListarPorInsumoAsync(insumoId);
 
@@ -77,14 +80,15 @@ public sealed class ProveedorService : IProveedorService
             .Select(a => new
             {
                 a.ProveedorId,
-                Unidad = ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida, unidadInsumo ?? string.Empty)
+                Unidad = ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida,
+                    unidadInsumo ?? string.Empty, densidadInsumo)
             })
             .Where(x => x.Unidad.HasValue)
             .OrderBy(x => x.Unidad!.Value)
             .FirstOrDefault()?.ProveedorId;
 
         var filas = asociaciones
-            .Select(a => MapearFila(a, masBaratoId, unidadInsumo))
+            .Select(a => MapearFila(a, masBaratoId, unidadInsumo, densidadInsumo))
             .ToList();
         return ResultadoProveedorDto.Ok(filas, "Proveedores del insumo.");
     }
@@ -121,9 +125,10 @@ public sealed class ProveedorService : IProveedorService
         var asociacion = await _repository.AsociarAsync(
             insumoId, dto.ProveedorId, dto.Costo, dto.Cantidad, dto.UnidadMedida);
         await _repository.SincronizarInsumoConPrincipalAsync(insumoId);
-        var unidadInsumo = await UnidadInsumoActualAsync(cuentaId, insumoId);
+        var (unidadInsumo, densidadInsumo) = await DatosInsumoActualAsync(cuentaId, insumoId);
         return ResultadoProveedorDto.Ok(
-            MapearFilaConProveedor(asociacion, proveedor, asociacion.ProveedorId, unidadInsumo),
+            MapearFilaConProveedor(asociacion, proveedor, asociacion.ProveedorId,
+                unidadInsumo, densidadInsumo),
             "Proveedor asociado correctamente.");
     }
 
@@ -151,9 +156,10 @@ public sealed class ProveedorService : IProveedorService
         var asociacion = await _repository.AsociarAsync(
             insumoId, proveedor.Id, dto.Costo, dto.Cantidad, dto.UnidadMedida);
         await _repository.SincronizarInsumoConPrincipalAsync(insumoId);
-        var unidadInsumo = await UnidadInsumoActualAsync(cuentaId, insumoId);
+        var (unidadInsumo, densidadInsumo) = await DatosInsumoActualAsync(cuentaId, insumoId);
         return ResultadoProveedorDto.Ok(
-            MapearFilaConProveedor(asociacion, proveedor, proveedor.Id, unidadInsumo),
+            MapearFilaConProveedor(asociacion, proveedor, proveedor.Id,
+                unidadInsumo, densidadInsumo),
             "Proveedor creado y asociado correctamente.");
     }
 
@@ -291,7 +297,8 @@ public sealed class ProveedorService : IProveedorService
         Correo = p.Correo
     };
 
-    private static InsumoProveedorDto MapearFila(InsumoProveedor a, int? masBaratoId, string? unidadInsumo) => new()
+    private static InsumoProveedorDto MapearFila(InsumoProveedor a, int? masBaratoId,
+        string? unidadInsumo, decimal? densidadInsumo) => new()
     {
         ProveedorId = a.ProveedorId,
         Nombre = a.Proveedor.Nombre,
@@ -300,13 +307,15 @@ public sealed class ProveedorService : IProveedorService
         Costo = a.Costo,
         Cantidad = a.Cantidad,
         UnidadMedida = a.UnidadMedida,
-        PrecioUnitario = ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida, unidadInsumo ?? string.Empty) is { } p
+        PrecioUnitario = ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida,
+            unidadInsumo ?? string.Empty, densidadInsumo) is { } p
             ? Math.Round(p, 2) : (decimal?)null,
         EsPrincipal = a.EsPrincipal,
         EsMasBarato = a.ProveedorId == masBaratoId
     };
 
-    private static InsumoProveedorDto MapearFilaConProveedor(InsumoProveedor a, Proveedor p, int? masBaratoId, string? unidadInsumo) => new()
+    private static InsumoProveedorDto MapearFilaConProveedor(InsumoProveedor a, Proveedor p,
+        int? masBaratoId, string? unidadInsumo, decimal? densidadInsumo) => new()
     {
         ProveedorId = p.Id,
         Nombre = p.Nombre,
@@ -315,15 +324,20 @@ public sealed class ProveedorService : IProveedorService
         Costo = a.Costo,
         Cantidad = a.Cantidad,
         UnidadMedida = a.UnidadMedida,
-        PrecioUnitario = ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida, unidadInsumo ?? string.Empty) is { } pr
+        PrecioUnitario = ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida,
+            unidadInsumo ?? string.Empty, densidadInsumo) is { } pr
             ? Math.Round(pr, 2) : (decimal?)null,
         EsPrincipal = a.EsPrincipal,
         EsMasBarato = p.Id == masBaratoId
     };
 
-    private async Task<string?> UnidadInsumoActualAsync(int cuentaId, int insumoId)
+    private async Task<(string? Unidad, decimal? Densidad)> DatosInsumoActualAsync(
+        int cuentaId, int insumoId)
     {
         var negocioId = await _repository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
-        return negocioId is null ? null : await _repository.ObtenerUnidadInsumoAsync(negocioId.Value, insumoId);
+        if (negocioId is null) return (null, null);
+        return (
+            await _repository.ObtenerUnidadInsumoAsync(negocioId.Value, insumoId),
+            await _repository.ObtenerDensidadInsumoAsync(negocioId.Value, insumoId));
     }
 }

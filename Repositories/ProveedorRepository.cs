@@ -42,6 +42,14 @@ public sealed class ProveedorRepository : IProveedorRepository
             .FirstOrDefaultAsync();
     }
 
+    public async Task<decimal?> ObtenerDensidadInsumoAsync(int negocioId, int insumoId)
+    {
+        return await _context.Insumos
+            .Where(i => i.Id == insumoId && i.NegocioId == negocioId)
+            .Select(i => i.DensidadGPorMl)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<List<Proveedor>> ListarPorNegocioAsync(int negocioId)
     {
         return await _context.Proveedors
@@ -395,10 +403,11 @@ public sealed class ProveedorRepository : IProveedorRepository
         // y Cantidad queda expresada en la unidad base del insumo.
         var unidadActual = await _context.Insumos
             .Where(i => i.Id == insumoId)
-            .Select(i => new { i.UnidadMedida })
+            .Select(i => new { i.UnidadMedida, i.DensidadGPorMl })
             .FirstOrDefaultAsync();
         if (unidadActual is null) return; // el insumo no existe
         var unidadBase = unidadActual.UnidadMedida;
+        var densidadBase = unidadActual.DensidadGPorMl;
 
         var asociaciones = await _context.InsumoProveedors
             .AsNoTracking()
@@ -434,7 +443,8 @@ public sealed class ProveedorRepository : IProveedorRepository
                 {
                     Fila = a,
                     Unidad = a.Cantidad > 0
-                        ? ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida, unidadBase)
+                        ? ConversorUnidades.PrecioPorUnidad(a.Costo, a.Cantidad, a.UnidadMedida,
+                            unidadBase, densidadBase)
                         : null
                 })
                 .Where(x => x.Unidad.HasValue)
@@ -454,7 +464,8 @@ public sealed class ProveedorRepository : IProveedorRepository
 
         // Cantidad del paquete convertida a la unidad base del insumo.
         decimal? cantidadEnBase = principal.Cantidad > 0
-            ? ConversorUnidades.Convertir(principal.Cantidad, principal.UnidadMedida ?? string.Empty, unidadBase)
+            ? ConversorUnidades.Convertir(principal.Cantidad, principal.UnidadMedida ?? string.Empty,
+                unidadBase, densidadBase)
             : null;
 
         if (cantidadEnBase is > 0)

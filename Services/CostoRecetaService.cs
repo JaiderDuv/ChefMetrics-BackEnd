@@ -45,7 +45,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
         foreach (var ri in receta.RecetaInsumos)
         {
             var i = ri.Insumo;
-            if (!ConversorUnidades.Compatibles(ri.UnidadMedida, i.UnidadMedida))
+            if (!ConversorUnidades.Compatibles(ri.UnidadMedida, i.UnidadMedida, i.DensidadGPorMl))
             {
                 dto.Advertencias.Add($"'{i.Nombre}': la unidad '{ri.UnidadMedida}' no es compatible con '{i.UnidadMedida}'. No se costeó.");
                 continue;
@@ -53,7 +53,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
 
             decimal costo; string fuente;
             if (principales.TryGetValue(i.Id, out var pp) &&
-                CostoPorUnidad(pp, i.UnidadMedida) is { } cpu)
+                CostoPorUnidad(pp, i.UnidadMedida, i.DensidadGPorMl) is { } cpu)
             { costo = cpu; fuente = "proveedor_principal"; }
             else
             {
@@ -66,7 +66,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
             if (costo <= 0) dto.Advertencias.Add($"'{i.Nombre}' tiene costo 0; el resultado puede estar subestimado.");
 
             dto.Lineas.Add(CalculadoraCostos.Linea(i.Id, i.Nombre, ri.Cantidad, ri.UnidadMedida,
-                i.UnidadMedida, ri.PorcentajeMerma, costo, fuente));
+                i.UnidadMedida, ri.PorcentajeMerma, costo, fuente, i.DensidadGPorMl));
         }
 
         // 2) Costos fijos prorrateados (solo los seleccionados por el usuario, si se indican)
@@ -134,7 +134,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
         foreach (var ri in receta.RecetaInsumos)
         {
             var i = ri.Insumo;
-            if (!ConversorUnidades.Compatibles(ri.UnidadMedida, i.UnidadMedida))
+            if (!ConversorUnidades.Compatibles(ri.UnidadMedida, i.UnidadMedida, i.DensidadGPorMl))
             {
                 dto.Advertencias.Add($"'{i.Nombre}': la unidad '{ri.UnidadMedida}' no es compatible con '{i.UnidadMedida}'. No se costeó.");
                 continue;
@@ -142,7 +142,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
 
             decimal costo; string fuente;
             if (principales.TryGetValue(i.Id, out var pp) &&
-                CostoPorUnidad(pp, i.UnidadMedida) is { } cpu)
+                CostoPorUnidad(pp, i.UnidadMedida, i.DensidadGPorMl) is { } cpu)
             { costo = cpu; fuente = "proveedor_principal"; }
             else
             {
@@ -155,7 +155,7 @@ public sealed class CostoRecetaService : ICostoRecetaService
             if (costo <= 0) dto.Advertencias.Add($"'{i.Nombre}' tiene costo 0; el resultado puede estar subestimado.");
 
             dto.Lineas.Add(CalculadoraCostos.Linea(i.Id, i.Nombre, ri.Cantidad * factor, ri.UnidadMedida,
-                i.UnidadMedida, ri.PorcentajeMerma, costo, fuente));
+                i.UnidadMedida, ri.PorcentajeMerma, costo, fuente, i.DensidadGPorMl));
         }
 
         var fijosConfigurados = await _repo.ListarCostosFijosAsync(negocioId.Value, soloActivos: true);
@@ -193,10 +193,11 @@ public sealed class CostoRecetaService : ICostoRecetaService
     // null si no se puede determinar (cantidad 0 o unidad incompatible).
     // Nota: el factor convierte cantidades (1 kg -> 1000 g), así que el precio
     // por unidad se divide por él (precio por g = precio por kg / 1000).
-    private static decimal? CostoPorUnidad(PrecioProveedorPrincipal pp, string unidadInsumo)
+    private static decimal? CostoPorUnidad(PrecioProveedorPrincipal pp, string unidadInsumo,
+        decimal? densidadGPorMl)
     {
         if (pp.Cantidad <= 0 || string.IsNullOrWhiteSpace(pp.UnidadMedida)) return null;
-        var factor = ConversorUnidades.Convertir(1m, pp.UnidadMedida, unidadInsumo);
+        var factor = ConversorUnidades.Convertir(1m, pp.UnidadMedida, unidadInsumo, densidadGPorMl);
         return factor is null or 0 ? null : pp.Costo / pp.Cantidad / factor;
     }
 

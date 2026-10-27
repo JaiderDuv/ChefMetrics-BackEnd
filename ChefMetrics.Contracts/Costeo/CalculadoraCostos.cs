@@ -22,9 +22,9 @@ public static class CalculadoraCostos
     // costoInsumo         = cantidadParaComprar × costo del proveedor principal
     // mermaExtra          = costoInsumo - cantidadConvertida × costo
     public static LineaCostoDto Linea(int insumoId, string nombre, decimal cantidad, string unidadReceta,
-        string unidadInsumo, decimal merma, decimal costo, string fuente)
+        string unidadInsumo, decimal merma, decimal costo, string fuente, decimal? densidadGPorMl = null)
     {
-        var convertida = ConversorUnidades.Convertir(cantidad, unidadReceta, unidadInsumo) ?? 0m;
+        var convertida = ConversorUnidades.Convertir(cantidad, unidadReceta, unidadInsumo, densidadGPorMl) ?? 0m;
         var paraComprar = CantidadParaComprar(convertida, merma);
         return new LineaCostoDto
         {

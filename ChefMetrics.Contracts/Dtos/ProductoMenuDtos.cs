@@ -27,7 +27,7 @@ public sealed class InsumoDirectoDto
     public decimal Cantidad { get; set; }
 
     [Required(ErrorMessage = "La unidad es obligatoria.")]
-    [RegularExpression(@"(?i)^(g|kg|ml|l|oz|lb|unidad|taza)$", ErrorMessage = "Unidad de medida no válida.")]
+    [RegularExpression(ConversorUnidades.PatronUnidades, ErrorMessage = "Unidad de medida no válida.")]
     public string UnidadMedida { get; set; } = "unidad";
 }
 

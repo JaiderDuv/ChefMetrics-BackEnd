@@ -23,15 +23,10 @@ public sealed class MaximoDecimalesAttribute : ValidationAttribute
 
 internal static class LimitesProveedor
 {
-    private static readonly HashSet<string> UnidadesPequenas =
-        new(StringComparer.OrdinalIgnoreCase) { "unidad", "taza" };
-
     public const decimal CostoMaximo = 999999.99m;
 
     public static decimal CantidadMaxima(string? unidadMedida) =>
-        !string.IsNullOrWhiteSpace(unidadMedida) && UnidadesPequenas.Contains(unidadMedida.Trim())
-            ? 999.99m
-            : 999999.99m;
+        ConversorUnidades.EsUnidadPequena(unidadMedida) ? 999.99m : 999999.99m;
 }
 
 

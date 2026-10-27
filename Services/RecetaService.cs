@@ -259,7 +259,7 @@ public sealed class RecetaService : IRecetaService
             if (!ConversorUnidades.EsValida(unidad)) return ("La unidad de medida no es válida.", null);
 
             var insumo = insumos[item.InsumoId];
-            if (!ConversorUnidades.Compatibles(unidad!, insumo.UnidadMedida))
+            if (!ConversorUnidades.Compatibles(unidad!, insumo.UnidadMedida, insumo.DensidadGPorMl))
                 return ($"La unidad '{unidad}' no es compatible con el insumo '{insumo.Nombre}', que se mide en '{insumo.UnidadMedida}'.", null);
 
             if (item.PorcentajeMerma < 0 || item.PorcentajeMerma > 100)
@@ -302,7 +302,8 @@ public sealed class RecetaService : IRecetaService
         {
             var cpu = principales is not null &&
                       principales.TryGetValue(ri.InsumoId, out var pp) &&
-                      ConversorUnidades.PrecioPorUnidad(pp.Costo, pp.Cantidad, pp.UnidadMedida, ri.Insumo.UnidadMedida) is { } p
+                      ConversorUnidades.PrecioPorUnidad(pp.Costo, pp.Cantidad, pp.UnidadMedida,
+                          ri.Insumo.UnidadMedida, ri.Insumo.DensidadGPorMl) is { } p
                         ? p
                         : CostoPorUnidad(ri.Insumo);
             return new RecetaInsumoDto
@@ -313,7 +314,7 @@ public sealed class RecetaService : IRecetaService
                 PorcentajeMerma = ri.PorcentajeMerma,
                 UnidadMedida = ri.UnidadMedida,
                 CostoLinea = ConversorUnidades.CostoLinea(ri.Cantidad, ri.UnidadMedida,
-                    ri.Insumo.UnidadMedida, cpu, ri.PorcentajeMerma)
+                    ri.Insumo.UnidadMedida, cpu, ri.PorcentajeMerma, ri.Insumo.DensidadGPorMl)
             };
         }).ToList();
 

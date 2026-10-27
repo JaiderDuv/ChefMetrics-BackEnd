@@ -8,11 +8,6 @@ namespace ChefMetrics_BackEnd.Services;
 
 public sealed class InsumoService : IInsumoService
 {
-    private static readonly HashSet<string> UnidadesValidas = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "g", "kg", "l", "ml", "oz", "lb", "unidad", "taza"
-    };
-
     private static readonly HashSet<string> CategoriasValidas = new(StringComparer.OrdinalIgnoreCase)
     {
         "materia_prima", "empaque", "otro"
@@ -56,6 +51,12 @@ public sealed class InsumoService : IInsumoService
             return ResultadoInsumoDto.Error(validacion);
         }
 
+        var errorDensidad = ValidarDensidad(dto.DensidadGPorMl, out var densidad);
+        if (errorDensidad is not null)
+        {
+            return ResultadoInsumoDto.Error(errorDensidad);
+        }
+
         if (dto.Cantidad.HasValue && dto.Cantidad.Value < 0)
         {
             return ResultadoInsumoDto.Error("La cantidad no puede ser negativa.");
@@ -81,6 +82,7 @@ public sealed class InsumoService : IInsumoService
                 CostoUnitario = dto.CostoUnitario,
                 Proveedor = proveedorNormalizado,
                 Cantidad = dto.Cantidad,
+                DensidadGPorMl = densidad,
                 Activo = dto.Activo ?? true,
                 FechaActualizacion = DateTime.UtcNow
             });
@@ -235,9 +237,20 @@ public sealed class InsumoService : IInsumoService
             if (!TryNormalizarUnidad(dto.UnidadMedida, out var unidad))
             {
                 return ResultadoInsumoDto.Error(
-                    $"La unidad de medida no es válida. Valores permitidos: {string.Join(", ", UnidadesValidas.OrderBy(u => u))}.");
+                    $"La unidad de medida no es válida. Valores permitidos: {string.Join(", ", ConversorUnidades.Unidades)}.");
             }
             insumo.UnidadMedida = unidad!;
+            hayCambios = true;
+        }
+
+        if (dto.DensidadGPorMl.HasValue)
+        {
+            var errorDensidad = ValidarDensidad(dto.DensidadGPorMl, out var densidad);
+            if (errorDensidad is not null)
+            {
+                return ResultadoInsumoDto.Error(errorDensidad);
+            }
+            insumo.DensidadGPorMl = densidad;
             hayCambios = true;
         }
 
@@ -480,7 +493,7 @@ public sealed class InsumoService : IInsumoService
         }
 
         var unidad = (ultimo.UnidadMedida ?? string.Empty).Trim().ToLowerInvariant();
-        if (!UnidadesValidas.Contains(unidad))
+        if (!ConversorUnidades.EsValida(unidad))
         {
             unidad = "g";
         }
@@ -927,7 +940,7 @@ public sealed class InsumoService : IInsumoService
         }
         if (!TryNormalizarUnidad(unidadMedida, out unidadNormalizada))
         {
-            return $"La unidad de medida no es válida. Valores permitidos: {string.Join(", ", UnidadesValidas.OrderBy(u => u))}.";
+            return $"La unidad de medida no es válida. Valores permitidos: {string.Join(", ", ConversorUnidades.Unidades)}.";
         }
         if (costoUnitario <= 0)
         {
@@ -955,18 +968,27 @@ public sealed class InsumoService : IInsumoService
         return candidato is not null && CategoriasValidas.Contains(candidato) ? candidato : null;
     }
 
-    private static decimal MaxCantidadPorUnidad(string? unidadMedida)
-    {
-        var unidad = unidadMedida?.Trim().ToLowerInvariant();
-        return unidad is "taza" or "unidad" ? 999.99m : 999999.99m;
-    }
+    private static decimal MaxCantidadPorUnidad(string? unidadMedida) =>
+        ConversorUnidades.EsUnidadPequena(unidadMedida) ? 999.99m : 999999.99m;
 
-    private static string MensajeTopeCantidad(string? unidadMedida)
-    {
-        var unidad = unidadMedida?.Trim().ToLowerInvariant();
-        return unidad is "taza" or "unidad"
-            ? "Para 'taza' o 'unidad' la cantidad máxima es 999.99 (3 enteros y 2 decimales)."
+    private static string MensajeTopeCantidad(string? unidadMedida) =>
+        ConversorUnidades.EsUnidadPequena(unidadMedida)
+            ? "Para las unidades de cocina (taza, cucharada, cucharadita, unidad o docena) la cantidad máxima es 999.99 (3 enteros y 2 decimales)."
             : "La cantidad máxima es 999999.99 (6 enteros y 2 decimales).";
+
+    private static string? ValidarDensidad(decimal? valor, out decimal? densidad)
+    {
+        densidad = null;
+        if (!valor.HasValue || valor.Value == 0m)
+        {
+            return null;
+        }
+        if (valor.Value < 0m || valor.Value > 20m)
+        {
+            return "La densidad debe estar entre 0,01 y 20 g/ml.";
+        }
+        densidad = decimal.Round(valor.Value, 4);
+        return null;
     }
 
     private static bool TryNormalizarUnidad(string? valor, out string? normalizada)
@@ -978,7 +1000,7 @@ public sealed class InsumoService : IInsumoService
         }
 
         var candidato = valor.Trim().ToLowerInvariant();
-        if (candidato.Length > 10 || !UnidadesValidas.Contains(candidato))
+        if (candidato.Length > 10 || !ConversorUnidades.EsValida(candidato))
         {
             return false;
         }
@@ -998,6 +1020,7 @@ public sealed class InsumoService : IInsumoService
             CostoUnitario = insumo.CostoUnitario,
             Proveedor = proveedorPrincipal,
             Cantidad = insumo.Cantidad,
+            DensidadGPorMl = insumo.DensidadGPorMl,
             Activo = insumo.Activo,
             FechaActualizacion = insumo.FechaActualizacion,
             NumeroRecetas = numeroRecetas

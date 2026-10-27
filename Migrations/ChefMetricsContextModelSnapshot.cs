@@ -266,6 +266,9 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.Property<decimal>("CostoUnitario")
                         .HasColumnType("decimal(12, 2)");
 
+                    b.Property<decimal?>("DensidadGPorMl")
+                        .HasColumnType("decimal(10, 4)");
+
                     b.Property<DateTime>("FechaActualizacion")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")

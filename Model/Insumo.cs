@@ -25,6 +25,11 @@ public partial class Insumo
 
     public decimal? Cantidad { get; set; }
 
+    // Densidad del insumo en g/ml. Permite convertir entre masa y volumen
+    // (por ejemplo, taza de harina a gramos) cuando la unidad de la receta
+    // no coincide con la unidad natural del insumo.
+    public decimal? DensidadGPorMl { get; set; }
+
     public virtual Negocio Negocio { get; set; } = null!;
 
     public virtual ICollection<InsumoProveedor> InsumoProveedors { get; set; } = new List<InsumoProveedor>();
