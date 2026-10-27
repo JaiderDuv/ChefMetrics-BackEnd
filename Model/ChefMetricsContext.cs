@@ -412,6 +412,7 @@ public partial class ChefMetricsContext : DbContext
 
             entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.Nombre).HasMaxLength(150);
+            entity.Property(e => e.Categoria).HasMaxLength(30);
 
             entity.HasOne(d => d.Negocio).WithMany(p => p.Receta)
                 .HasForeignKey(d => d.NegocioId)
