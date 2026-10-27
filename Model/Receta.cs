@@ -8,6 +8,8 @@ public partial class Receta
 {
     public string? ImagenUrl { get; set; }
 
+    public string? Categoria { get; set; }
+
     public int Id { get; set; }
 
     public int NegocioId { get; set; }

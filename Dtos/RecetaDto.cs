@@ -20,6 +20,7 @@ public sealed class RecetaInsumoDto
 }
 
 public sealed class GuardarRecetaDto
+
 {
     [Required(ErrorMessage = "El nombre es obligatorio.")]
     [StringLength(100, MinimumLength = 3, ErrorMessage = "El nombre debe tener entre 3 y 100 caracteres.")]
@@ -28,6 +29,10 @@ public sealed class GuardarRecetaDto
     public string Nombre { get; set; } = string.Empty;
 
     [Range(1, 1000, ErrorMessage = "Las porciones deben estar entre 1 y 1000.")]
+
+    [StringLength(30)]
+    public string? Categoria { get; set; }
+
     public int PorcionesBase { get; set; } = 1;
 
     [StringLength(2000, ErrorMessage = "Las instrucciones no pueden superar 2000 caracteres.")]
@@ -40,6 +45,7 @@ public sealed class GuardarRecetaDto
 
 public sealed class RecetaDto
 {
+    public string? Categoria { get; set; }
     public int Id { get; set; }
     public string Nombre { get; set; } = string.Empty;
     public int PorcionesBase { get; set; }

@@ -27,6 +27,12 @@ public sealed class RecetaService : IRecetaService
     private static readonly HashSet<string> ExtensionesImagen = new() { ".jpg", ".jpeg", ".png", ".webp" };
     private static readonly HashSet<string> TiposImagen = new() { "image/jpeg", "image/png", "image/webp" };
 
+    // Mismos valores que el frontend (CategoriasReceta). La columna Categoria es opcional.
+    private static readonly HashSet<string> CategoriasValidas = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "entradas", "platos_fuertes", "postres", "bebidas", "salsas_bases", "panaderia", "otros"
+    };
+
     private readonly IRecetaRepository _recetaRepository;
     private readonly IInsumoRepository _insumoRepository;
     private readonly IWebHostEnvironment _env;
@@ -74,6 +80,7 @@ public sealed class RecetaService : IRecetaService
                 Nombre = nombre,
                 PorcionesBase = dto.PorcionesBase,
                 Instrucciones = NormalizarTexto(dto.Instrucciones),
+                Categoria = NormalizarCategoria(dto.Categoria),
                 FechaCreacion = DateTime.UtcNow,
                 RecetaInsumos = ingredientes!
             });
@@ -101,6 +108,7 @@ public sealed class RecetaService : IRecetaService
         receta.Nombre = nombre;
         receta.PorcionesBase = dto.PorcionesBase;
         receta.Instrucciones = NormalizarTexto(dto.Instrucciones);
+        receta.Categoria = NormalizarCategoria(dto.Categoria);
         _recetaRepository.ReemplazarInsumos(receta, ingredientes!);
 
         try { await _recetaRepository.GuardarCambiosAsync(); }
@@ -218,6 +226,10 @@ public sealed class RecetaService : IRecetaService
     {
         if (nombre.Length < 3) return ("El nombre debe tener al menos 3 caracteres.", null);
         if (nombre.Length > 100) return ("El nombre no puede superar los 100 caracteres.", null);
+
+        if (!string.IsNullOrWhiteSpace(dto.Categoria) && !CategoriasValidas.Contains(dto.Categoria.Trim()))
+            return ("La categoría no es válida.", null);
+
         if (dto.Insumos.Count == 0) return ("La receta necesita al menos un insumo.", null);
 
         var ids = dto.Insumos.Select(i => i.InsumoId).ToList();
@@ -252,6 +264,9 @@ public sealed class RecetaService : IRecetaService
 
     private static string? NormalizarTexto(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();
 
+    private static string? NormalizarCategoria(string? v) =>
+        string.IsNullOrWhiteSpace(v) ? null : v.Trim().ToLowerInvariant();
+
     // Insumo.CostoUnitario es el total del paquete (Insumo.Cantidad): se divide para el precio por unidad.
     private static decimal CostoPorUnidad(Insumo i) =>
         i.Cantidad.HasValue && i.Cantidad.Value > 0 ? i.CostoUnitario / i.Cantidad.Value : i.CostoUnitario;
@@ -275,6 +290,7 @@ public sealed class RecetaService : IRecetaService
             Nombre = r.Nombre,
             PorcionesBase = r.PorcionesBase,
             Instrucciones = r.Instrucciones,
+            Categoria = r.Categoria,
             ImagenUrl = r.ImagenUrl,
             FechaCreacion = r.FechaCreacion,
             Insumos = lineas,
