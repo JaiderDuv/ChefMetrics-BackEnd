@@ -305,6 +305,7 @@ public partial class ChefMetricsContext : DbContext
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.FechaCreacion).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.ImagenUrl);
             entity.Property(e => e.Nombre).HasMaxLength(150);
             entity.Property(e => e.PrecioVenta).HasColumnType("decimal(12, 2)");
 

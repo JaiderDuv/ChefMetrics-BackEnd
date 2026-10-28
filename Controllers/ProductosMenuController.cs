@@ -49,6 +49,31 @@ public sealed class ProductosMenuController : ControllerBase
         return r.NoEncontrado ? NotFound(new { mensaje = r.Mensaje }) : Ok(r.Producto);
     }
 
+    // POST /api/productos-menu/{id}/imagen  (multipart/form-data, campo "archivo")
+    [HttpPost("{id:int}/imagen")]
+    [RequestSizeLimit(3_000_000)]
+    public async Task<IActionResult> SubirImagen([FromRoute] int id, IFormFile archivo)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+
+        var r = await _servicio.GuardarImagenAsync(cuentaId, id, archivo);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
+        return Ok(r.Producto);
+    }
+
+    // DELETE /api/productos-menu/{id}/imagen
+    [HttpDelete("{id:int}/imagen")]
+    public async Task<IActionResult> QuitarImagen([FromRoute] int id)
+    {
+        if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
+
+        var r = await _servicio.QuitarImagenAsync(cuentaId, id);
+        if (r.NoEncontrado) return NotFound(new { mensaje = r.Mensaje });
+        if (!r.Exito) return BadRequest(new { mensaje = r.Mensaje });
+        return Ok(r.Producto);
+    }
+
     // POST /api/productos-menu -> 201 + Location al nuevo detalle.
     [HttpPost]
     public async Task<IActionResult> Crear([FromBody] CrearProductoMenuDto dto)
