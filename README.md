@@ -34,14 +34,6 @@ Para usar otra base de datos o una clave JWT distinta, define las variables de e
 En desarrollo, si no hay SMTP configurado, las cuentas nuevas se verifican
 automáticamente para poder iniciar sesión sin enviar correos.
 
-## Cambios recientes
-
-- Conversión de unidades ampliada y centralizada en `ChefMetrics.Contracts/Costeo/ConversorUnidades.cs`.
-- Densidad opcional por insumo (`DensidadGPorMl`) para convertir entre masa y volumen.
-- Onboarding reducido a dos pasos y con persistencia de datos personales/negocio.
-- Categorías de negocio `Panadería` y `Pastelería` disponibles en el frontend.
-- Pruebas de conversión, merma, escalado, costeo de producto, evaluación de menú y precio sugerido.
-
 ## Documentación
 
 - [Matriz de trazabilidad](docs/trazabilidad.md)
