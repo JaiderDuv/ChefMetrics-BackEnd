@@ -5,6 +5,7 @@ using ChefMetrics_BackEnd.Model; // Contiene la clase ChefMetricsContext
 using ChefMetrics_BackEnd.Repositories;
 using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ChefMetrics_BackEnd.Services
 {
@@ -13,6 +14,8 @@ namespace ChefMetrics_BackEnd.Services
         private readonly IUserRepository _usuarioRepository;
         private readonly IEmailService _emailService;
         private readonly ChefMetricsContext _context; // Nombre exacto del DbContext
+        private readonly IWebHostEnvironment _entorno;
+        private readonly EmailSettings _emailSettings;
 
         // CK_UsuarioEmprendedor_TipoDocumento: solo CC, CE, TI o PA.
         private static readonly HashSet<string> TiposDocumentoValidos = new(StringComparer.OrdinalIgnoreCase)
@@ -23,11 +26,15 @@ namespace ChefMetrics_BackEnd.Services
         public UsuarioService(
             ChefMetricsContext context,
             IUserRepository usuarioRepository,
-            IEmailService emailService)
+            IEmailService emailService,
+            IWebHostEnvironment entorno,
+            IOptions<EmailSettings> emailOptions)
         {
             _context = context;
             _usuarioRepository = usuarioRepository;
             _emailService = emailService;
+            _entorno = entorno;
+            _emailSettings = emailOptions.Value;
         }
 
         public async Task<bool> RegistrarEmprendedorFormalizadoAsync(EmprendedorFormalizado dto)
@@ -86,6 +93,16 @@ namespace ChefMetrics_BackEnd.Services
             string correoContacto)
         {
             var correoNormalizado = correoElectronico.ToLower().Trim();
+
+            // En desarrollo, si no hay SMTP configurado la cuenta se verifica
+            // automáticamente: así un clon nuevo puede registrarse y probar la
+            // aplicación sin configurar una contraseña de Gmail.
+            var smtpConfigurado =
+                !string.IsNullOrWhiteSpace(_emailSettings.Host) &&
+                !string.IsNullOrWhiteSpace(_emailSettings.Username) &&
+                !string.IsNullOrWhiteSpace(_emailSettings.Password) &&
+                !string.IsNullOrWhiteSpace(_emailSettings.From);
+            var verificarAutomaticamente = _entorno.IsDevelopment() && !smtpConfigurado;
 
             // Evita exponer el error crudo de BD (DbUpdateException) cuando el
             // correo ya existe por un intento anterior.
@@ -148,7 +165,7 @@ namespace ChefMetrics_BackEnd.Services
                 Correo = correoNormalizado,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(contrasena),
                 TipoCuenta = "Emprendedor",
-                EmailVerificado = false,
+                EmailVerificado = verificarAutomaticamente,
                 Activo = true,
                 FechaCreacion = DateTime.UtcNow
             };
@@ -190,6 +207,11 @@ namespace ChefMetrics_BackEnd.Services
                 });
 
                 await transaccion.CommitAsync();
+
+                if (verificarAutomaticamente)
+                {
+                    return;
+                }
 
                 // 3. Generar token, persistirlo y enviar correo de verificación
                 // (fuera de la transacción; sin esta fila el enlace nunca validaría)
