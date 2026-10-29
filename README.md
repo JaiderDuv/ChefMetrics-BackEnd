@@ -37,7 +37,3 @@ automáticamente para poder iniciar sesión sin enviar correos.
 ## Documentación
 
 - [Matriz de trazabilidad](docs/trazabilidad.md)
-
-## Nota sobre archivos no rastreados
-
-No agregar a los commits `wwwroot/uploads/recetas/e1e50b5566ef42869bb3dc3431314c44.png`.
