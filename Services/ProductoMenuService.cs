@@ -13,6 +13,8 @@ public interface IProductoMenuService
     Task<ResultadoProductoMenuDto> ActualizarAsync(int cuentaId, int id, ActualizarProductoMenuDto dto);
     Task<ResultadoProductoMenuDto> ActualizarParcialAsync(int cuentaId, int id, PatchProductoMenuDto dto);
     Task<ResultadoCosteo<bool>> EliminarAsync(int cuentaId, int id);
+    Task<ResultadoProductoMenuDto> GuardarImagenAsync(int cuentaId, int id, IFormFile archivo);
+    Task<ResultadoProductoMenuDto> QuitarImagenAsync(int cuentaId, int id);
 }
 
 public sealed class ProductoMenuService : IProductoMenuService
@@ -20,19 +22,26 @@ public sealed class ProductoMenuService : IProductoMenuService
     private const string SinNegocio = "Aún no tienes un negocio registrado para administrar el menú.";
     private const string NoExiste = "No se encontró el producto solicitado.";
     private const string Duplicado = "Ya existe un producto con ese nombre en tu negocio.";
+    private const long MaxImagenBytes = 2 * 1024 * 1024;
+
+    private static readonly HashSet<string> ExtensionesImagen = new() { ".jpg", ".jpeg", ".png", ".webp" };
+    private static readonly HashSet<string> TiposImagen = new() { "image/jpeg", "image/png", "image/webp" };
 
     private readonly IProductoMenuRepository _repo;
     private readonly IInsumoRepository _insumos;
     private readonly ICostoProductoService _costos;
+    private readonly IWebHostEnvironment _env;
 
     public ProductoMenuService(
         IProductoMenuRepository repo,
         IInsumoRepository insumos,
-        ICostoProductoService costos)
+        ICostoProductoService costos,
+        IWebHostEnvironment env)
     {
         _repo = repo;
         _insumos = insumos;
         _costos = costos;
+        _env = env;
     }
 
     public async Task<List<ProductoMenuDto>?> ListarAsync(int cuentaId, string? busqueda, bool incluirInactivos)
@@ -55,6 +64,7 @@ public sealed class ProductoMenuService : IProductoMenuService
             {
                 Id = p.Id,
                 Nombre = p.Nombre,
+                ImagenUrl = p.ImagenUrl,
                 PrecioVenta = p.PrecioVenta,
                 CostoTotal = total,
                 CostoDirecto = directo,
@@ -81,10 +91,13 @@ public sealed class ProductoMenuService : IProductoMenuService
 
         var c = costo.Datos;
         var producto = await _repo.ObtenerPorIdAsync(negocioId.Value, id);
+        if (producto is null) return ResultadoProductoMenuDto.NoHallado(NoExiste);
+
         return ResultadoProductoMenuDto.Ok(new ProductoMenuDetalleDto
         {
             Id = id,
             Nombre = c.Producto,
+            ImagenUrl = producto.ImagenUrl,
             PrecioVenta = c.PrecioVenta,
             CostoTotal = c.CostoTotal,
             CostoDirecto = c.CostoDirecto,
@@ -92,7 +105,7 @@ public sealed class ProductoMenuService : IProductoMenuService
             MargenReal = c.MargenReal,
             MargenDirecto = c.MargenDirecto,
             NumRecetas = c.Recetas.Count,
-            Activo = producto!.Activo,
+            Activo = producto.Activo,
             FechaCreacion = producto.FechaCreacion,
             Recetas = c.Recetas,
             InsumosDirectos = c.InsumosDirectos,
@@ -289,10 +302,84 @@ public sealed class ProductoMenuService : IProductoMenuService
         var producto = await _repo.ObtenerParaEditarAsync(negocioId.Value, id);
         if (producto is null) return ResultadoCosteo<bool>.NoHallado(NoExiste);
 
+        var imagen = producto.ImagenUrl;
         _repo.Eliminar(producto);
         await _repo.GuardarCambiosAsync();
+        BorrarArchivo(imagen);
         return ResultadoCosteo<bool>.Ok(true, "El producto fue eliminado correctamente.");
     }
+
+    // ---------- Imágenes ----------
+
+    public async Task<ResultadoProductoMenuDto> GuardarImagenAsync(int cuentaId, int id, IFormFile archivo)
+    {
+        var negocioId = await _insumos.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (!negocioId.HasValue) return ResultadoProductoMenuDto.NoHallado(SinNegocio);
+
+        var producto = await _repo.ObtenerParaEditarAsync(negocioId.Value, id);
+        if (producto is null) return ResultadoProductoMenuDto.NoHallado(NoExiste);
+
+        if (archivo is null || archivo.Length == 0)
+            return ResultadoProductoMenuDto.Error("No se recibió ninguna imagen.");
+        if (archivo.Length > MaxImagenBytes)
+            return ResultadoProductoMenuDto.Error("La imagen no puede superar los 2 MB.");
+
+        var ext = Path.GetExtension(archivo.FileName).ToLowerInvariant();
+        if (!ExtensionesImagen.Contains(ext) || !TiposImagen.Contains(archivo.ContentType.ToLowerInvariant()))
+            return ResultadoProductoMenuDto.Error("Solo se permiten imágenes JPG, PNG o WEBP.");
+
+        // Verifica los primeros bytes: evita que renombren un .exe como .jpg.
+        var cabecera = new byte[12];
+        await using (var lectura = archivo.OpenReadStream())
+            await lectura.ReadExactlyAsync(cabecera, 0, (int)Math.Min(12, archivo.Length));
+        if (!FirmaValida(cabecera))
+            return ResultadoProductoMenuDto.Error("El archivo no es una imagen válida.");
+
+        var carpeta = Path.Combine(RaizWeb(), "uploads", "menu");
+        Directory.CreateDirectory(carpeta);
+        var nombreArchivo = $"{Guid.NewGuid():N}{ext}";   // el nombre original nunca se usa
+        await using (var destino = File.Create(Path.Combine(carpeta, nombreArchivo)))
+            await archivo.CopyToAsync(destino);
+
+        var anterior = producto.ImagenUrl;
+        producto.ImagenUrl = $"/uploads/menu/{nombreArchivo}";
+        await _repo.GuardarCambiosAsync();
+        BorrarArchivo(anterior);
+
+        return await ObtenerAsync(cuentaId, id);
+    }
+
+    public async Task<ResultadoProductoMenuDto> QuitarImagenAsync(int cuentaId, int id)
+    {
+        var negocioId = await _insumos.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (!negocioId.HasValue) return ResultadoProductoMenuDto.NoHallado(SinNegocio);
+
+        var producto = await _repo.ObtenerParaEditarAsync(negocioId.Value, id);
+        if (producto is null) return ResultadoProductoMenuDto.NoHallado(NoExiste);
+
+        var anterior = producto.ImagenUrl;
+        producto.ImagenUrl = null;
+        await _repo.GuardarCambiosAsync();
+        BorrarArchivo(anterior);
+
+        return await ObtenerAsync(cuentaId, id);
+    }
+
+    private string RaizWeb() => _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+
+    private void BorrarArchivo(string? rutaRelativa)
+    {
+        if (string.IsNullOrWhiteSpace(rutaRelativa)) return;
+        var nombre = Path.GetFileName(rutaRelativa);   // GetFileName evita rutas maliciosas
+        var completa = Path.Combine(RaizWeb(), "uploads", "menu", nombre);
+        try { if (File.Exists(completa)) File.Delete(completa); } catch { /* no bloquear por esto */ }
+    }
+
+    private static bool FirmaValida(byte[] b) =>
+        (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) ||                                   // JPEG
+        (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) ||                   // PNG
+        (b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 &&
+         b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50);                   // WEBP
 
     private static string? ValidarNombre(string nombre)
     {

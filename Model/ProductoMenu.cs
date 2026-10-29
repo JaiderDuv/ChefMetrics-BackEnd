@@ -11,6 +11,8 @@ public partial class ProductoMenu
 
     public string Nombre { get; set; } = null!;
 
+    public string? ImagenUrl { get; set; }
+
     public decimal? PrecioVenta { get; set; }
 
     public bool Activo { get; set; }

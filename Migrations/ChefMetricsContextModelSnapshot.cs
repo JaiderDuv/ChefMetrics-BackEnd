@@ -511,6 +511,9 @@ namespace ChefMetrics_BackEnd.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("(sysutcdatetime())");
 
+                    b.Property<string>("ImagenUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("NegocioId")
                         .HasColumnType("int");
 
