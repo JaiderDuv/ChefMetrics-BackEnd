@@ -1,7 +1,3 @@
-# Trazabilidad propuesta → funcionalidad → archivos → pruebas
-
-Rutas relativas a `C:\PGC`. La propuesta PGC se implementa entre el backend (`ChefMetrics-BackEnd`) y el frontend Blazor (`PWGAPG-Frontend`).
-
 | Propuesta / necesidad | Funcionalidad implementada | Archivos principales | Pruebas / verificación |
 |---|---|---|---|
 | Medir y costear con las unidades que realmente usa una panadería o pastelería | Catálogo compartido de unidades: `mg`, `g`, `kg`, `oz`, `lb`, `ml`, `l`, `cdta`, `cda`, `taza`, `floz`, `pt`, `qt`, `gal`, `unidad`, `docena`. Conversión dentro de la misma familia y entre masa/volumen cuando hay densidad. | `ChefMetrics-BackEnd/ChefMetrics.Contracts/Costeo/ConversorUnidades.cs`; `ChefMetrics-BackEnd/ChefMetrics.Contracts/Costeo/CalculadoraCostos.cs`; `PWGAPG-Frontend/Components/RecetaForm.razor`; `PWGAPG-Frontend/Components/ProductoMenuForm.razor`; `PWGAPG-Frontend/Pages/Insumos.razor`; `PWGAPG-Frontend/Pages/InsumosProveedores.razor`; `PWGAPG-Frontend/Pages/ProveedoresInsumo.razor` | `ChefMetrics-BackEnd.Tests/ConversorUnidadesTests.cs`; `ChefMetrics-BackEnd.Tests/CostoRecetaServiceTests.cs`; `ChefMetrics-BackEnd.Tests/CostoProductoServiceTests.cs` |
