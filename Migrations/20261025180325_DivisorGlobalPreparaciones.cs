@@ -10,32 +10,52 @@ namespace ChefMetrics_BackEnd.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "PreparacionesBaseMes",
-                table: "Negocio",
-                type: "int",
-                nullable: true);
+            // En bases creadas por fuera de EF la columna ya existe; en bases
+            // nuevas hay que crearla.
+            migrationBuilder.Sql(
+                """
+                IF COL_LENGTH(N'Negocio', N'PreparacionesBaseMes') IS NULL
+                    ALTER TABLE [Negocio] ADD [PreparacionesBaseMes] int NULL;
+                """);
 
             // Las columnas por fila tenían restricciones CHECK y un valor por
             // defecto. SQL Server no permite eliminarlas sin retirar antes esas
-            // restricciones.
+            // restricciones. En una base nueva ValorDivisor nunca se creó, por
+            // eso la eliminación también es condicional.
             migrationBuilder.Sql(
                 """
                 IF OBJECT_ID(N'[CK_CostoFijo_UnidadProrrateo]', N'C') IS NOT NULL
                     ALTER TABLE [CostoFijo] DROP CONSTRAINT [CK_CostoFijo_UnidadProrrateo];
                 IF OBJECT_ID(N'[CK_CostoFijo_ValorDivisor]', N'C') IS NOT NULL
                     ALTER TABLE [CostoFijo] DROP CONSTRAINT [CK_CostoFijo_ValorDivisor];
-                IF OBJECT_ID(N'[DF_CostoFijo_ValorDivisor]', N'D') IS NOT NULL
-                    ALTER TABLE [CostoFijo] DROP CONSTRAINT [DF_CostoFijo_ValorDivisor];
+
+                DECLARE @dfUnidad sysname;
+                SELECT @dfUnidad = d.name
+                  FROM sys.default_constraints AS d
+                  INNER JOIN sys.columns AS c
+                    ON c.object_id = d.parent_object_id
+                   AND c.column_id = d.parent_column_id
+                 WHERE d.parent_object_id = OBJECT_ID(N'[CostoFijo]')
+                   AND c.name = N'UnidadProrrateo';
+                IF @dfUnidad IS NOT NULL
+                    EXEC(N'ALTER TABLE [CostoFijo] DROP CONSTRAINT [' + @dfUnidad + N'];');
+
+                DECLARE @dfValor sysname;
+                SELECT @dfValor = d.name
+                  FROM sys.default_constraints AS d
+                  INNER JOIN sys.columns AS c
+                    ON c.object_id = d.parent_object_id
+                   AND c.column_id = d.parent_column_id
+                 WHERE d.parent_object_id = OBJECT_ID(N'[CostoFijo]')
+                   AND c.name = N'ValorDivisor';
+                IF @dfValor IS NOT NULL
+                    EXEC(N'ALTER TABLE [CostoFijo] DROP CONSTRAINT [' + @dfValor + N'];');
+
+                IF COL_LENGTH(N'CostoFijo', N'UnidadProrrateo') IS NOT NULL
+                    EXEC(N'ALTER TABLE [CostoFijo] DROP COLUMN [UnidadProrrateo];');
+                IF COL_LENGTH(N'CostoFijo', N'ValorDivisor') IS NOT NULL
+                    EXEC(N'ALTER TABLE [CostoFijo] DROP COLUMN [ValorDivisor];');
                 """);
-
-            migrationBuilder.DropColumn(
-                name: "UnidadProrrateo",
-                table: "CostoFijo");
-
-            migrationBuilder.DropColumn(
-                name: "ValorDivisor",
-                table: "CostoFijo");
         }
 
         /// <inheritdoc />

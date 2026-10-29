@@ -31,11 +31,10 @@ public sealed class GuardarRecetaDto
         ErrorMessage = "El nombre solo admite letras, números, espacios y . , ' - ( ) & (y debe incluir letras).")]
     public string Nombre { get; set; } = string.Empty;
 
-    [Range(1, 1000, ErrorMessage = "Las porciones deben estar entre 1 y 1000.")]
-
     [StringLength(30)]
     public string? Categoria { get; set; }
 
+    [Range(1, 1000, ErrorMessage = "Las porciones deben estar entre 1 y 1000.")]
     public int PorcionesBase { get; set; } = 1;
 
     [StringLength(2000, ErrorMessage = "Las instrucciones no pueden superar 2000 caracteres.")]

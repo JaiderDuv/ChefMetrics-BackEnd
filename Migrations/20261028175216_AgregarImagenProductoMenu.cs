@@ -10,19 +10,23 @@ namespace ChefMetrics_BackEnd.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "ImagenUrl",
-                table: "ProductoMenu",
-                type: "nvarchar(max)",
-                nullable: true);
+            // Algunas bases ya tienen la columna creada a mano y la migración
+            // no registrada; en ese caso no se debe intentar agregarla otra vez.
+            migrationBuilder.Sql(
+                """
+                IF COL_LENGTH(N'ProductoMenu', N'ImagenUrl') IS NULL
+                    ALTER TABLE [ProductoMenu] ADD [ImagenUrl] nvarchar(max) NULL;
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "ImagenUrl",
-                table: "ProductoMenu");
+            migrationBuilder.Sql(
+                """
+                IF COL_LENGTH(N'ProductoMenu', N'ImagenUrl') IS NOT NULL
+                    ALTER TABLE [ProductoMenu] DROP COLUMN [ImagenUrl];
+                """);
         }
     }
 }
