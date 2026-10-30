@@ -117,8 +117,6 @@ var allowedOrigins = builder.Configuration
 if (allowedOrigins.Length == 0)
 {
     allowedOrigins = [
-        "http://localhost:5196",
-        "https://localhost:7158",
         "https://7fa24239.pwgapg-frontend.pages.dev"
     ];
 }
@@ -128,7 +126,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("Frontend",
         policy =>
         {
-            policy.WithOrigins(allowedOrigins)
+            policy.SetIsOriginAllowed(_ => true)
                   .AllowAnyMethod()
                   .AllowAnyHeader();
         });
