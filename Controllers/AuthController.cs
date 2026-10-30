@@ -10,10 +10,12 @@ namespace ChefMetrics_BackEnd.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger)
         {
             _authService = authService;
+            _logger = logger;
         }
 
         [AllowAnonymous]
@@ -78,16 +80,23 @@ namespace ChefMetrics_BackEnd.Controllers
 
             try
             {
-                var enrutado = await _authService.SolicitarRecuperacionPasswordAsync(dto);
+                await _authService.SolicitarRecuperacionPasswordAsync(dto);
+
+                // Siempre se responde igual para no revelar si el correo existe.
                 return Ok(new
                 {
-                    exito = enrutado,
+                    exito = true,
                     mensaje = "Si el correo electrónico existe en nuestra plataforma, se enviarán las instrucciones de restablecimiento."
                 });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { mensaje = ex.Message });
+                _logger.LogError(ex, "Error al solicitar la recuperación de contraseña.");
+                return BadRequest(new
+                {
+                    exito = false,
+                    mensaje = "No se pudo procesar la solicitud de recuperación. Intenta de nuevo más tarde."
+                });
             }
         }
 
@@ -115,7 +124,12 @@ namespace ChefMetrics_BackEnd.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { mensaje = ex.Message });
+                _logger.LogError(ex, "Error al restablecer la contraseña.");
+                return BadRequest(new
+                {
+                    exito = false,
+                    mensaje = "No se pudo procesar el restablecimiento de contraseña. Intenta de nuevo más tarde."
+                });
             }
         }
     }
