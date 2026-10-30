@@ -116,7 +116,11 @@ var allowedOrigins = builder.Configuration
     .Get<string[]>() ?? [];
 if (allowedOrigins.Length == 0)
 {
-    allowedOrigins = ["http://localhost:5196", "https://localhost:7158"];
+    allowedOrigins = [
+        "http://localhost:5196",
+        "https://localhost:7158",
+        "https://7fa24239.pwgapg-frontend.pages.dev"
+    ];
 }
 
 builder.Services.AddCors(options =>
@@ -135,7 +139,7 @@ var app = builder.Build();
 // Crea la base en una instalación nueva y aplica migraciones pendientes en
 // las bases existentes. Evita que cada integrante deba ejecutar dotnet ef
 // (y que la app falle por columnas faltantes).
-using (var scope = app.Services.CreateScope())
+using (var scope = app.Services.CreateScope())  
 {
     var db = scope.ServiceProvider.GetRequiredService<ChefMetricsContext>();
     db.Database.Migrate();
