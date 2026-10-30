@@ -141,18 +141,14 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
-if (app.Environment.IsDevelopment())
+// Se expone OpenAPI con acceso anónimo para que no pida token JWT en la especificación
+app.MapOpenApi().AllowAnonymous();
+
+app.UseSwaggerUI(options =>
 {
-    // La política de autorización de respaldo también cubre los endpoints
-    // generados por MapOpenApi. El documento solo se expone en Development,
-    // pero debe ser anónimo para que Swagger UI pueda cargarlo.
-    app.MapOpenApi().AllowAnonymous();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/openapi/v1.json", "ChefMetrics BackEnd API v1");
-        options.RoutePrefix = "swagger";
-    });
-}
+    options.SwaggerEndpoint("/openapi/v1.json", "ChefMetrics BackEnd API v1");
+    options.RoutePrefix = "swagger";
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
