@@ -1,6 +1,7 @@
 ﻿using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChefMetrics_BackEnd.Services;
@@ -36,14 +37,17 @@ public sealed class RecetaService : IRecetaService
     private readonly IInsumoRepository _insumoRepository;
     private readonly ICosteoRepository _costeoRepository;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<RecetaService> _logger;
 
     public RecetaService(IRecetaRepository recetaRepository, IInsumoRepository insumoRepository,
-                         ICosteoRepository costeoRepository, IWebHostEnvironment env)
+                         ICosteoRepository costeoRepository, IWebHostEnvironment env,
+                         ILogger<RecetaService> logger)
     {
         _recetaRepository = recetaRepository;
         _insumoRepository = insumoRepository;
         _costeoRepository = costeoRepository;
         _env = env;
+        _logger = logger;
     }
 
     public async Task<List<RecetaDto>?> ListarAsync(int cuentaId, string? busqueda)
@@ -92,9 +96,16 @@ public sealed class RecetaService : IRecetaService
             var creada = await _recetaRepository.ObtenerPorIdAsync(negocioId.Value, receta.Id);
             return ResultadoRecetaDto.Ok(await MapearAsync(creada!), "La receta fue creada correctamente.");
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_Receta_NegocioNombre"))
         {
             return ResultadoRecetaDto.Error(NombreDuplicado);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudo crear la receta {Nombre} para el negocio {NegocioId}.",
+                nombre, negocioId.Value);
+            return ResultadoRecetaDto.Error("No se pudo guardar la receta. Intenta de nuevo.");
         }
     }
 
@@ -117,7 +128,17 @@ public sealed class RecetaService : IRecetaService
         _recetaRepository.ReemplazarInsumos(receta, ingredientes!);
 
         try { await _recetaRepository.GuardarCambiosAsync(); }
-        catch (DbUpdateException) { return ResultadoRecetaDto.Error(NombreDuplicado); }
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_Receta_NegocioNombre"))
+        {
+            return ResultadoRecetaDto.Error(NombreDuplicado);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudo actualizar la receta {RecetaId} del negocio {NegocioId}.",
+                recetaId, negocioId.Value);
+            return ResultadoRecetaDto.Error("No se pudo guardar la receta. Intenta de nuevo.");
+        }
 
         var actualizada = await _recetaRepository.ObtenerPorIdAsync(negocioId.Value, receta.Id);
         return ResultadoRecetaDto.Ok(await MapearAsync(actualizada!), "La receta fue actualizada correctamente.");

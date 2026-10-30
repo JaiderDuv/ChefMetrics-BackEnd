@@ -1,5 +1,5 @@
 /*
-  Verificación local de las defensas de integridad y tenencia.
+  Verificación local de las defensas de integridad de la base.
 
   Uso:
     sqlcmd -S "SATUS22\MSSQL1SVR" -d ChefMetrics -E -C -b -i scripts\verificar-integridad.sql
@@ -21,144 +21,14 @@ SET NUMERIC_ROUNDABORT OFF;
 DECLARE @errores int = 0;
 DECLARE @mensaje nvarchar(2048);
 
-/* 1. Trigger: producto y receta de negocios distintos. */
-BEGIN TRY
-    BEGIN TRANSACTION;
+/*
+  Las pruebas de los triggers de tenencia se retiraron junto con los triggers
+  (migración QuitarTriggersIncompatibles). EF Core no puede insertar con
+  OUTPUT INSERTED en tablas con triggers, así que esa validación se hace en
+  los servicios.
+*/
 
-    INSERT INTO dbo.ProductoMenuReceta (ProductoMenuId, RecetaId, Cantidad)
-    SELECT TOP (1) p.Id, r.Id, 1
-    FROM dbo.ProductoMenu p
-    CROSS JOIN dbo.Receta r
-    WHERE p.NegocioId = 3 AND r.NegocioId = 5
-      AND NOT EXISTS (
-          SELECT 1 FROM dbo.ProductoMenuReceta pr
-          WHERE pr.ProductoMenuId = p.Id AND pr.RecetaId = r.Id);
-
-    IF @@ROWCOUNT = 0
-        THROW 51001, N'No hay datos para probar el trigger de ProductoMenuReceta.', 1;
-
-    ROLLBACK TRANSACTION;
-    SET @errores += 1;
-    PRINT N'FALLO: se permitió asociar una receta de otro negocio.';
-END TRY
-BEGIN CATCH
-    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    IF ERROR_NUMBER() = 51001
-    BEGIN
-        SET @errores += 1;
-        PRINT N'FALLO: ' + ERROR_MESSAGE();
-    END
-    ELSE
-    BEGIN
-        SET @mensaje = ERROR_MESSAGE();
-        PRINT N'OK: trigger ProductoMenuReceta -> ' + @mensaje;
-    END
-END CATCH;
-
-/* 2. Trigger: producto e insumo de negocios distintos. */
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    INSERT INTO dbo.ProductoMenuInsumo (ProductoMenuId, InsumoId, Cantidad, UnidadMedida)
-    SELECT TOP (1) p.Id, i.Id, 1, N'unidad'
-    FROM dbo.ProductoMenu p
-    CROSS JOIN dbo.Insumo i
-    WHERE p.NegocioId = 3 AND i.NegocioId = 5
-      AND NOT EXISTS (
-          SELECT 1 FROM dbo.ProductoMenuInsumo pi
-          WHERE pi.ProductoMenuId = p.Id AND pi.InsumoId = i.Id);
-
-    IF @@ROWCOUNT = 0
-        THROW 51002, N'No hay datos para probar el trigger de ProductoMenuInsumo.', 1;
-
-    ROLLBACK TRANSACTION;
-    SET @errores += 1;
-    PRINT N'FALLO: se permitió asociar un insumo de otro negocio al menú.';
-END TRY
-BEGIN CATCH
-    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    IF ERROR_NUMBER() = 51002
-    BEGIN
-        SET @errores += 1;
-        PRINT N'FALLO: ' + ERROR_MESSAGE();
-    END
-    ELSE
-    BEGIN
-        SET @mensaje = ERROR_MESSAGE();
-        PRINT N'OK: trigger ProductoMenuInsumo -> ' + @mensaje;
-    END
-END CATCH;
-
-/* 3. Trigger: receta e insumo de negocios distintos. */
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    INSERT INTO dbo.RecetaInsumo (RecetaId, InsumoId, Cantidad, UnidadMedida, PorcentajeMerma)
-    SELECT TOP (1) r.Id, i.Id, 1, 'g', 0
-    FROM dbo.Receta r
-    CROSS JOIN dbo.Insumo i
-    WHERE r.NegocioId = 3 AND i.NegocioId = 5
-      AND NOT EXISTS (
-          SELECT 1 FROM dbo.RecetaInsumo ri
-          WHERE ri.RecetaId = r.Id AND ri.InsumoId = i.Id);
-
-    IF @@ROWCOUNT = 0
-        THROW 51003, N'No hay datos para probar el trigger de RecetaInsumo.', 1;
-
-    ROLLBACK TRANSACTION;
-    SET @errores += 1;
-    PRINT N'FALLO: se permitió asociar un insumo de otro negocio a una receta.';
-END TRY
-BEGIN CATCH
-    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    IF ERROR_NUMBER() = 51003
-    BEGIN
-        SET @errores += 1;
-        PRINT N'FALLO: ' + ERROR_MESSAGE();
-    END
-    ELSE
-    BEGIN
-        SET @mensaje = ERROR_MESSAGE();
-        PRINT N'OK: trigger RecetaInsumo -> ' + @mensaje;
-    END
-END CATCH;
-
-/* 4. Trigger: insumo y proveedor de negocios distintos. */
-BEGIN TRY
-    BEGIN TRANSACTION;
-
-    INSERT INTO dbo.InsumoProveedor
-        (InsumoId, ProveedorId, Costo, EsPrincipal, FechaActualizacion, Cantidad, UnidadMedida)
-    SELECT TOP (1) i.Id, p.Id, 1, 0, SYSDATETIME(), 1, N'unidad'
-    FROM dbo.Insumo i
-    CROSS JOIN dbo.Proveedor p
-    WHERE i.NegocioId = 3 AND p.NegocioId = 5
-      AND NOT EXISTS (
-          SELECT 1 FROM dbo.InsumoProveedor ip
-          WHERE ip.InsumoId = i.Id AND ip.ProveedorId = p.Id);
-
-    IF @@ROWCOUNT = 0
-        THROW 51004, N'No hay datos para probar el trigger de InsumoProveedor.', 1;
-
-    ROLLBACK TRANSACTION;
-    SET @errores += 1;
-    PRINT N'FALLO: se permitió asociar un proveedor de otro negocio.';
-END TRY
-BEGIN CATCH
-    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    IF ERROR_NUMBER() = 51004
-    BEGIN
-        SET @errores += 1;
-        PRINT N'FALLO: ' + ERROR_MESSAGE();
-    END
-    ELSE
-    BEGIN
-        SET @mensaje = ERROR_MESSAGE();
-        PRINT N'OK: trigger InsumoProveedor -> ' + @mensaje;
-    END
-END CATCH;
-
-/* 5. Check: nombre de producto demasiado corto. */
+/* 1. Check: nombre de producto demasiado corto. */
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -175,7 +45,7 @@ BEGIN CATCH
     PRINT N'OK: check CK_ProductoMenu_Nombre -> ' + @mensaje;
 END CATCH;
 
-/* 6. Check: precio cero. */
+/* 2. Check: precio cero. */
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -192,7 +62,7 @@ BEGIN CATCH
     PRINT N'OK: check CK_ProductoMenu_Precio -> ' + @mensaje;
 END CATCH;
 
-/* 7. FK: historial apuntando a una asociación inexistente. */
+/* 3. FK: historial apuntando a una asociación inexistente. */
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -210,7 +80,7 @@ BEGIN CATCH
     PRINT N'OK: FK HistorialPrecioInsumo -> ' + @mensaje;
 END CATCH;
 
-/* 8. FK con ON DELETE SET NULL: al borrar la asociación se conserva el historial. */
+/* 4. FK con ON DELETE SET NULL: al borrar la asociación se conserva el historial. */
 BEGIN TRY
     BEGIN TRANSACTION;
 
@@ -223,7 +93,7 @@ BEGIN TRY
     );
 
     IF @asociacionConHistorial IS NULL
-        THROW 51008, N'No hay historial asociado para probar ON DELETE SET NULL.', 1;
+        THROW 51003, N'No hay historial asociado para probar ON DELETE SET NULL.', 1;
 
     DELETE FROM dbo.InsumoProveedor WHERE Id = @asociacionConHistorial;
 
@@ -241,7 +111,7 @@ BEGIN TRY
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
-    IF ERROR_NUMBER() = 51008
+    IF ERROR_NUMBER() = 51003
     BEGIN
         SET @errores += 1;
         PRINT N'FALLO: ' + ERROR_MESSAGE();

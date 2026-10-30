@@ -396,6 +396,22 @@ public sealed class InsumoRepository : IInsumoRepository
         return insumo;
     }
 
+    public async Task<T> EjecutarEnTransaccionAsync<T>(Func<Task<T>> operacion)
+    {
+        await using var transaccion = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var resultado = await operacion();
+            await transaccion.CommitAsync();
+            return resultado;
+        }
+        catch
+        {
+            await transaccion.RollbackAsync();
+            throw;
+        }
+    }
+
     public async Task<List<Insumo>> ListarParaHistorialAsync(int negocioId, string? nombre, string? proveedor)
     {
         var query = _context.Insumos
