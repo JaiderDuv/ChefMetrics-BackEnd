@@ -111,12 +111,18 @@ public sealed class ProveedorService : IProveedorService
 
     public async Task<ResultadoProveedorDto> AsociarAsync(int cuentaId, int insumoId, AsociarProveedorDto dto)
     {
-        var validacion = await ValidarInsumoDelNegocioAsync(cuentaId, insumoId);
-        if (validacion != null) return validacion;
+        var negocioId = await _repository.ObtenerNegocioIdPorCuentaAsync(cuentaId);
+        if (negocioId is null)
+            return ResultadoProveedorDto.NoHallado("Aún no tienes un negocio registrado.");
 
-        var proveedor = await _repository.ObtenerPorIdAsync(dto.ProveedorId);
+        if (!await _repository.ExisteInsumoEnNegocioAsync(negocioId.Value, insumoId))
+            return ResultadoProveedorDto.NoHallado("No se encontró el insumo solicitado.");
+
+        // El proveedor debe pertenecer al mismo negocio que el insumo: no se
+        // acepta un ID de proveedor de otro emprendimiento.
+        var proveedor = await _repository.ObtenerPorIdDelNegocioAsync(negocioId.Value, dto.ProveedorId);
         if (proveedor is null)
-            return ResultadoProveedorDto.NoHallado("El proveedor no existe.");
+            return ResultadoProveedorDto.NoHallado("El proveedor no existe en tu negocio.");
         if (await _repository.ExisteAsociacionAsync(insumoId, dto.ProveedorId))
             return ResultadoProveedorDto.Error("Este proveedor ya está asociado a este insumo.");
         if (dto.Costo > 999999.99m)
