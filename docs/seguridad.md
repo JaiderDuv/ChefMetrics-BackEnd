@@ -55,25 +55,33 @@ Migrations\20261029031241_EndurecerIntegridadTenant.cs
 - Se agregaron índices por negocio/fecha y por insumo original para las consultas
   de historial, y un índice de listado de menú por `(NegocioId, Activo, Nombre)`.
 
-### 2.3 Triggers de tenencia
+### 2.3 Validación de tenencia en la capa de servicios
 
-| Trigger | Regla |
+La migración `20261029031241_EndurecerIntegridadTenant` creó inicialmente cuatro
+triggers para validar que las tablas puente no mezclaran registros de negocios
+distintos. Esos triggers se eliminaron en
+`20261030121311_QuitarTriggersIncompatibles`: SQL Server no permite
+`OUTPUT INSERTED` cuando la tabla tiene triggers habilitados, y EF Core usa esa
+cláusula en todos los `INSERT`. El resultado eran errores de guardado que la API
+reportaba como nombres duplicados aunque el registro fuera nuevo.
+
+La regla de tenencia se mantiene en la capa de servicios, que es la única que
+recibe datos del cliente:
+
+| Servicio | Regla |
 |---|---|
-| `TR_ProductoMenuReceta_ValidarNegocio` | El producto y la receta deben tener el mismo `NegocioId`. |
-| `TR_ProductoMenuInsumo_ValidarNegocio` | El producto y el insumo deben tener el mismo `NegocioId`. |
-| `TR_RecetaInsumo_ValidarNegocio` | La receta y el insumo deben tener el mismo `NegocioId`. |
-| `TR_InsumoProveedor_ValidarNegocio` | El insumo y el proveedor deben tener el mismo `NegocioId`. |
+| `ProductoMenuService` | El producto y cada receta o insumo directo deben pertenecer al mismo `NegocioId`. |
+| `RecetaService` | La receta y cada insumo deben pertenecer al mismo `NegocioId`. |
+| `InsumoService` / `ProveedorService` | El insumo y el proveedor deben pertenecer al mismo `NegocioId`. |
 
-Los triggers cubren `INSERT` y `UPDATE` y funcionan con operaciones de varias filas
-porque revisan la tabla `inserted`.
+### 2.4 Lo que no cubre la base
 
-### 2.4 Lo que no cubre un trigger
-
-Un producto se crea primero y sus recetas se agregan después; por eso un trigger
-no puede exigir “al menos una receta” en el `INSERT` de `ProductoMenu` sin romper
-el flujo normal. Esa regla se valida en `ProductoMenuService` y en el DTO
-(`[MinLength(1)]`). La base sí impide las referencias cruzadas entre negocios,
-que es el riesgo de seguridad más importante.
+Un producto se crea primero y sus recetas se agregan después; por eso la base no
+puede exigir “al menos una receta” en el `INSERT` de `ProductoMenu`. Esa regla se
+valida en `ProductoMenuService` y en el DTO (`[MinLength(1)]`). Por la misma razón
+(evitar triggers que rompan EF Core), la base tampoco impide por sí sola las
+referencias cruzadas entre negocios en las tablas puente: esa validación queda en
+los servicios.
 
 ### 2.5 Prueba local
 
@@ -82,8 +90,8 @@ sqlcmd -S "SATUS22\MSSQL1SVR" -d ChefMetrics -E -C -b -f 65001 `
   -i scripts\verificar-integridad.sql
 ```
 
-El script prueba los cuatro triggers, los checks, la FK y `ON DELETE SET NULL`
-dentro de transacciones con `ROLLBACK`. La salida esperada termina con:
+El script prueba los checks, la FK y `ON DELETE SET NULL` dentro de transacciones
+con `ROLLBACK`. La salida esperada termina con:
 
 ```text
 OK: todas las verificaciones de integridad pasaron.

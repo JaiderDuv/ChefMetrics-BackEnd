@@ -18,15 +18,18 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
     private readonly IUserRepository _userRepository;
     private readonly IPerfilEmprendimientoRepository _perfilRepository;
     private readonly IEmailService _emailService;
+    private readonly ILogger<PerfilEmpreService> _logger;
 
     public PerfilEmpreService(
         IUserRepository userRepository,
         IPerfilEmprendimientoRepository perfilRepository,
-        IEmailService emailService)
+        IEmailService emailService,
+        ILogger<PerfilEmpreService> logger)
     {
         _userRepository = userRepository;
         _perfilRepository = perfilRepository;
         _emailService = emailService;
+        _logger = logger;
     }
 
     public async Task<PermisoEdicionPerfilDto?> ConfirmarIdentidadAsync(
@@ -370,9 +373,15 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
         {
             await _perfilRepository.GuardarCambiosUsuarioAsync();
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_UsuarioEmprendedor_NumeroDocumento"))
         {
             return Error("El documento de identidad ya está registrado por otro usuario.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudo actualizar el perfil del emprendimiento para la cuenta {CuentaId}.", cuentaId);
+            return Error("No se pudo actualizar el perfil. Intenta de nuevo.");
         }
 
         return new ActualizarPerfilResultadoDto
