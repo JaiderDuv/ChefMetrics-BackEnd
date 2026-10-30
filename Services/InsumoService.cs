@@ -16,10 +16,12 @@ public sealed class InsumoService : IInsumoService
     private const int TamanoPaginaMaximo = 100;
 
     private readonly IInsumoRepository _insumoRepository;
+    private readonly ILogger<InsumoService> _logger;
 
-    public InsumoService(IInsumoRepository insumoRepository)
+    public InsumoService(IInsumoRepository insumoRepository, ILogger<InsumoService> logger)
     {
         _insumoRepository = insumoRepository;
+        _logger = logger;
     }
 
     public async Task<ResultadoInsumoDto> CrearAsync(int cuentaId, CrearInsumoDto dto)
@@ -73,60 +75,72 @@ public sealed class InsumoService : IInsumoService
 
         try
         {
-            var insumo = await _insumoRepository.CrearAsync(new Insumo
+            var insumo = await _insumoRepository.EjecutarEnTransaccionAsync(async () =>
             {
-                NegocioId = negocioId.Value,
-                Nombre = nombre,
-                UnidadMedida = unidadNormalizada!,
-                Categoria = categoria,
-                CostoUnitario = dto.CostoUnitario,
-                Proveedor = proveedorNormalizado,
-                Cantidad = dto.Cantidad,
-                DensidadGPorMl = densidad,
-                Activo = dto.Activo ?? true,
-                FechaActualizacion = DateTime.UtcNow
-            });
-
-            if (proveedorNormalizado is not null)
-            {
-                var cantidadInicial = dto.Cantidad is > 0 ? dto.Cantidad.Value : 1m;
-
-                var proveedor = await _insumoRepository.ObtenerOCrearProveedorAsync(
-                    negocioId.Value, proveedorNormalizado);
-                var asociacion = await _insumoRepository.CrearInsumoProveedorAsync(new InsumoProveedor
+                var creado = await _insumoRepository.CrearAsync(new Insumo
                 {
-                    InsumoId = insumo.Id,
-                    ProveedorId = proveedor.Id,
-                    Costo = dto.CostoUnitario,
-                    Cantidad = cantidadInicial,
+                    NegocioId = negocioId.Value,
+                    Nombre = nombre,
                     UnidadMedida = unidadNormalizada!,
-                    EsPrincipal = true,
+                    Categoria = categoria,
+                    CostoUnitario = dto.CostoUnitario,
+                    Proveedor = proveedorNormalizado,
+                    Cantidad = dto.Cantidad,
+                    DensidadGPorMl = densidad,
+                    Activo = dto.Activo ?? true,
                     FechaActualizacion = DateTime.UtcNow
                 });
-                await _insumoRepository.RegistrarCambioPrecioAsync(new HistorialPrecioInsumo
-                {
-                    InsumoProveedorId = asociacion.Id,
-                    NegocioId = negocioId.Value,
-                    InsumoIdOriginal = insumo.Id,
-                    NombreInsumo = nombre,
-                    ProveedorNombre = proveedorNormalizado,
-                    CostoAnterior = dto.CostoUnitario,
-                    CostoNuevo = dto.CostoUnitario,
-                    Cantidad = cantidadInicial,
-                    UnidadMedida = unidadNormalizada,
-                    FechaCambio = DateTime.UtcNow
-                });
 
-                // Si este nombre corresponde a un insumo eliminado, se revive su historial.
-                await _insumoRepository.RevincularHistorialEliminadoAsync(
-                    negocioId.Value, nombre, insumo.Id, asociacion.Id);
-            }
+                if (proveedorNormalizado is not null)
+                {
+                    var cantidadInicial = dto.Cantidad is > 0 ? dto.Cantidad.Value : 1m;
+
+                    var proveedor = await _insumoRepository.ObtenerOCrearProveedorAsync(
+                        negocioId.Value, proveedorNormalizado);
+                    var asociacion = await _insumoRepository.CrearInsumoProveedorAsync(new InsumoProveedor
+                    {
+                        InsumoId = creado.Id,
+                        ProveedorId = proveedor.Id,
+                        Costo = dto.CostoUnitario,
+                        Cantidad = cantidadInicial,
+                        UnidadMedida = unidadNormalizada!,
+                        EsPrincipal = true,
+                        FechaActualizacion = DateTime.UtcNow
+                    });
+                    await _insumoRepository.RegistrarCambioPrecioAsync(new HistorialPrecioInsumo
+                    {
+                        InsumoProveedorId = asociacion.Id,
+                        NegocioId = negocioId.Value,
+                        InsumoIdOriginal = creado.Id,
+                        NombreInsumo = nombre,
+                        ProveedorNombre = proveedorNormalizado,
+                        CostoAnterior = dto.CostoUnitario,
+                        CostoNuevo = dto.CostoUnitario,
+                        Cantidad = cantidadInicial,
+                        UnidadMedida = unidadNormalizada,
+                        FechaCambio = DateTime.UtcNow
+                    });
+
+                    // Si este nombre corresponde a un insumo eliminado, se revive su historial.
+                    await _insumoRepository.RevincularHistorialEliminadoAsync(
+                        negocioId.Value, nombre, creado.Id, asociacion.Id);
+                }
+
+                return creado;
+            });
 
             return ResultadoInsumoDto.Ok(Mapear(insumo, 0, proveedorNormalizado), "El insumo fue creado correctamente.");
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_Insumo_NegocioNombre"))
         {
             return ResultadoInsumoDto.Error("Ya existe un insumo con ese nombre en tu negocio.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudo crear el insumo {Nombre} para el negocio {NegocioId}.",
+                nombre, negocioId.Value);
+            return ResultadoInsumoDto.Error("No se pudo guardar el insumo. Intenta de nuevo.");
         }
     }
 
@@ -450,9 +464,16 @@ public sealed class InsumoService : IInsumoService
         {
             await _insumoRepository.ActualizarAsync(insumo);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_Insumo_NegocioNombre"))
         {
             return ResultadoInsumoDto.Error("Ya existe otro insumo con ese nombre en tu negocio.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudo actualizar el insumo {InsumoId} del negocio {NegocioId}.",
+                insumo.Id, negocioId.Value);
+            return ResultadoInsumoDto.Error("No se pudo guardar el insumo. Intenta de nuevo.");
         }
 
         var numeroRecetas = await _insumoRepository.ContarRecetasAsociadasAsync(insumo.Id);
