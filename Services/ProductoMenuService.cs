@@ -1,6 +1,7 @@
 using ChefMetrics.Contracts;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
+using ChefMetrics_BackEnd.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChefMetrics_BackEnd.Services;
@@ -31,17 +32,20 @@ public sealed class ProductoMenuService : IProductoMenuService
     private readonly IInsumoRepository _insumos;
     private readonly ICostoProductoService _costos;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<ProductoMenuService> _logger;
 
     public ProductoMenuService(
         IProductoMenuRepository repo,
         IInsumoRepository insumos,
         ICostoProductoService costos,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        ILogger<ProductoMenuService> logger)
     {
         _repo = repo;
         _insumos = insumos;
         _costos = costos;
         _env = env;
+        _logger = logger;
     }
 
     public async Task<List<ProductoMenuDto>?> ListarAsync(int cuentaId, string? busqueda, bool incluirInactivos)
@@ -162,9 +166,16 @@ public sealed class ProductoMenuService : IProductoMenuService
             });
             return await ObtenerAsync(cuentaId, creado.Id);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_ProductoMenu_NegocioNombre"))
         {
             return ResultadoProductoMenuDto.Error(Duplicado);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudo crear el producto {Nombre} para el negocio {NegocioId}.",
+                nombre, negocioId.Value);
+            return ResultadoProductoMenuDto.Error("No se pudo guardar el producto. Intenta de nuevo.");
         }
     }
 
@@ -212,7 +223,17 @@ public sealed class ProductoMenuService : IProductoMenuService
         }));
 
         try { await _repo.GuardarCambiosAsync(); }
-        catch (DbUpdateException) { return ResultadoProductoMenuDto.Error(Duplicado); }
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_ProductoMenu_NegocioNombre"))
+        {
+            return ResultadoProductoMenuDto.Error(Duplicado);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudo actualizar el producto {ProductoId} del negocio {NegocioId}.",
+                id, negocioId.Value);
+            return ResultadoProductoMenuDto.Error("No se pudo guardar el producto. Intenta de nuevo.");
+        }
 
         return await ObtenerAsync(cuentaId, id);
     }
@@ -289,7 +310,17 @@ public sealed class ProductoMenuService : IProductoMenuService
             return ResultadoProductoMenuDto.Error("Debes enviar al menos un campo para actualizar.");
 
         try { await _repo.GuardarCambiosAsync(); }
-        catch (DbUpdateException) { return ResultadoProductoMenuDto.Error(Duplicado); }
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_ProductoMenu_NegocioNombre"))
+        {
+            return ResultadoProductoMenuDto.Error(Duplicado);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudo actualizar parcialmente el producto {ProductoId} del negocio {NegocioId}.",
+                id, negocioId.Value);
+            return ResultadoProductoMenuDto.Error("No se pudo guardar el producto. Intenta de nuevo.");
+        }
 
         return await ObtenerAsync(cuentaId, id);
     }

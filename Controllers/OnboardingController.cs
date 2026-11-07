@@ -14,10 +14,12 @@ namespace ChefMetrics_BackEnd.Controllers;
 public class OnboardingController : ControllerBase
 {
     private readonly ChefMetricsContext _context;
+    private readonly ILogger<OnboardingController> _logger;
 
-    public OnboardingController(ChefMetricsContext context)
+    public OnboardingController(ChefMetricsContext context, ILogger<OnboardingController> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public class OnboardingFotoPerfilDto
@@ -240,9 +242,15 @@ public class OnboardingController : ControllerBase
         {
             await _context.SaveChangesAsync();
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_UsuarioEmprendedor_NumeroDocumento"))
         {
             return BadRequest(new { mensaje = "El documento de identidad ya está registrado por otro usuario." });
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudieron guardar los datos personales de la cuenta {CuentaId}.", cuentaId);
+            return BadRequest(new { mensaje = "No se pudieron guardar los datos personales. Intenta de nuevo." });
         }
 
         return Ok(new { exito = true, mensaje = "Datos personales guardados." });
@@ -340,9 +348,15 @@ public class OnboardingController : ControllerBase
         {
             await _context.SaveChangesAsync();
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.EsViolacionDeIndiceUnico("UQ_UsuarioEmprendedor_NIT"))
         {
-            return BadRequest(new { mensaje = "No se pudo guardar la información. Verifica que el NIT no esté registrado por otro negocio." });
+            return BadRequest(new { mensaje = "El NIT ya está registrado por otro negocio." });
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex,
+                "No se pudo guardar la información del negocio de la cuenta {CuentaId}.", cuentaId);
+            return BadRequest(new { mensaje = "No se pudo guardar la información del negocio. Intenta de nuevo." });
         }
 
         return Ok(new { exito = true, mensaje = "Información del negocio guardada." });

@@ -8,7 +8,7 @@ Las pruebas automatizadas del backend viven en:
 C:\PGC\ChefMetrics-BackEnd\ChefMetrics-BackEnd.Tests\
 ```
 
-Son proyectos xUnit con Moq. Al cierre de este cambio hay **72 pruebas** y **0 fallos**:
+Son proyectos xUnit con Moq. Al cierre de este cambio hay **77 pruebas** y **0 fallos**:
 
 | Archivo | Qué cubre |
 |---|---|
@@ -45,7 +45,7 @@ dotnet test ChefMetrics-BackEnd.sln `
 Resultado esperado al cierre:
 
 ```text
-Correctas! - Con error: 0, Superado: 72, Omitido: 0, Total: 72
+Correctas! - Con error: 0, Superado: 77, Omitido: 0, Total: 77
 ```
 
 Archivos que quedan disponibles:
@@ -78,14 +78,13 @@ sqlcmd -S "SATUS22\MSSQL1SVR" -d ChefMetrics -E -C -b -f 65001 `
 
 El script abre una transacción por prueba y hace `ROLLBACK`; no deja datos. Comprueba:
 
-1. Trigger que impide mezclar productos y recetas de negocios distintos.
-2. Trigger que impide mezclar productos e insumos de negocios distintos.
-3. Trigger que impide mezclar recetas e insumos de negocios distintos.
-4. Trigger que impide mezclar insumos y proveedores de negocios distintos.
-5. Check de nombre de producto (3 a 75 caracteres, sin espacios externos).
-6. Check de precio de venta mayor que cero y máximo `999.999,99`.
-7. FK de `HistorialPrecioInsumo` contra una asociación inexistente.
-8. `ON DELETE SET NULL`: el historial se conserva al desasociar un proveedor.
+1. Check de nombre de producto (3 a 75 caracteres, sin espacios externos).
+2. Check de precio de venta mayor que cero y máximo `999.999,99`.
+3. FK de `HistorialPrecioInsumo` contra una asociación inexistente.
+4. `ON DELETE SET NULL`: el historial se conserva al desasociar un proveedor.
+
+Los triggers de tenencia se eliminaron porque bloqueaban los `INSERT` de EF Core
+(`OUTPUT INSERTED`); esa validación se hace en los servicios.
 
 Si todo pasa, la última línea es:
 
@@ -124,7 +123,7 @@ Para verlo en GitHub:
 Sugerencia de guion breve:
 
 1. **Cobertura funcional:** mostrar la tabla anterior y la salida
-   `72 superadas / 0 fallidas`.
+   `77 superadas / 0 fallidas`.
 2. **Pruebas nuevas de seguridad:** abrir
    `ProveedorServiceSeguridadTests.cs` y explicar que el proveedor se busca por
    `NegocioId`, no solo por `Id`.
@@ -132,7 +131,8 @@ Sugerencia de guion breve:
    introduce `FromSqlRaw`, `new SqlCommand` o un `SELECT` literal en controllers,
    services o repositories, la prueba falla.
 4. **Defensa en base de datos:** ejecutar `verificar-integridad.sql` y mostrar los
-   ocho `OK`; recalcar que los inserts inválidos por SQL directo son rechazados.
+   cuatro `OK`; recalcar que los checks y las FK rechazan inserts inválidos y que
+   la tenencia entre negocios se valida en los servicios.
 5. **CI:** mostrar el workflow y el artefacto con TRX + cobertura.
 
 ## 6. Cómo agregar una prueba nueva

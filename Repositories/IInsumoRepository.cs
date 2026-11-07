@@ -24,6 +24,12 @@ public interface IInsumoRepository
     Task<Dictionary<int, int>> ContarRecetasPorInsumosAsync(IEnumerable<int> insumoIds);
 
     Task<Insumo> CrearAsync(Insumo insumo);
+
+    // Ejecuta varias operaciones como una sola unidad: si alguna falla se
+    // deshacen también las que ya se habían guardado (por ejemplo el insumo
+    // cuando falla la asociación con su proveedor).
+    Task<T> EjecutarEnTransaccionAsync<T>(Func<Task<T>> operacion);
+
     Task<List<Insumo>> ListarParaHistorialAsync(int negocioId, string? nombre, string? proveedor);
 
     Task<Proveedor> ObtenerOCrearProveedorAsync(int negocioId, string nombre);

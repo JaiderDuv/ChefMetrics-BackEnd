@@ -156,56 +156,68 @@ namespace ChefMetrics_BackEnd.Services
 
             // Todo el registro va en una transacción: si algo falla no quedan
             // Cuenta/Usuario/Negocio huérfanos. El correo se envía tras el commit.
+            // Todo el registro va en una transacción: si algo falla no quedan cuentas huérfanas.
             await using var transaccion = await _context.Database.BeginTransactionAsync();
             try
             {
-            // 1. Crear la Cuenta (Autenticación)
-            var cuenta = new Cuenta
-            {
-                Correo = correoNormalizado,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(contrasena),
-                TipoCuenta = "Emprendedor",
-                EmailVerificado = verificarAutomaticamente,
-                Activo = true,
-                FechaCreacion = DateTime.UtcNow
-            };
+                // 1. Crear la Cuenta (Autenticación)
+                var cuenta = new Cuenta
+                {
+                    Correo = correoNormalizado,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(contrasena),
+                    TipoCuenta = "Emprendedor",
+                    EmailVerificado = verificarAutomaticamente,
+                    Activo = true,
+                    FechaCreacion = DateTime.UtcNow
+                };
 
-            _context.Cuenta.Add(cuenta); // En el DbContext la propiedad se llama "Cuenta"
-            await _context.SaveChangesAsync();
-
-            // 2. Crear el UsuarioEmprendedor (Perfil y Datos de Negocio)
-            var emprendedor = new UsuarioEmprendedor
-            {
-                CuentaId = cuenta.Id,
-                Nombres = nombres.Trim(),
-                Apellidos = apellidos.Trim(),
-                TipoFormalizacion = tipoFormalizacion,
-                Nit = nit,
-                RazonSocial = razonSocial,
-                TipoDocumento = tipoDocFinal,
-                NumeroDocumento = numeroDocFinal,
-                NombreEmprendimiento = string.IsNullOrWhiteSpace(nombreEmprendimiento) ? null : nombreEmprendimiento,
-                OnboardingCompletado = false,
-                FechaCreacion = DateTime.UtcNow
-            };
-
-                _context.UsuarioEmprendedors.Add(emprendedor); // En el DbContext la propiedad se llama "UsuarioEmprendedors"
+                _context.Cuenta.Add(cuenta);
                 await _context.SaveChangesAsync();
 
-                // 2b. Crear el Negocio con los datos del negocio capturados en el registro
-                // (TelefonoContacto, CorreoContacto y CategoriaNegocio via TipoEmprendimiento)
-                var tipoEmprendimiento = await _usuarioRepository
-                    .ObtenerOCrearTipoEmprendimientoAsync(categoriaNegocio);
+                // 2. Crear el UsuarioEmprendedor
+                var emprendedor = new UsuarioEmprendedor
+                {
+                    CuentaId = cuenta.Id,
+                    Nombres = nombres.Trim(),
+                    Apellidos = apellidos.Trim(),
+                    TipoFormalizacion = tipoFormalizacion,
+                    Nit = nit,
+                    RazonSocial = razonSocial,
+                    TipoDocumento = tipoDocFinal,
+                    NumeroDocumento = numeroDocFinal,
+                    NombreEmprendimiento = string.IsNullOrWhiteSpace(nombreEmprendimiento) ? null : nombreEmprendimiento,
+                    OnboardingCompletado = false,
+                    FechaCreacion = DateTime.UtcNow
+                };
 
-                await _usuarioRepository.RegistrarNegocioAsync(new Negocio
+                _context.UsuarioEmprendedors.Add(emprendedor);
+                await _context.SaveChangesAsync();
+
+                // 2b. Obtener o crear el TipoEmprendimiento de forma segura con el contexto actual
+                var tipoEmprendimiento = await _context.TipoEmprendimientos
+                    .FirstOrDefaultAsync(t => t.Nombre.ToLower() == categoriaNegocio.ToLower());
+
+                if (tipoEmprendimiento == null)
+                {
+                    tipoEmprendimiento = new TipoEmprendimiento { Nombre = categoriaNegocio };
+                    _context.TipoEmprendimientos.Add(tipoEmprendimiento);
+                    await _context.SaveChangesAsync();
+                }
+
+                // 2c. Crear el Negocio usando el contexto actual de la transacción
+                var negocio = new Negocio
                 {
                     UsuarioId = emprendedor.Id,
                     TipoEmprendimientoId = tipoEmprendimiento.Id,
                     TelefonoContacto = telefonoLimpio,
                     CorreoContacto = correoContactoLimpio,
                     FechaActualizacion = DateTime.UtcNow
-                });
+                };
 
+                _context.Negocios.Add(negocio);
+                await _context.SaveChangesAsync();
+
+                // Confirmar la transacción de forma segura
                 await transaccion.CommitAsync();
 
                 if (verificarAutomaticamente)
@@ -213,23 +225,21 @@ namespace ChefMetrics_BackEnd.Services
                     return;
                 }
 
-                // 3. Generar token, persistirlo y enviar correo de verificación
-                // (fuera de la transacción; sin esta fila el enlace nunca validaría)
-            string nombreCompleto = $"{emprendedor.Nombres} {emprendedor.Apellidos}";
+                // 3. Generar token y enviar correo de verificación
+                string nombreCompleto = $"{emprendedor.Nombres} {emprendedor.Apellidos}";
+                string token = TokenGenerator.GenerarTokenVerificacion();
 
-            string token = TokenGenerator.GenerarTokenVerificacion();
-            await _usuarioRepository.RegistrarPasswordResetTokenAsync(new PasswordResetToken
-            {
-                CuentaId = cuenta.Id,
-                TokenHash = TokenGenerator.CalcularHash(token),
-                Tipo = TokenPurposes.EmailVerification,
-                Usado = false,
-                FechaCreacion = DateTime.UtcNow,
-                FechaExpiracion = DateTime.UtcNow.AddMinutes(15)
-            });
+                await _usuarioRepository.RegistrarPasswordResetTokenAsync(new PasswordResetToken
+                {
+                    CuentaId = cuenta.Id,
+                    TokenHash = TokenGenerator.CalcularHash(token),
+                    Tipo = TokenPurposes.EmailVerification,
+                    Usado = false,
+                    FechaCreacion = DateTime.UtcNow,
+                    FechaExpiracion = DateTime.UtcNow.AddMinutes(15)
+                });
 
-            // Llama al servicio SMTP para enviar el correo
-            await _emailService.EnviarCorreoVerificacionAsync(cuenta.Correo, nombreCompleto, token);
+                await _emailService.EnviarCorreoVerificacionAsync(cuenta.Correo, nombreCompleto, token);
             }
             catch
             {

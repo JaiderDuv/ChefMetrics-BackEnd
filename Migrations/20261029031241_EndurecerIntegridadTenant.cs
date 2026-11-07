@@ -110,84 +110,11 @@ BEGIN
         CHECK ([Cantidad] > 0 AND [Cantidad] <= 100000);
 END;");
 
-            // Un trigger no puede impedir que un producto se inserte sin
-            // recetas (la regla de negocio se valida en el servicio), pero sí
-            // evita que una tabla puente apunte a otra cuenta.
-            migrationBuilder.Sql(@"
-CREATE OR ALTER TRIGGER [dbo].[TR_ProductoMenuReceta_ValidarNegocio]
-ON [dbo].[ProductoMenuReceta]
-AFTER INSERT, UPDATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    IF EXISTS (
-        SELECT 1
-        FROM inserted i
-        INNER JOIN [dbo].[ProductoMenu] p ON p.[Id] = i.[ProductoMenuId]
-        INNER JOIN [dbo].[Receta] r ON r.[Id] = i.[RecetaId]
-        WHERE p.[NegocioId] <> r.[NegocioId])
-    BEGIN
-        THROW 50001, N'La receta y el producto del menú deben pertenecer al mismo negocio.', 1;
-    END;
-END;");
-
-            migrationBuilder.Sql(@"
-CREATE OR ALTER TRIGGER [dbo].[TR_ProductoMenuInsumo_ValidarNegocio]
-ON [dbo].[ProductoMenuInsumo]
-AFTER INSERT, UPDATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    IF EXISTS (
-        SELECT 1
-        FROM inserted i
-        INNER JOIN [dbo].[ProductoMenu] p ON p.[Id] = i.[ProductoMenuId]
-        INNER JOIN [dbo].[Insumo] ins ON ins.[Id] = i.[InsumoId]
-        WHERE p.[NegocioId] <> ins.[NegocioId])
-    BEGIN
-        THROW 50002, N'El insumo y el producto del menú deben pertenecer al mismo negocio.', 1;
-    END;
-END;");
-
-            migrationBuilder.Sql(@"
-CREATE OR ALTER TRIGGER [dbo].[TR_RecetaInsumo_ValidarNegocio]
-ON [dbo].[RecetaInsumo]
-AFTER INSERT, UPDATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    IF EXISTS (
-        SELECT 1
-        FROM inserted i
-        INNER JOIN [dbo].[Receta] r ON r.[Id] = i.[RecetaId]
-        INNER JOIN [dbo].[Insumo] ins ON ins.[Id] = i.[InsumoId]
-        WHERE r.[NegocioId] <> ins.[NegocioId])
-    BEGIN
-        THROW 50003, N'El insumo y la receta deben pertenecer al mismo negocio.', 1;
-    END;
-END;");
-
-            migrationBuilder.Sql(@"
-CREATE OR ALTER TRIGGER [dbo].[TR_InsumoProveedor_ValidarNegocio]
-ON [dbo].[InsumoProveedor]
-AFTER INSERT, UPDATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    IF EXISTS (
-        SELECT 1
-        FROM inserted i
-        INNER JOIN [dbo].[Insumo] ins ON ins.[Id] = i.[InsumoId]
-        INNER JOIN [dbo].[Proveedor] p ON p.[Id] = i.[ProveedorId]
-        WHERE ins.[NegocioId] <> p.[NegocioId])
-    BEGIN
-        THROW 50004, N'El insumo y el proveedor deben pertenecer al mismo negocio.', 1;
-    END;
-END;");
+            // Los triggers de validación de negocio se retiraron porque SQL Server
+            // no permite OUTPUT INSERTED.* en tablas con triggers habilitados,
+            // lo que rompía las altas de EF Core. La validación de negocio se
+            // hace en los servicios; la migración QuitarTriggersIncompatibles
+            // elimina los triggers en las bases que ya los tenían.
         }
 
         /// <inheritdoc />
