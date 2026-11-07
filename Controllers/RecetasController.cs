@@ -8,7 +8,7 @@ namespace ChefMetrics_BackEnd.Controllers;
 
 [ApiController]
 [Route("api/recetas")]
-[Authorize]
+[Authorize(Policy = "RecetasLectura")]
 public sealed class RecetasController : ControllerBase
 {
     private readonly IRecetaService _recetaService;
@@ -29,6 +29,7 @@ public sealed class RecetasController : ControllerBase
 
     // POST /api/recetas/{id}/imagen  (multipart/form-data, campo "archivo")
     [HttpPost("{id:int}/imagen")]
+    [Authorize(Policy = "SoloEmprendedor")]
     [RequestSizeLimit(3_000_000)]
     public async Task<IActionResult> SubirImagen([FromRoute] int id, IFormFile archivo)
     {
@@ -42,6 +43,7 @@ public sealed class RecetasController : ControllerBase
 
     // DELETE /api/recetas/{id}/imagen
     [HttpDelete("{id:int}/imagen")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> QuitarImagen([FromRoute] int id)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -64,6 +66,7 @@ public sealed class RecetasController : ControllerBase
     // POST /api/recetas
     // POST /api/recetas
     [HttpPost]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> Crear([FromBody] GuardarRecetaDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -85,6 +88,7 @@ public sealed class RecetasController : ControllerBase
 
     // PUT /api/recetas/{id}
     [HttpPut("{id:int}")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> Actualizar([FromRoute] int id, [FromBody] GuardarRecetaDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -99,6 +103,7 @@ public sealed class RecetasController : ControllerBase
 
     // DELETE /api/recetas/{id} — definitiva; bloqueada si está en un producto del menú.
     [HttpDelete("{id:int}")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> Eliminar([FromRoute] int id)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();

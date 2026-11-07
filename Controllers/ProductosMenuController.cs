@@ -10,7 +10,7 @@ namespace ChefMetrics_BackEnd.Controllers;
 // CRUD /api/productos-menu + costeo y precio sugerido del menú.
 [ApiController]
 [Route("api/productos-menu")]
-[Authorize]
+[Authorize(Policy = "MenuLectura")]
 public sealed class ProductosMenuController : ControllerBase
 {
     private readonly IProductoMenuService _servicio;
@@ -51,6 +51,7 @@ public sealed class ProductosMenuController : ControllerBase
 
     // POST /api/productos-menu/{id}/imagen  (multipart/form-data, campo "archivo")
     [HttpPost("{id:int}/imagen")]
+    [Authorize(Policy = "SoloEmprendedor")]
     [RequestSizeLimit(3_000_000)]
     public async Task<IActionResult> SubirImagen([FromRoute] int id, IFormFile archivo)
     {
@@ -64,6 +65,7 @@ public sealed class ProductosMenuController : ControllerBase
 
     // DELETE /api/productos-menu/{id}/imagen
     [HttpDelete("{id:int}/imagen")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> QuitarImagen([FromRoute] int id)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -76,6 +78,7 @@ public sealed class ProductosMenuController : ControllerBase
 
     // POST /api/productos-menu -> 201 + Location al nuevo detalle.
     [HttpPost]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> Crear([FromBody] CrearProductoMenuDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -89,6 +92,7 @@ public sealed class ProductosMenuController : ControllerBase
 
     // PUT /api/productos-menu/{id} — reemplazo total estandarizado.
     [HttpPut("{id:int}")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> Actualizar([FromRoute] int id, [FromBody] ActualizarProductoMenuDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -102,6 +106,7 @@ public sealed class ProductosMenuController : ControllerBase
 
     // PATCH /api/productos-menu/{id} — solo campos editados (evita pérdida de datos).
     [HttpPatch("{id:int}")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> ActualizarParcial([FromRoute] int id, [FromBody] PatchProductoMenuDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -115,6 +120,7 @@ public sealed class ProductosMenuController : ControllerBase
 
     // DELETE /api/productos-menu/{id}
     [HttpDelete("{id:int}")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> Eliminar([FromRoute] int id)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -137,6 +143,7 @@ public sealed class ProductosMenuController : ControllerBase
 
     // POST /api/productos-menu/costo-preview — costo antes de guardar (soporta empaques).
     [HttpPost("costo-preview")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> CostoPreview([FromBody] PreviewCostoProductoDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -150,6 +157,7 @@ public sealed class ProductosMenuController : ControllerBase
     // POST /api/productos-menu/{id}/precio-sugerido { margenDeseado, costosFijosIds }
     // costosFijosIds vacío = precio con costo directo; null = incluye todos los fijos.
     [HttpPost("{id:int}/precio-sugerido")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> PrecioSugerido([FromRoute] int id, [FromBody] SugerirPrecioProductoDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();
@@ -161,6 +169,7 @@ public sealed class ProductosMenuController : ControllerBase
 
     // POST /api/productos-menu/precio-sugerido-preview — sugerencia antes de guardar.
     [HttpPost("precio-sugerido-preview")]
+    [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> PrecioPreview([FromBody] PreviewPrecioProductoDto dto)
     {
         if (!TryObtenerCuentaId(out var cuentaId)) return Unauthorized();

@@ -51,16 +51,12 @@ namespace ChefMetrics_BackEnd.Services
                 };
             }
 
-            // 1. Verificar si la cuenta existe y está activa
+            // 1. Verificar si la cuenta existe.
             var cuenta = await _userRepository.ObtenerCuentaPorEmailAsync(email);
-            if (cuenta == null || !cuenta.Activo)
+            if (cuenta == null)
             {
                 RegistrarIntentoFallido(email);
-                return new LoginResponseDto
-                {
-                    Exito = false,
-                    Mensaje = "Credenciales incorrectas. Verifique su correo y contraseña."
-                };
+                return CredencialesIncorrectas();
             }
 
             // 2. Comprobar si la contraseña es correcta
@@ -68,11 +64,20 @@ namespace ChefMetrics_BackEnd.Services
             if (!passwordValida)
             {
                 RegistrarIntentoFallido(email);
-                return new LoginResponseDto
-                {
-                    Exito = false,
-                    Mensaje = "Credenciales incorrectas. Verifique su correo y contraseña."
-                };
+                return CredencialesIncorrectas();
+            }
+
+            if (cuenta.Empleado is { Activo: false })
+                return new LoginResponseDto { Exito = false, Mensaje = "Tu cuenta fue inactivada de tus funciones. Contacta al administrador del negocio para recuperar el acceso." };
+
+            if (cuenta.Empleado is { } empleadoPendiente &&
+                !string.Equals(empleadoPendiente.EstadoInvitacion, "aceptada", StringComparison.OrdinalIgnoreCase))
+                return new LoginResponseDto { Exito = false, Mensaje = "Debes aceptar la invitación enviada a tu correo antes de iniciar sesión." };
+
+            if (!cuenta.Activo)
+            {
+                RegistrarIntentoFallido(email);
+                return CredencialesIncorrectas();
             }
 
             // 3. Comprobar verificación de email (únicamente tras validar la contraseña correcta)
@@ -100,18 +105,7 @@ namespace ChefMetrics_BackEnd.Services
                 Revocado = false
             });
 
-            return new LoginResponseDto
-            {
-                Exito = true,
-                Mensaje = "Inicio de sesión exitoso.",
-                Token = accessToken,
-                AccessToken = accessToken,
-                RefreshToken = refreshToken,
-                IdUsuario = usuario?.Id ?? cuenta.Id,
-                CorreoElectronico = cuenta.Correo,
-                NombreEmprendimiento = usuario?.NombreEmprendimiento,
-                OnboardingCompletado = usuario?.OnboardingCompletado ?? false
-            };
+                return CrearRespuestaLogin(cuenta, usuario, accessToken, refreshToken);
         }
 
         public async Task<LoginResponseDto?> RenovarSesionAsync(RefreshTokenDto dto)
@@ -128,7 +122,10 @@ namespace ChefMetrics_BackEnd.Services
                 refreshToken.Revocado ||
                 refreshToken.FechaExpiracion <= DateTime.UtcNow ||
                 !refreshToken.Cuenta.Activo ||
-                !refreshToken.Cuenta.EmailVerificado)
+                !refreshToken.Cuenta.EmailVerificado ||
+                (refreshToken.Cuenta.Empleado is { Activo: false }) ||
+                (refreshToken.Cuenta.Empleado is { } empleadoRefresh &&
+                 !string.Equals(empleadoRefresh.EstadoInvitacion, "aceptada", StringComparison.OrdinalIgnoreCase)))
             {
                 return null;
             }
@@ -153,17 +150,38 @@ namespace ChefMetrics_BackEnd.Services
                 return null;
             }
 
+            return CrearRespuestaLogin(cuenta, usuario, accessToken, nuevoRefreshToken, "Sesión renovada.");
+        }
+
+        private static LoginResponseDto CredencialesIncorrectas() => new()
+        {
+            Exito = false,
+            Mensaje = "Credenciales incorrectas. Verifique su correo y contraseña."
+        };
+
+        private static LoginResponseDto CrearRespuestaLogin(
+            Cuenta cuenta,
+            UsuarioEmprendedor? usuario,
+            string accessToken,
+            string refreshToken,
+            string mensaje = "Inicio de sesión exitoso.")
+        {
+            var empleado = cuenta.Empleado;
+            var esEmpleado = usuario is null && empleado is not null;
             return new LoginResponseDto
             {
                 Exito = true,
-                Mensaje = "Sesión renovada.",
+                Mensaje = mensaje,
                 Token = accessToken,
                 AccessToken = accessToken,
-                RefreshToken = nuevoRefreshToken,
+                RefreshToken = refreshToken,
                 IdUsuario = usuario?.Id ?? cuenta.Id,
                 CorreoElectronico = cuenta.Correo,
-                NombreEmprendimiento = usuario?.NombreEmprendimiento,
-                OnboardingCompletado = usuario?.OnboardingCompletado ?? false
+                NombreEmprendimiento = usuario?.NombreEmprendimiento ?? empleado?.Negocio?.Usuario?.NombreEmprendimiento,
+                OnboardingCompletado = esEmpleado || (usuario?.OnboardingCompletado ?? false),
+                Rol = esEmpleado ? empleado?.Rol?.Nombre ?? "Empleado" : "Emprendedor",
+                TipoCuenta = esEmpleado ? "empleado" : "emprendedor",
+                NegocioId = usuario?.Negocio?.Id ?? empleado?.NegocioId
             };
         }
 

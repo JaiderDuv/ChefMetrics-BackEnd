@@ -54,13 +54,27 @@ namespace ChefMetrics_BackEnd.Utilities
                 ? settings.AccessTokenMinutes
                 : 15;
 
-            var claims = new[]
+            var empleado = cuenta.Empleado;
+            var esEmpleado = usuario is null && empleado is not null;
+            var rol = esEmpleado ? empleado!.Rol?.Nombre ?? "Empleado" : "Emprendedor";
+            var tipoCuenta = esEmpleado ? "empleado" : "emprendedor";
+            var negocioId = usuario?.Negocio?.Id ?? empleado?.NegocioId;
+
+            var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, cuenta.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, cuenta.Correo),
-                new Claim(JwtRegisteredClaimNames.UniqueName, usuario?.NombreEmprendimiento ?? string.Empty),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
+                new Claim(JwtRegisteredClaimNames.UniqueName, usuario?.NombreEmprendimiento ?? empleado?.Negocio?.Usuario?.NombreEmprendimiento ?? string.Empty),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+                new Claim(ClaimTypes.Role, rol),
+                new Claim("tipoCuenta", tipoCuenta)
             };
+
+            if (negocioId.HasValue) claims.Add(new Claim("negocioId", negocioId.Value.ToString()));
+            if (esEmpleado)
+            {
+                claims.Add(new Claim("versionEmpleado", empleado!.SessionVersion.ToString()));
+            }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.Key));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

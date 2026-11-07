@@ -114,8 +114,9 @@ public sealed class CostoProductoService : ICostoProductoService
             : (await _productos.ObtenerInsumosActivosAsync(negocioId, idsDirectos.Distinct()))
                 .ToDictionary(i => i.Id);
 
-        var fijosConfigurados = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
-        var preparacionesBaseMes = await _costeo.ObtenerPreparacionesBaseMesAsync(negocioId);
+        var configuracion = await _costeo.ObtenerConfiguracionCostosAsync(negocioId);
+        var fijosConfigurados = configuracion.CostosFijos;
+        var preparacionesBaseMes = configuracion.PreparacionesBaseMes;
         var advertenciasFijos = new List<string>();
         var fijosAplicados = fijosConfigurados.Count == 0
             ? new List<CostoFijo>()
@@ -321,8 +322,9 @@ public sealed class CostoProductoService : ICostoProductoService
             : (await _productos.ObtenerInsumosActivosAsync(negocioId, idsDirectos))
                 .ToDictionary(i => i.Id);
 
-        var fijosConfigurados = await _costeo.ListarCostosFijosAsync(negocioId, soloActivos: true);
-        var preparacionesBaseMes = await _costeo.ObtenerPreparacionesBaseMesAsync(negocioId);
+        var configuracion = await _costeo.ObtenerConfiguracionCostosAsync(negocioId);
+        var fijosConfigurados = configuracion.CostosFijos;
+        var preparacionesBaseMes = configuracion.PreparacionesBaseMes;
         var advertenciasFijos = new List<string>();
         var fijosAplicados = fijosConfigurados.Count == 0
             ? new List<CostoFijo>()

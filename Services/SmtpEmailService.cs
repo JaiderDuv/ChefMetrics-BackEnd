@@ -53,6 +53,20 @@ namespace ChefMetrics_BackEnd.Services
                 new Dictionary<string, string> { ["correoElectronico"] = destinatario });
         }
 
+        public Task EnviarInvitacionEmpleadoAsync(string destinatario, string nombreNegocio, string token)
+        {
+            var url = string.IsNullOrWhiteSpace(_settings.InvitationUrl)
+                ? "https://localhost:7158/aceptar-invitacion"
+                : _settings.InvitationUrl;
+
+            return EnviarCorreoAsync(
+                destinatario,
+                token,
+                url,
+                $"Invitación para unirte a {nombreNegocio} en ChefMetrics",
+                (_, link) => ConstruirCorreoInvitacion(nombreNegocio, link));
+        }
+
         private async Task EnviarCorreoAsync(
             string destinatario,
             string token,
@@ -295,6 +309,21 @@ namespace ChefMetrics_BackEnd.Services
         </tr>
     </table>
 </div>";
+        }
+
+        private static string ConstruirCorreoInvitacion(string nombreNegocio, string link)
+        {
+            var negocio = WebUtility.HtmlEncode(nombreNegocio);
+            var linkHtml = WebUtility.HtmlEncode(link);
+            return $"""
+                <div style="font-family:Arial,sans-serif;max-width:600px;margin:24px auto;padding:24px;color:#243047">
+                  <h2>Invitación a ChefMetrics</h2>
+                  <p>Te invitaron a colaborar con <strong>{negocio}</strong>.</p>
+                  <p>Abre el siguiente enlace para aceptar la invitación y ver tus datos de acceso:</p>
+                  <p><a href="{linkHtml}" style="display:inline-block;padding:12px 18px;background:#d49a59;color:white;text-decoration:none;border-radius:8px">Aceptar invitación</a></p>
+                  <p>Si no esperabas esta invitación, puedes ignorar este mensaje.</p>
+                </div>
+                """;
         }
     }
 }

@@ -7,5 +7,7 @@ namespace ChefMetrics_BackEnd.Services
 
         Task EnviarCorreoRecuperacionAsync(string email, string token);
         Task EnviarCorreoRecuperacionAsync(string destinatario, string nombreCompleto, string token);
+
+        Task EnviarInvitacionEmpleadoAsync(string destinatario, string nombreNegocio, string token);
     }
 }

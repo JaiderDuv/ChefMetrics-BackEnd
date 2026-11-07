@@ -10,6 +10,7 @@ public interface ICosteoRepository
     Task<Dictionary<int, PrecioProveedorPrincipal>> ObtenerCostosProveedorPrincipalAsync(IEnumerable<int> insumoIds);
     Task<List<CostoFijo>> ListarCostosFijosAsync(int negocioId, bool soloActivos);
     Task<int?> ObtenerPreparacionesBaseMesAsync(int negocioId);
+    Task<(List<CostoFijo> CostosFijos, int? PreparacionesBaseMes)> ObtenerConfiguracionCostosAsync(int negocioId);
     Task<bool> ActualizarPreparacionesBaseMesAsync(int negocioId, int? preparacionesBaseMes);
     Task<CostoFijo?> ObtenerCostoFijoAsync(int negocioId, int id, bool conTracking);
     Task<bool> ExisteNombreCostoFijoAsync(int negocioId, string nombre, int? excluirId = null);
@@ -32,7 +33,9 @@ public sealed class CosteoRepository : ICosteoRepository
     // Devuelve el paquete completo: el precio por unidad se calcula en el servicio.
     public async Task<Dictionary<int, PrecioProveedorPrincipal>> ObtenerCostosProveedorPrincipalAsync(IEnumerable<int> insumoIds)
     {
-        var ids = insumoIds.ToList();
+        var ids = insumoIds.Distinct().ToArray();
+        if (ids.Length == 0) return new Dictionary<int, PrecioProveedorPrincipal>();
+
         var filas = await _db.InsumoProveedors.AsNoTracking()
             .Where(ip => ids.Contains(ip.InsumoId) && ip.EsPrincipal)
             .Select(ip => new { ip.InsumoId, ip.Costo, ip.Cantidad, ip.UnidadMedida, ip.FechaActualizacion })
@@ -55,6 +58,18 @@ public sealed class CosteoRepository : ICosteoRepository
             .Where(n => n.Id == negocioId)
             .Select(n => n.PreparacionesBaseMes)
             .FirstOrDefaultAsync();
+
+    public async Task<(List<CostoFijo> CostosFijos, int? PreparacionesBaseMes)> ObtenerConfiguracionCostosAsync(
+        int negocioId)
+    {
+        var negocio = await _db.Negocios.AsNoTracking()
+            .Include(n => n.CostoFijos.Where(c => c.Activo))
+            .FirstOrDefaultAsync(n => n.Id == negocioId);
+
+        return negocio is null
+            ? (new List<CostoFijo>(), null)
+            : (negocio.CostoFijos.OrderBy(c => c.Nombre).ToList(), negocio.PreparacionesBaseMes);
+    }
 
     public async Task<bool> ActualizarPreparacionesBaseMesAsync(int negocioId, int? preparacionesBaseMes)
     {

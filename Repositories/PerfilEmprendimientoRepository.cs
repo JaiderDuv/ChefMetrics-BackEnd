@@ -98,13 +98,53 @@ public sealed class PerfilEmprendimientoRepository : IPerfilEmprendimientoReposi
         IEnumerable<Empleado> empleadosNuevos,
         IEnumerable<Empleado> empleadosEliminados)
     {
+        var eliminados = empleadosEliminados.ToList();
+        var cuentaIdsSolicitadas = eliminados
+            .Where(e => e.CuentaId.HasValue)
+            .Select(e => e.CuentaId!.Value)
+            .Distinct()
+            .ToArray();
+
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
-        _context.Empleados.RemoveRange(empleadosEliminados);
+        var cuentaIdsEliminables = await _context.Cuenta
+            .Where(c => cuentaIdsSolicitadas.Contains(c.Id) &&
+                        c.TipoCuenta == "empleado" &&
+                        !_context.UsuarioEmprendedors.Any(u => u.CuentaId == c.Id))
+            .Select(c => c.Id)
+            .ToArrayAsync();
+
+        var cuentaIdsInseguras = cuentaIdsSolicitadas.Except(cuentaIdsEliminables).ToArray();
+        if (cuentaIdsInseguras.Length > 0)
+        {
+            throw new InvalidOperationException(
+                "No se puede eliminar un registro de empleado vinculado a una cuenta de otro tipo.");
+        }
+
+        if (cuentaIdsEliminables.Length > 0)
+        {
+            await _context.RefreshTokens
+                .Where(t => cuentaIdsEliminables.Contains(t.CuentaId))
+                .ExecuteDeleteAsync();
+            await _context.PasswordResetTokens
+                .Where(t => cuentaIdsEliminables.Contains(t.CuentaId))
+                .ExecuteDeleteAsync();
+            await _context.PerfilEditGrants
+                .Where(g => cuentaIdsEliminables.Contains(g.CuentaId))
+                .ExecuteDeleteAsync();
+        }
+
+        _context.Empleados.RemoveRange(eliminados);
         await _context.Empleados.AddRangeAsync(empleadosNuevos);
         permiso.Usado = true;
 
         await _context.SaveChangesAsync();
+        if (cuentaIdsEliminables.Length > 0)
+        {
+            await _context.Cuenta
+                .Where(c => cuentaIdsEliminables.Contains(c.Id))
+                .ExecuteDeleteAsync();
+        }
         await transaction.CommitAsync();
     }
 

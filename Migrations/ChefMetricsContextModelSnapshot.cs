@@ -125,6 +125,15 @@ namespace ChefMetrics_BackEnd.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("Activo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("CredencialCifrada")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("CorreoInvitado")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -158,10 +167,18 @@ namespace ChefMetrics_BackEnd.Migrations
                     b.Property<int>("RolId")
                         .HasColumnType("int");
 
+                    b.Property<int>("SessionVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("TokenInvitacion")
                         .HasMaxLength(255)
                         .IsUnicode(false)
                         .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime?>("TokenInvitacionExpira")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id")
                         .HasName("PK__Empleado__3214EC07B989D586");

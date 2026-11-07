@@ -60,6 +60,12 @@ namespace ChefMetrics_BackEnd.Repositories
         {
             return await _context.Cuenta
                 .Include(c => c.UsuarioEmprendedor)
+                    .ThenInclude(u => u!.Negocio)
+                .Include(c => c.Empleado!)
+                    .ThenInclude(e => e.Rol)
+                .Include(c => c.Empleado!)
+                    .ThenInclude(e => e.Negocio!)
+                        .ThenInclude(n => n.Usuario)
                 .FirstOrDefaultAsync(c => c.Correo.ToLower() == email.ToLower());
         }
 
@@ -67,6 +73,12 @@ namespace ChefMetrics_BackEnd.Repositories
         {
             return await _context.Cuenta
                 .Include(c => c.UsuarioEmprendedor)
+                    .ThenInclude(u => u!.Negocio)
+                .Include(c => c.Empleado!)
+                    .ThenInclude(e => e.Rol)
+                .Include(c => c.Empleado!)
+                    .ThenInclude(e => e.Negocio!)
+                        .ThenInclude(n => n.Usuario)
                 .FirstOrDefaultAsync(c => c.Id == cuentaId);
         }
 
@@ -82,6 +94,14 @@ namespace ChefMetrics_BackEnd.Repositories
             return await _context.RefreshTokens
                 .Include(t => t.Cuenta)
                 .ThenInclude(c => c.UsuarioEmprendedor)
+                    .ThenInclude(u => u!.Negocio)
+                .Include(t => t.Cuenta)
+                    .ThenInclude(c => c.Empleado!)
+                        .ThenInclude(e => e.Rol)
+                .Include(t => t.Cuenta)
+                    .ThenInclude(c => c.Empleado!)
+                        .ThenInclude(e => e.Negocio!)
+                            .ThenInclude(n => n.Usuario)
                 .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
         }
 

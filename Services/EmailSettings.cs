@@ -10,5 +10,6 @@ namespace ChefMetrics_BackEnd.Services
         public string From { get; set; } = string.Empty;
         public string VerificationUrl { get; set; } = string.Empty;
         public string PasswordResetUrl { get; set; } = string.Empty;
+        public string InvitationUrl { get; set; } = string.Empty;
     }
 }

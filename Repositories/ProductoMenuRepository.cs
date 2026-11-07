@@ -26,7 +26,8 @@ public sealed class ProductoMenuRepository : IProductoMenuRepository
     public Task<List<ProductoMenu>> ListarAsync(int negocioId, string? busqueda, bool incluirInactivos)
     {
         var q = _db.ProductoMenus.AsNoTracking()
-            .Include(p => p.ProductoMenuReceta).ThenInclude(pr => pr.Receta)
+            .AsSplitQuery()
+            .Include(p => p.ProductoMenuReceta)
             .Include(p => p.ProductoMenuInsumos)
             .Where(p => p.NegocioId == negocioId && (incluirInactivos || p.Activo));
 
@@ -62,7 +63,9 @@ public sealed class ProductoMenuRepository : IProductoMenuRepository
 
     public Task<List<Receta>> ObtenerRecetasConInsumosAsync(int negocioId, IEnumerable<int> recetaIds)
     {
-        var ids = recetaIds.ToList();
+        var ids = recetaIds.Distinct().ToArray();
+        if (ids.Length == 0) return Task.FromResult(new List<Receta>());
+
         return _db.Receta.AsNoTracking()
             .Include(r => r.RecetaInsumos).ThenInclude(ri => ri.Insumo)
             .Where(r => r.NegocioId == negocioId && ids.Contains(r.Id))

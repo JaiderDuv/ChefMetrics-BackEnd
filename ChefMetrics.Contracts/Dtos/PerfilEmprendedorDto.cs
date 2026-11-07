@@ -84,6 +84,7 @@ public class EmpleadoDto
 
     public string? NombreRol { get; set; }
     public string? EstadoInvitacion { get; set; }
+    public bool Activo { get; set; } = true;
 }
 
 public class RolDto

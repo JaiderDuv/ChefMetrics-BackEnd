@@ -25,5 +25,8 @@ namespace ChefMetrics.Contracts
         public string? CorreoElectronico { get; set; }
         public string? NombreEmprendimiento { get; set; }
         public bool OnboardingCompletado { get; set; }
+        public string? Rol { get; set; }
+        public string? TipoCuenta { get; set; }
+        public int? NegocioId { get; set; }
     }
 }

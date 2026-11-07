@@ -448,7 +448,8 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
                     CorreoInvitado = e.CorreoInvitado,
                     RolId = e.RolId,
                     NombreRol = e.Rol?.Nombre ?? string.Empty,
-                    EstadoInvitacion = e.EstadoInvitacion
+                    EstadoInvitacion = e.EstadoInvitacion,
+                    Activo = e.Activo
                 }).ToList() ?? new()
         };
     }

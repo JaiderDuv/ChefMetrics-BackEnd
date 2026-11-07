@@ -1,5 +1,6 @@
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Utilities;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChefMetrics_BackEnd.Repositories;
@@ -7,17 +8,37 @@ namespace ChefMetrics_BackEnd.Repositories;
 public sealed class InsumoRepository : IInsumoRepository
 {
     private readonly ChefMetricsContext _context;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public InsumoRepository(ChefMetricsContext context)
+        : this(context, new HttpContextAccessor())
+    {
+    }
+
+    public InsumoRepository(ChefMetricsContext context, IHttpContextAccessor httpContextAccessor)
     {
         _context = context;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<int?> ObtenerNegocioIdPorCuentaAsync(int cuentaId)
     {
-        return await _context.Negocios
+        if (_httpContextAccessor.HttpContext?.Items.TryGetValue(
+                EmpleadoRequestContext.HttpContextItemKey, out var contexto) == true &&
+            contexto is EmpleadoRequestContext empleado && empleado.CuentaId == cuentaId)
+        {
+            return empleado.NegocioId;
+        }
+
+        var negocioId = await _context.Negocios
             .Where(n => n.Usuario.CuentaId == cuentaId)
             .Select(n => (int?)n.Id)
+            .FirstOrDefaultAsync();
+        if (negocioId.HasValue) return negocioId;
+
+        return await _context.Empleados
+            .Where(e => e.CuentaId == cuentaId && e.Activo && e.EstadoInvitacion == "aceptada")
+            .Select(e => (int?)e.NegocioId)
             .FirstOrDefaultAsync();
     }
 

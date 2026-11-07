@@ -25,6 +25,14 @@ public partial class Empleado
 
     public DateTime? FechaAceptacion { get; set; }
 
+    public bool Activo { get; set; } = true;
+
+    public string? CredencialCifrada { get; set; }
+
+    public DateTime? TokenInvitacionExpira { get; set; }
+
+    public int SessionVersion { get; set; }
+
     public virtual Cuenta? Cuenta { get; set; }
 
     public virtual UsuarioEmprendedor InvitadoPorNavigation { get; set; } = null!;

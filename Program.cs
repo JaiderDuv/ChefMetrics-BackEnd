@@ -1,11 +1,15 @@
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Repositories;
 using ChefMetrics_BackEnd.Services;
+using ChefMetrics_BackEnd.Health;
+using ChefMetrics_BackEnd.Utilities;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
+using System.Security.Claims;
 using System.Text;
 
 // El documento OpenAPI se serializa con la cultura del proceso. En equipos
@@ -31,6 +35,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddCosteo();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -46,10 +51,23 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPerfilEmpreService, PerfilEmpreService>();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddDataProtection();
+builder.Services.AddScoped<ICredencialProtector, CredencialProtector>();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.PostConfigure<EmailSettings>(options =>
+{
+    if (string.IsNullOrWhiteSpace(options.InvitationUrl))
+    {
+        options.InvitationUrl = isDevelopment
+            ? "https://localhost:7158/aceptar-invitacion"
+            : "https://pwgapg-frontend.pages.dev/aceptar-invitacion";
+    }
+});
 builder.Services.AddScoped<IUmbralMargenRepository, UmbralMargenRepository>();
 builder.Services.AddScoped<IEvaluacionMenuService, EvaluacionMenuService>();
 builder.Services.AddMemoryCache();
+builder.Services.AddHealthChecks()
+    .AddCheck<DbHealthCheck>("database");
 
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
 
@@ -106,18 +124,28 @@ builder.Services.AddAuthorization(options =>
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
+
+    options.AddPolicy("SoloEmprendedor", policy => policy.RequireRole("Emprendedor"));
+    options.AddPolicy("RecetasLectura", policy => policy.RequireRole("Emprendedor", "Chef"));
+    options.AddPolicy("MenuLectura", policy => policy.RequireRole("Emprendedor", "Chef", "Cajero"));
 });
 
 builder.Services.AddDbContext<ChefMetricsContext>(options =>
     options.UseSqlServer(connectionString));
 
-var allowedOrigins = builder.Configuration
+var configuredOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>() ?? [];
-if (allowedOrigins.Length == 0)
-{
-    allowedOrigins = ["http://localhost:5196", "https://localhost:7158"];
-}
+var allowedOrigins = configuredOrigins
+    .Concat([
+        "http://localhost:5196",
+        "https://localhost:7158",
+        "https://pwgapg-frontend.pages.dev",
+        "https://7fa24239.pwgapg-frontend.pages.dev"
+    ])
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
 
 builder.Services.AddCors(options =>
 {
@@ -159,6 +187,58 @@ app.UseStaticFiles();
 app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
+app.Use(async (context, next) =>
+{
+    var user = context.User;
+    var role = user.FindFirst(ClaimTypes.Role)?.Value;
+    var tipoCuenta = user.FindFirst("tipoCuenta")?.Value;
+    if (user.Identity?.IsAuthenticated == true &&
+        string.Equals(tipoCuenta, "empleado", StringComparison.OrdinalIgnoreCase))
+    {
+        var path = context.Request.Path.Value ?? string.Empty;
+        var readOnly = HttpMethods.IsGet(context.Request.Method) ||
+                       HttpMethods.IsHead(context.Request.Method) ||
+                       HttpMethods.IsOptions(context.Request.Method);
+        var menuRoute = path.Equals("/api/productos-menu", StringComparison.OrdinalIgnoreCase) ||
+                        path.StartsWith("/api/productos-menu/", StringComparison.OrdinalIgnoreCase);
+        var recipeRoute = path.Equals("/api/recetas", StringComparison.OrdinalIgnoreCase) ||
+                          path.StartsWith("/api/recetas/", StringComparison.OrdinalIgnoreCase);
+        var canReadRoute = menuRoute ||
+            (string.Equals(role, "Chef", StringComparison.OrdinalIgnoreCase) && recipeRoute);
+
+        // Reject forbidden methods and routes before opening a database connection.
+        if (!readOnly || !canReadRoute)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
+        var cuentaIdValue = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value;
+        var versionToken = user.FindFirst("versionEmpleado")?.Value;
+        if (!int.TryParse(cuentaIdValue, out var cuentaId) || !int.TryParse(versionToken, out var version))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        var empleadoActual = await context.RequestServices.GetRequiredService<ChefMetricsContext>()
+            .Empleados.AsNoTracking()
+            .Where(e => e.CuentaId == cuentaId && e.Activo && e.EstadoInvitacion == "aceptada")
+            .Select(e => new { e.SessionVersion, e.NegocioId })
+            .SingleOrDefaultAsync();
+        if (empleadoActual is null || empleadoActual.SessionVersion != version)
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        context.Items[EmpleadoRequestContext.HttpContextItemKey] =
+            new EmpleadoRequestContext(cuentaId, empleadoActual.NegocioId);
+    }
+
+    await next();
+});
 app.MapControllers();
+app.MapHealthChecks("/health/db").AllowAnonymous();
 
 app.Run();

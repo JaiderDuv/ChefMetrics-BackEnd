@@ -121,6 +121,8 @@ public partial class ChefMetricsContext : DbContext
                 .HasFilter("([TokenInvitacion] IS NOT NULL)");
 
             entity.Property(e => e.CorreoInvitado).HasMaxLength(255);
+            entity.Property(e => e.Activo).HasDefaultValue(true);
+            entity.Property(e => e.CredencialCifrada).HasMaxLength(1000);
             entity.Property(e => e.EstadoInvitacion)
                 .HasMaxLength(20)
                 .IsUnicode(false)
@@ -129,6 +131,8 @@ public partial class ChefMetricsContext : DbContext
             entity.Property(e => e.TokenInvitacion)
                 .HasMaxLength(255)
                 .IsUnicode(false);
+            entity.Property(e => e.TokenInvitacionExpira);
+            entity.Property(e => e.SessionVersion).HasDefaultValue(0);
 
             entity.HasOne(d => d.Cuenta).WithOne(p => p.Empleado)
                 .HasForeignKey<Empleado>(d => d.CuentaId)
