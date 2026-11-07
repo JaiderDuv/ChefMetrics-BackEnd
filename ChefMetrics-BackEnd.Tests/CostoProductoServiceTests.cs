@@ -61,10 +61,8 @@ public sealed class CostoProductoServiceTests
         var costeo = new Mock<ICosteoRepository>(MockBehavior.Strict);
         costeo.Setup(c => c.ObtenerCostosProveedorPrincipalAsync(It.IsAny<IEnumerable<int>>()))
             .ReturnsAsync(new Dictionary<int, PrecioProveedorPrincipal>());
-        costeo.Setup(c => c.ListarCostosFijosAsync(NegocioId, true))
-            .ReturnsAsync(new List<CostoFijo>());
-        costeo.Setup(c => c.ObtenerPreparacionesBaseMesAsync(NegocioId))
-            .ReturnsAsync((int?)null);
+        costeo.Setup(c => c.ObtenerConfiguracionCostosAsync(NegocioId))
+            .ReturnsAsync((new List<CostoFijo>(), (int?)null));
 
         var insumos = new Mock<IInsumoRepository>(MockBehavior.Strict);
         insumos.Setup(i => i.ObtenerNegocioIdPorCuentaAsync(CuentaId)).ReturnsAsync(NegocioId);
@@ -125,10 +123,8 @@ public sealed class CostoProductoServiceTests
         var costeo = new Mock<ICosteoRepository>(MockBehavior.Strict);
         costeo.Setup(c => c.ObtenerCostosProveedorPrincipalAsync(It.IsAny<IEnumerable<int>>()))
             .ReturnsAsync(new Dictionary<int, PrecioProveedorPrincipal>());
-        costeo.Setup(c => c.ListarCostosFijosAsync(NegocioId, true))
-            .ReturnsAsync(new List<CostoFijo>());
-        costeo.Setup(c => c.ObtenerPreparacionesBaseMesAsync(NegocioId))
-            .ReturnsAsync((int?)null);
+        costeo.Setup(c => c.ObtenerConfiguracionCostosAsync(NegocioId))
+            .ReturnsAsync((new List<CostoFijo>(), (int?)null));
 
         var insumos = new Mock<IInsumoRepository>(MockBehavior.Strict);
         insumos.Setup(i => i.ObtenerNegocioIdPorCuentaAsync(CuentaId)).ReturnsAsync(NegocioId);
