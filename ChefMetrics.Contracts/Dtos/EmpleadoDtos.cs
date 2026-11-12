@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 
 namespace ChefMetrics.Contracts;
 
@@ -67,9 +68,11 @@ public sealed class ActualizarEmpleadoDto : IValidatableObject
         }
 
         if (NuevaPassword!.Length is < 8 or > 72 ||
-            !System.Text.RegularExpressions.Regex.IsMatch(
+            !Regex.IsMatch(
                 NuevaPassword,
-                @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,72}$"))
+                @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,72}$",
+                RegexOptions.None,
+                TimeSpan.FromMilliseconds(100)))
         {
             yield return new ValidationResult(
                 "Usa entre 8 y 72 caracteres con mayúscula, minúscula, número y símbolo especial (@$!%*?&).",
