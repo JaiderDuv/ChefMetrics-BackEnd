@@ -176,6 +176,9 @@ app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/openapi/v1.json", "ChefMetrics BackEnd API v1");
     options.RoutePrefix = "swagger";
+    options.DocumentTitle = "ChefMetrics API documentation";
+    options.InjectStylesheet("./accessibility.css");
+    options.InjectJavascript("./accessibility.js");
 });
 
 app.UseHttpsRedirection();
