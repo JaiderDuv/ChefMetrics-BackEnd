@@ -42,6 +42,7 @@ public sealed class ProductoMenuRepository : IProductoMenuRepository
 
     public Task<ProductoMenu?> ObtenerPorIdAsync(int negocioId, int id) =>
         _db.ProductoMenus.AsNoTracking()
+            .AsSplitQuery()
             .Include(p => p.ProductoMenuReceta).ThenInclude(pr => pr.Receta)
                 .ThenInclude(r => r.RecetaInsumos).ThenInclude(ri => ri.Insumo)
             .Include(p => p.ProductoMenuInsumos).ThenInclude(pi => pi.Insumo)
@@ -49,6 +50,7 @@ public sealed class ProductoMenuRepository : IProductoMenuRepository
 
     public Task<ProductoMenu?> ObtenerParaEditarAsync(int negocioId, int id) =>
         _db.ProductoMenus
+            .AsSplitQuery()
             .Include(p => p.ProductoMenuReceta)
             .Include(p => p.ProductoMenuInsumos)
             .FirstOrDefaultAsync(p => p.Id == id && p.NegocioId == negocioId);

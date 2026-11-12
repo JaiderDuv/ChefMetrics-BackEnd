@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 using ChefMetrics_BackEnd.Model;
 using ChefMetrics_BackEnd.Utilities;
 using Microsoft.AspNetCore.Authorization;
@@ -65,7 +66,10 @@ public class OnboardingController : ControllerBase
         [Required, StringLength(20, MinimumLength = 7)]
         public string TelefonoEmpresa { get; set; } = string.Empty;
 
+        [JsonRequired]
         public bool Formalizado { get; set; }
+
+        [JsonRequired]
         public bool TieneSitioFisico { get; set; }
         public string? Direccion { get; set; }
         public string? LogoBase64 { get; set; }

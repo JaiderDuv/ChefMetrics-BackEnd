@@ -110,7 +110,7 @@ namespace ChefMetrics_BackEnd.Services
 
             using var client = new SmtpClient(_settings.Host, _settings.Port)
             {
-                EnableSsl = _settings.EnableSsl,
+                EnableSsl = true,
                 UseDefaultCredentials = false,
                 DeliveryMethod = SmtpDeliveryMethod.Network,
                 Credentials = new NetworkCredential(_settings.Username, _settings.Password),

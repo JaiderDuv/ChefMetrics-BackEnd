@@ -163,10 +163,10 @@ var app = builder.Build();
 // Crea la base en una instalación nueva y aplica migraciones pendientes en
 // las bases existentes. Evita que cada integrante deba ejecutar dotnet ef
 // (y que la app falle por columnas faltantes).
-using (var scope = app.Services.CreateScope())
+await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ChefMetricsContext>();
-    db.Database.Migrate();
+    await db.Database.MigrateAsync();
 }
 
 // Se expone OpenAPI con acceso anónimo para que no pida token JWT en la especificación
@@ -240,4 +240,4 @@ app.Use(async (context, next) =>
 app.MapControllers();
 app.MapHealthChecks("/health/db").AllowAnonymous();
 
-app.Run();
+await app.RunAsync();
