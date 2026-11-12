@@ -1,0 +1,41 @@
+.api-documentation-title {
+    color: #252d3e;
+    font: 700 1.5rem system-ui, sans-serif;
+    margin: 1.25rem auto 0;
+    max-width: 1460px;
+    padding: 0 20px;
+}
+
+.swagger-ui .info .title small {
+    background: #495466;
+}
+
+.swagger-ui .info .title small.version-stamp {
+    background: #365a0a;
+}
+
+.swagger-ui .info a {
+    color: #174e9f;
+    text-decoration: underline;
+}
+
+.swagger-ui .opblock .opblock-summary-method {
+    color: #111;
+    text-shadow: none;
+}
+
+.swagger-ui .opblock-title > span {
+    color: #252d3e;
+    background-color: #fff;
+}
+
+.swagger-ui select {
+    appearance: auto;
+    background-image: none;
+    color: #252d3e;
+}
+
+main :where(a, button, input, select, textarea):focus-visible {
+    outline: 3px solid #185abd;
+    outline-offset: 3px;
+}

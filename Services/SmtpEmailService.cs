@@ -126,18 +126,18 @@ namespace ChefMetrics_BackEnd.Services
             var nombreHtml = WebUtility.HtmlEncode(nombreCompleto);
 
             return $@"
-<div style=""background-color: #F3F4F6; padding: 40px 10px; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh;"">
-    <table align=""center"" border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"">
+<div lang=""es"" style=""background-color: #F3F4F6; padding: 40px 10px; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh;"">
+    <table role=""presentation"" align=""center"" border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"">
         
         <!-- Header Superior Oscuro -->
         <tr>
             <td style=""background-color: #1F2937; padding: 25px 25px 20px 25px;"">
-                <table border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
+                <table role=""presentation"" border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
                     <tr>
                         <!-- Columna 1: LOGO A LA IZQUIERDA -->
                         <td width=""60"" align=""left"" style=""vertical-align: middle; padding-right: 15px;"">
                             <img src=""https://res.cloudinary.com/h9nkn3lo/image/upload/f_auto,q_auto/Logo.png"" 
-                                 alt=""Logo"" 
+                                 alt=""""
                                  width=""50"" 
                                  height=""50"" 
                                  style=""display: block; border: 0; max-width: 50px; height: auto;"" />
@@ -165,7 +165,7 @@ namespace ChefMetrics_BackEnd.Services
         </tr>
         <tr>
             <td align=""center"" style=""padding: 40px 30px 20px 30px;"">
-                <div style=""width: 64px; height: 64px; background-color: #D97706; border-radius: 50%; display: inline-block; text-align: center; line-height: 64px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3);"">
+                <div aria-hidden=""true"" style=""width: 64px; height: 64px; background-color: #8F4A12; border-radius: 50%; display: inline-block; text-align: center; line-height: 64px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3);"">
                     <span style=""color: #ffffff; font-size: 28px; vertical-align: middle;"">&#x2709;</span>
                 </div>
                 <h2 style=""color: #111827; font-size: 24px; margin-top: 0; margin-bottom: 12px; font-weight: 700;"">
@@ -175,16 +175,16 @@ namespace ChefMetrics_BackEnd.Services
                 <p style=""color: #4B5563; font-size: 15px; line-height: 1.6; margin-bottom: 30px; max-width: 480px;"">
                     Nos alegra mucho tenerte con nosotros. Para completar tu registro y comenzar a hacer crecer tu emprendimiento en <strong>Chef Metrics</strong>, confirma tu cuenta haciendo clic en el siguiente botón:
                 </p>
-                <table border=""0"" cellpadding=""0"" cellspacing=""0"" style=""margin: 10px auto 30px auto;"">
+                <table role=""presentation"" border=""0"" cellpadding=""0"" cellspacing=""0"" style=""margin: 10px auto 30px auto;"">
                     <tr>
-                        <td align=""center"" bgcolor=""#D97706"" style=""border-radius: 50px;"">
-                            <a href=""{linkHtml}"" target=""_blank"" style=""display: inline-block; padding: 16px 40px; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 50px; background-color: #D97706; letter-spacing: 1px; text-transform: uppercase;"">
+                        <td align=""center"" bgcolor=""#8F4A12"" style=""border-radius: 50px;"">
+                            <a href=""{linkHtml}"" target=""_blank"" style=""display: inline-block; padding: 16px 40px; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 50px; background-color: #8F4A12; letter-spacing: 1px; text-transform: uppercase;"">
                                 VERIFICAR CUENTA
                             </a>
                         </td>
                     </tr>
                 </table>
-                <p style=""color: #9CA3AF; font-size: 12px; margin-top: 25px; margin-bottom: 0;"">
+                <p style=""color: #6B7280; font-size: 12px; margin-top: 25px; margin-bottom: 0;"">
                     Si no realizaste este registro, puedes ignorar este correo.
                 </p>
             </td>
@@ -195,8 +195,8 @@ namespace ChefMetrics_BackEnd.Services
             </td>
         </tr>
         <tr>
-            <td align=""center"" style=""background-color: #F9FAFB; padding: 25px 20px; color: #9CA3AF; font-size: 12px;"">
-                <p style=""color: #D97706; font-size: 13px; font-weight: bold; margin: 0 0 6px 0; letter-spacing: 1px;"">
+            <td align=""center"" style=""background-color: #F9FAFB; padding: 25px 20px; color: #6B7280; font-size: 12px;"">
+                <p style=""color: #8F4A12; font-size: 13px; font-weight: bold; margin: 0 0 6px 0; letter-spacing: 1px;"">
                     CHEF METRICS
                 </p>
                 <p style=""margin: 0; color: #6B7280; font-size: 12px;"">
@@ -214,18 +214,18 @@ namespace ChefMetrics_BackEnd.Services
             var nombreHtml = WebUtility.HtmlEncode(nombreCompleto);
 
             return $@"
-<div style=""background-color: #F3F4F6; padding: 40px 10px; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh;"">
-    <table align=""center"" border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"">
+<div lang=""es"" style=""background-color: #F3F4F6; padding: 40px 10px; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh;"">
+    <table role=""presentation"" align=""center"" border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"" style=""max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"">
         
         <!-- Header Superior Oscuro -->
         <tr>
             <td style=""background-color: #1F2937; padding: 25px 25px 20px 25px;"">
-                <table border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
+                <table role=""presentation"" border=""0"" cellpadding=""0"" cellspacing=""0"" width=""100%"">
                     <tr>
                         <!-- Columna 1: LOGO A LA IZQUIERDA -->
                         <td width=""60"" align=""left"" style=""vertical-align: middle; padding-right: 15px;"">
                             <img src=""https://res.cloudinary.com/h9nkn3lo/image/upload/f_auto,q_auto/Logo.png"" 
-                                 alt=""Logo"" 
+                                 alt=""""
                                  width=""50"" 
                                  height=""50"" 
                                  style=""display: block; border: 0; max-width: 50px; height: auto;"" />
@@ -258,7 +258,7 @@ namespace ChefMetrics_BackEnd.Services
         <tr>
             <td align=""center"" style=""padding: 40px 30px 20px 30px;"">
                 <!-- Icono de Candado / Llave en Círculo Naranja -->
-                <div style=""width: 64px; height: 64px; background-color: #D97706; border-radius: 50%; display: inline-block; text-align: center; line-height: 64px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3);"">
+                <div aria-hidden=""true"" style=""width: 64px; height: 64px; background-color: #8F4A12; border-radius: 50%; display: inline-block; text-align: center; line-height: 64px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3);"">
                     <span style=""color: #ffffff; font-size: 28px; vertical-align: middle;"">&#x1F511;</span>
                 </div>
 
@@ -273,17 +273,17 @@ namespace ChefMetrics_BackEnd.Services
                 </p>
 
                 <!-- Botón Redondeado -->
-                <table border=""0"" cellpadding=""0"" cellspacing=""0"" style=""margin: 10px auto 30px auto;"">
+                <table role=""presentation"" border=""0"" cellpadding=""0"" cellspacing=""0"" style=""margin: 10px auto 30px auto;"">
                     <tr>
-                        <td align=""center"" bgcolor=""#D97706"" style=""border-radius: 50px;"">
-                            <a href=""{linkHtml}"" target=""_blank"" style=""display: inline-block; padding: 16px 40px; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 50px; background-color: #D97706; letter-spacing: 1px; text-transform: uppercase;"">
+                        <td align=""center"" bgcolor=""#8F4A12"" style=""border-radius: 50px;"">
+                            <a href=""{linkHtml}"" target=""_blank"" style=""display: inline-block; padding: 16px 40px; font-size: 14px; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 50px; background-color: #8F4A12; letter-spacing: 1px; text-transform: uppercase;"">
                                 RESTABLECER CONTRASEÑA
                             </a>
                         </td>
                     </tr>
                 </table>
 
-                <p style=""color: #9CA3AF; font-size: 12px; margin-top: 25px; margin-bottom: 0;"">
+                <p style=""color: #6B7280; font-size: 12px; margin-top: 25px; margin-bottom: 0;"">
                     Si no solicitaste este cambio, puedes ignorar este mensaje de forma segura. Tu contraseña actual no cambiará.
                 </p>
             </td>
@@ -298,8 +298,8 @@ namespace ChefMetrics_BackEnd.Services
 
         <!-- Footer -->
         <tr>
-            <td align=""center"" style=""background-color: #F9FAFB; padding: 25px 20px; color: #9CA3AF; font-size: 12px;"">
-                <p style=""color: #D97706; font-size: 13px; font-weight: bold; margin: 0 0 6px 0; letter-spacing: 1px;"">
+            <td align=""center"" style=""background-color: #F9FAFB; padding: 25px 20px; color: #6B7280; font-size: 12px;"">
+                <p style=""color: #8F4A12; font-size: 13px; font-weight: bold; margin: 0 0 6px 0; letter-spacing: 1px;"">
                     CHEF METRICS
                 </p>
                 <p style=""margin: 0; color: #6B7280; font-size: 12px;"">
@@ -316,11 +316,11 @@ namespace ChefMetrics_BackEnd.Services
             var negocio = WebUtility.HtmlEncode(nombreNegocio);
             var linkHtml = WebUtility.HtmlEncode(link);
             return $"""
-                <div style="font-family:Arial,sans-serif;max-width:600px;margin:24px auto;padding:24px;color:#243047">
-                  <h2>Invitación a ChefMetrics</h2>
+                <div lang="es" style="font-family:Arial,sans-serif;max-width:600px;margin:24px auto;padding:24px;color:#243047">
+                  <h1>Invitación a ChefMetrics</h1>
                   <p>Te invitaron a colaborar con <strong>{negocio}</strong>.</p>
                   <p>Abre el siguiente enlace para aceptar la invitación y ver tus datos de acceso:</p>
-                  <p><a href="{linkHtml}" style="display:inline-block;padding:12px 18px;background:#d49a59;color:white;text-decoration:none;border-radius:8px">Aceptar invitación</a></p>
+                  <p><a href="{linkHtml}" style="display:inline-block;padding:12px 18px;background:#8F4A12;color:white;text-decoration:none;border-radius:8px">Aceptar invitación</a></p>
                   <p>Si no esperabas esta invitación, puedes ignorar este mensaje.</p>
                 </div>
                 """;
