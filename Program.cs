@@ -6,6 +6,7 @@ using ChefMetrics_BackEnd.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
@@ -23,15 +24,22 @@ CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
 var builder = WebApplication.CreateBuilder(args);
 var isDevelopment = builder.Environment.IsDevelopment();
 
-// Los appsettings con credenciales están ignorados por seguridad, así que un
-// clon nuevo no trae cadena de conexión. En desarrollo se usa LocalDB para que
-// cualquier integrante pueda ejecutar el proyecto sin configurar nada.
+// LocalDB es el valor de desarrollo. Producción requiere su conexión SQL explícita.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
 {
+    if (!isDevelopment)
+    {
+        throw new InvalidOperationException(
+            "Configura ConnectionStrings__DefaultConnection con la conexión SQL de producción.");
+    }
+
     connectionString =
         "Server=(localdb)\\MSSQLLocalDB;Database=ChefMetrics;Trusted_Connection=true;TrustServerCertificate=true;";
 }
+
+var frontendBaseUrl = FrontendUrls.ResolveBaseUrl(
+    builder.Configuration["Frontend:BaseUrl"], isDevelopment);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -56,18 +64,18 @@ builder.Services.AddScoped<ICredencialProtector, CredencialProtector>();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.PostConfigure<EmailSettings>(options =>
 {
-    if (string.IsNullOrWhiteSpace(options.InvitationUrl))
-    {
-        options.InvitationUrl = isDevelopment
-            ? "https://localhost:7158/aceptar-invitacion"
-            : "https://pwgapg-frontend.pages.dev/aceptar-invitacion";
-    }
+    options.VerificationUrl = FrontendUrls.ResolveEmailUrl(
+        options.VerificationUrl, frontendBaseUrl, "confirmar-cuenta", isDevelopment);
+    options.PasswordResetUrl = FrontendUrls.ResolveEmailUrl(
+        options.PasswordResetUrl, frontendBaseUrl, "nueva-contrasena", isDevelopment);
+    options.InvitationUrl = FrontendUrls.ResolveEmailUrl(
+        options.InvitationUrl, frontendBaseUrl, "aceptar-invitacion", isDevelopment);
 });
 builder.Services.AddScoped<IUmbralMargenRepository, UmbralMargenRepository>();
 builder.Services.AddScoped<IEvaluacionMenuService, EvaluacionMenuService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHealthChecks()
-    .AddCheck<DbHealthCheck>("database");
+    .AddCheck<DbHealthCheck>("database", timeout: TimeSpan.FromSeconds(5));
 
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
 
@@ -138,6 +146,7 @@ var configuredOrigins = builder.Configuration
     .Get<string[]>() ?? [];
 var allowedOrigins = configuredOrigins
     .Concat([
+        frontendBaseUrl.GetLeftPart(UriPartial.Authority),
         "http://localhost:5196",
         "https://localhost:7158",
         "https://pwgapg-frontend.pages.dev",
@@ -154,7 +163,8 @@ builder.Services.AddCors(options =>
         {
             policy.WithOrigins(allowedOrigins)
                   .AllowAnyMethod()
-                  .AllowAnyHeader();
+                  .AllowAnyHeader()
+                  .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
         });
 });
 
@@ -238,6 +248,10 @@ app.Use(async (context, next) =>
     await next();
 });
 app.MapControllers();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false
+}).AllowAnonymous();
 app.MapHealthChecks("/health/db").AllowAnonymous();
 
 await app.RunAsync();

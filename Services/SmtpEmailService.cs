@@ -55,14 +55,10 @@ namespace ChefMetrics_BackEnd.Services
 
         public Task EnviarInvitacionEmpleadoAsync(string destinatario, string nombreNegocio, string token)
         {
-            var url = string.IsNullOrWhiteSpace(_settings.InvitationUrl)
-                ? "https://localhost:7158/aceptar-invitacion"
-                : _settings.InvitationUrl;
-
             return EnviarCorreoAsync(
                 destinatario,
                 token,
-                url,
+                _settings.InvitationUrl,
                 $"Invitación para unirte a {nombreNegocio} en ChefMetrics",
                 (_, link) => ConstruirCorreoInvitacion(nombreNegocio, link));
         }

@@ -88,28 +88,28 @@ public class OnboardingController : ControllerBase
             return Unauthorized();
         }
 
-        var cuenta = await _context.Cuenta
+        var datos = await _context.Cuenta
             .AsNoTracking()
-            .Include(c => c.UsuarioEmprendedor)
-            .ThenInclude(u => u!.Negocio)
-            .FirstOrDefaultAsync(c => c.Id == cuentaId);
+            .Where(c => c.Id == cuentaId && c.UsuarioEmprendedor != null)
+            .Select(c => new
+            {
+                c.UsuarioEmprendedor!.Nombres,
+                c.UsuarioEmprendedor.Apellidos,
+                c.UsuarioEmprendedor.TipoDocumento,
+                c.UsuarioEmprendedor.NumeroDocumento,
+                CorreoElectronico = c.Correo,
+                TelefonoContacto = c.UsuarioEmprendedor.Negocio == null
+                    ? null : c.UsuarioEmprendedor.Negocio.TelefonoContacto,
+                c.UsuarioEmprendedor.FotoPerfilUrl
+            })
+            .FirstOrDefaultAsync(HttpContext.RequestAborted);
 
-        if (cuenta is null || cuenta.UsuarioEmprendedor is null)
+        if (datos is null)
         {
             return NotFound(new { mensaje = "No se encontró el perfil." });
         }
 
-        var usuario = cuenta.UsuarioEmprendedor;
-        return Ok(new
-        {
-            usuario.Nombres,
-            usuario.Apellidos,
-            usuario.TipoDocumento,
-            usuario.NumeroDocumento,
-            CorreoElectronico = cuenta.Correo,
-            usuario.Negocio?.TelefonoContacto,
-            FotoPerfilUrl = usuario.FotoPerfilUrl
-        });
+        return Ok(datos);
     }
 
     // Guarda la foto de perfil del emprendedor. Se acepta una data URL de imagen
