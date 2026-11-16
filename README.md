@@ -4,7 +4,7 @@ API y contratos compartidos de ChefMetrics. El frontend Blazor está en `../PWGA
 
 ## Requisitos
 
-- .NET SDK 9
+- .NET SDK 10
 - SQL Server o LocalDB (la base `ChefMetrics` se crea automáticamente)
 - `dotnet-ef` solo si vas a crear migraciones nuevas
 
