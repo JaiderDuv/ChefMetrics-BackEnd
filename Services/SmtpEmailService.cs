@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Mail;
+using System.Net.Http.Json;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.WebUtilities;
@@ -11,10 +12,12 @@ namespace ChefMetrics_BackEnd.Services
     public class SmtpEmailService : IEmailService
     {
         private readonly EmailSettings _settings;
+        private readonly HttpClient _httpClient;
 
-        public SmtpEmailService(IOptions<EmailSettings> options)
+        public SmtpEmailService(IOptions<EmailSettings> options, HttpClient httpClient)
         {
             _settings = options.Value;
+            _httpClient = httpClient;
         }
 
         public async Task EnviarCorreoVerificacionAsync(string email, string token)
@@ -71,17 +74,9 @@ namespace ChefMetrics_BackEnd.Services
             Func<string, string, string> construirCuerpo,
             Dictionary<string, string>? queryExtra = null)
         {
-            if (string.IsNullOrWhiteSpace(_settings.Password))
+            if (!_settings.PuedeEnviar || string.IsNullOrWhiteSpace(baseUrl))
             {
-                throw new InvalidOperationException("Falta configurar la contraseña de aplicación de Gmail en Email:Password.");
-            }
-
-            if (string.IsNullOrWhiteSpace(_settings.Host) ||
-                string.IsNullOrWhiteSpace(_settings.Username) ||
-                string.IsNullOrWhiteSpace(_settings.From) ||
-                string.IsNullOrWhiteSpace(baseUrl))
-            {
-                throw new InvalidOperationException("La configuración SMTP del correo está incompleta.");
+                throw new InvalidOperationException("La configuración de correo está incompleta.");
             }
 
             var link = QueryHelpers.AddQueryString(baseUrl, "token", token);
@@ -93,16 +88,37 @@ namespace ChefMetrics_BackEnd.Services
                 }
             }
 
+            var from = new MailAddress(_settings.From, "CHEF METRICS");
+            var to = new MailAddress(destinatario);
+            var html = construirCuerpo(destinatario, link);
+
+            if (_settings.UsaBrevo)
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
+                request.Headers.Add("api-key", _settings.BrevoApiKey);
+                request.Content = JsonContent.Create(new
+                {
+                    sender = new { email = from.Address, name = from.DisplayName },
+                    to = new[] { new { email = to.Address } },
+                    subject,
+                    htmlContent = html
+                });
+
+                using var response = await _httpClient.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+                return;
+            }
+
             using var message = new MailMessage
             {
-                From = new MailAddress(_settings.From, "CHEF METRICS"),
+                From = from,
                 Subject = subject,
-                Body = construirCuerpo(destinatario, link),
+                Body = html,
                 IsBodyHtml = true,
                 BodyEncoding = Encoding.UTF8,
                 SubjectEncoding = Encoding.UTF8
             };
-            message.To.Add(destinatario);
+            message.To.Add(to);
 
             using var client = new SmtpClient(_settings.Host, _settings.Port)
             {

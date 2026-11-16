@@ -31,8 +31,13 @@ para que cualquier integrante pueda ejecutar el proyecto sin pasos manuales.
 Para usar otra base de datos o una clave JWT distinta, define las variables de entorno
 `ConnectionStrings__DefaultConnection` y `Jwt__Key` antes de ejecutar el proyecto.
 
-En desarrollo, si no hay SMTP configurado, las cuentas nuevas se verifican
+En desarrollo, si no hay correo configurado, las cuentas nuevas se verifican
 automáticamente para poder iniciar sesión sin enviar correos.
+
+En Render Free, configura `Email__BrevoApiKey` como secreto y `Email__From`
+con un remitente verificado en Brevo. El backend usa la API HTTPS de Brevo
+para recuperación de contraseña, verificación e invitaciones. Sin una clave
+de Brevo, el backend usa la configuración SMTP existente.
 
 ## Documentación
 

@@ -94,15 +94,8 @@ namespace ChefMetrics_BackEnd.Services
         {
             var correoNormalizado = correoElectronico.ToLower().Trim();
 
-            // En desarrollo, si no hay SMTP configurado la cuenta se verifica
-            // automáticamente: así un clon nuevo puede registrarse y probar la
-            // aplicación sin configurar una contraseña de Gmail.
-            var smtpConfigurado =
-                !string.IsNullOrWhiteSpace(_emailSettings.Host) &&
-                !string.IsNullOrWhiteSpace(_emailSettings.Username) &&
-                !string.IsNullOrWhiteSpace(_emailSettings.Password) &&
-                !string.IsNullOrWhiteSpace(_emailSettings.From);
-            var verificarAutomaticamente = _entorno.IsDevelopment() && !smtpConfigurado;
+            // Permite probar el registro en desarrollo sin un proveedor de correo.
+            var verificarAutomaticamente = _entorno.IsDevelopment() && !_emailSettings.PuedeEnviar;
 
             // Evita exponer el error crudo de BD (DbUpdateException) cuando el
             // correo ya existe por un intento anterior.
