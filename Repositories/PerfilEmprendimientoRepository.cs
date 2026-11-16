@@ -68,6 +68,14 @@ public sealed class PerfilEmprendimientoRepository : IPerfilEmprendimientoReposi
 
     public async Task<List<Role>> ObtenerRolesAsync()
     {
+        if (_context.Database.IsSqlServer())
+        {
+            return await _context.Roles
+                .FromSql($"EXEC [dbo].[ListarRoles]")
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
         return await _context.Roles
             .AsNoTracking()
             .OrderBy(r => r.Nombre)

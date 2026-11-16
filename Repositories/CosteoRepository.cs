@@ -48,16 +48,36 @@ public sealed class CosteoRepository : ICosteoRepository
             });
     }
 
-    public Task<List<CostoFijo>> ListarCostosFijosAsync(int negocioId, bool soloActivos) =>
-        _db.CostoFijos.AsNoTracking()
+    public Task<List<CostoFijo>> ListarCostosFijosAsync(int negocioId, bool soloActivos)
+    {
+        if (_db.Database.IsSqlServer())
+        {
+            return _db.CostoFijos
+                .FromSql($"EXEC [dbo].[ListarCostosFijos] {negocioId}, {soloActivos}")
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        return _db.CostoFijos.AsNoTracking()
             .Where(c => c.NegocioId == negocioId && (!soloActivos || c.Activo))
             .OrderBy(c => c.Nombre).ToListAsync();
+    }
 
-    public Task<int?> ObtenerPreparacionesBaseMesAsync(int negocioId) =>
-        _db.Negocios.AsNoTracking()
+    public async Task<int?> ObtenerPreparacionesBaseMesAsync(int negocioId)
+    {
+        if (_db.Database.IsSqlServer())
+        {
+            var valores = await _db.Database
+                .SqlQuery<int?>($"EXEC [dbo].[ObtenerPreparacionesBaseMes] {negocioId}")
+                .ToListAsync();
+            return valores.SingleOrDefault();
+        }
+
+        return await _db.Negocios.AsNoTracking()
             .Where(n => n.Id == negocioId)
             .Select(n => n.PreparacionesBaseMes)
             .FirstOrDefaultAsync();
+    }
 
     public async Task<(List<CostoFijo> CostosFijos, int? PreparacionesBaseMes)> ObtenerConfiguracionCostosAsync(
         int negocioId)

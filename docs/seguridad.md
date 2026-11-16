@@ -55,18 +55,16 @@ Migrations\20261029031241_EndurecerIntegridadTenant.cs
 - Se agregaron índices por negocio/fecha y por insumo original para las consultas
   de historial, y un índice de listado de menú por `(NegocioId, Activo, Nombre)`.
 
-### 2.3 Validación de tenencia en la capa de servicios
+### 2.3 Validación de tenencia
 
-La migración `20261029031241_EndurecerIntegridadTenant` creó inicialmente cuatro
-triggers para validar que las tablas puente no mezclaran registros de negocios
-distintos. Esos triggers se eliminaron en
-`20261030121311_QuitarTriggersIncompatibles`: SQL Server no permite
-`OUTPUT INSERTED` cuando la tabla tiene triggers habilitados, y EF Core usa esa
-cláusula en todos los `INSERT`. El resultado eran errores de guardado que la API
-reportaba como nombres duplicados aunque el registro fuera nuevo.
+La migración `20261116000000_AgregarTriggersYProcedimientos` instala cinco
+triggers de inserción y actualización. Cuatro validan las asociaciones de
+insumo con proveedor, receta con insumo, y producto de menú con insumo o receta.
+El quinto comprueba que el negocio indicado en un historial de precios coincida
+con el del insumo asociado. EF Core desactiva la cláusula `OUTPUT` directa en
+las cinco tablas para permitir que los triggers convivan con los guardados de la API.
 
-La regla de tenencia se mantiene en la capa de servicios, que es la única que
-recibe datos del cliente:
+Los servicios también validan la tenencia al recibir datos del cliente.
 
 | Servicio | Regla |
 |---|---|
@@ -78,10 +76,7 @@ recibe datos del cliente:
 
 Un producto se crea primero y sus recetas se agregan después; por eso la base no
 puede exigir “al menos una receta” en el `INSERT` de `ProductoMenu`. Esa regla se
-valida en `ProductoMenuService` y en el DTO (`[MinLength(1)]`). Por la misma razón
-(evitar triggers que rompan EF Core), la base tampoco impide por sí sola las
-referencias cruzadas entre negocios en las tablas puente: esa validación queda en
-los servicios.
+valida en `ProductoMenuService` y en el DTO (`[MinLength(1)]`).
 
 ### 2.5 Prueba local
 
@@ -90,8 +85,9 @@ sqlcmd -S "SATUS22\MSSQL1SVR" -d ChefMetrics -E -C -b -f 65001 `
   -i scripts\verificar-integridad.sql
 ```
 
-El script prueba los checks, la FK y `ON DELETE SET NULL` dentro de transacciones
-con `ROLLBACK`. La salida esperada termina con:
+El script comprueba que estén presentes los cinco triggers activos y los cinco
+procedimientos almacenados. Prueba los checks, la FK y `ON DELETE SET NULL` en
+transacciones con `ROLLBACK`. La salida esperada termina con el siguiente mensaje.
 
 ```text
 OK: todas las verificaciones de integridad pasaron.

@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace ChefMetrics_BackEnd.Tests;
 
 // Prueba de arquitectura: el código de aplicación solo debe usar EF Core.
@@ -5,6 +7,11 @@ namespace ChefMetrics_BackEnd.Tests;
 // controlada para crear constraints y triggers.
 public sealed class SeguridadSqlTests
 {
+    // EF Core convierte cada argumento interpolado en un parámetro SQL.
+    private static readonly Regex LlamadaAProcedimiento = new(
+        """^\.(?:FromSql|SqlQuery<int\?>)\(\$"EXEC \[dbo\]\.\[[A-Za-z][A-Za-z0-9]*\](?: \{\w+\}(?:, \{\w+\})*)?"\)$""",
+        RegexOptions.CultureInvariant);
+
     private static readonly string[] Carpetas =
     [
         "Controllers",
@@ -61,7 +68,9 @@ public sealed class SeguridadSqlTests
 
                     foreach (var patron in PatronesProhibidos)
                     {
-                        if (linea.Contains(patron, StringComparison.OrdinalIgnoreCase))
+                        if (linea.Contains(patron, StringComparison.OrdinalIgnoreCase) &&
+                            !(carpeta == "Repositories" && patron == "\"EXEC " &&
+                              LlamadaAProcedimiento.IsMatch(linea)))
                         {
                             hallazgos.Add(
                                 $"{Path.GetRelativePath(raiz, archivo)}:{i + 1}: {linea}");

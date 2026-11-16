@@ -83,8 +83,9 @@ El script abre una transacción por prueba y hace `ROLLBACK`; no deja datos. Com
 3. FK de `HistorialPrecioInsumo` contra una asociación inexistente.
 4. `ON DELETE SET NULL`: el historial se conserva al desasociar un proveedor.
 
-Los triggers de tenencia se eliminaron porque bloqueaban los `INSERT` de EF Core
-(`OUTPUT INSERTED`); esa validación se hace en los servicios.
+El script también comprueba el inventario de cinco triggers habilitados y cinco
+procedimientos almacenados instalados por la migración
+`20261116000000_AgregarTriggersYProcedimientos`.
 
 Si todo pasa, la última línea es:
 

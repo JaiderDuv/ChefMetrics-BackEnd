@@ -21,12 +21,38 @@ SET NUMERIC_ROUNDABORT OFF;
 DECLARE @errores int = 0;
 DECLARE @mensaje nvarchar(2048);
 
-/*
-  Las pruebas de los triggers de tenencia se retiraron junto con los triggers
-  (migración QuitarTriggersIncompatibles). EF Core no puede insertar con
-  OUTPUT INSERTED en tablas con triggers, así que esa validación se hace en
-  los servicios.
-*/
+/* Inventario de los objetos gestionados por la migración del proyecto. */
+DECLARE @triggersActivos int =
+(
+    SELECT COUNT(*)
+    FROM sys.triggers AS t
+    WHERE t.is_disabled = 0
+      AND t.object_id IN (
+          OBJECT_ID(N'dbo.TR_InsumoProveedor_ValidarNegocio', N'TR'),
+          OBJECT_ID(N'dbo.TR_RecetaInsumo_ValidarNegocio', N'TR'),
+          OBJECT_ID(N'dbo.TR_ProductoMenuInsumo_ValidarNegocio', N'TR'),
+          OBJECT_ID(N'dbo.TR_ProductoMenuReceta_ValidarNegocio', N'TR'),
+          OBJECT_ID(N'dbo.TR_HistorialPrecioInsumo_ValidarNegocio', N'TR')
+      )
+);
+
+DECLARE @procedimientos int =
+(
+    SELECT COUNT(*)
+    FROM sys.procedures AS p
+    WHERE p.object_id IN (
+        OBJECT_ID(N'dbo.ListarProveedoresPorNegocio', N'P'),
+        OBJECT_ID(N'dbo.ListarCostosFijos', N'P'),
+        OBJECT_ID(N'dbo.ObtenerPreparacionesBaseMes', N'P'),
+        OBJECT_ID(N'dbo.ListarHistorialArchivadoPorInsumo', N'P'),
+        OBJECT_ID(N'dbo.ListarRoles', N'P')
+    )
+);
+
+SELECT @triggersActivos AS TriggersActivos, @procedimientos AS ProcedimientosAlmacenados;
+
+IF @triggersActivos <> 5 OR @procedimientos <> 5
+    THROW 51004, N'Se esperaban cinco triggers activos y cinco procedimientos del proyecto.', 1;
 
 /* 1. Check: nombre de producto demasiado corto. */
 BEGIN TRY

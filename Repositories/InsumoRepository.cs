@@ -337,6 +337,14 @@ public sealed class InsumoRepository : IInsumoRepository
 
     public Task<List<HistorialPrecioInsumo>> ListarHistorialArchivadoPorInsumoAsync(int negocioId, int insumoId)
     {
+        if (_context.Database.IsSqlServer())
+        {
+            return _context.HistorialPrecioInsumos
+                .FromSql($"EXEC [dbo].[ListarHistorialArchivadoPorInsumo] {negocioId}, {insumoId}")
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
         return _context.HistorialPrecioInsumos
             .AsNoTracking()
             .Where(h => h.FechaEliminacion != null && h.NegocioId == negocioId && h.InsumoIdOriginal == insumoId)

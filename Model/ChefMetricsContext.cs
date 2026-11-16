@@ -157,7 +157,7 @@ public partial class ChefMetricsContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PK__Historia__3214EC07AA1990A3");
 
-            entity.ToTable("HistorialPrecioInsumo");
+            entity.ToTable("HistorialPrecioInsumo", table => table.UseSqlOutputClause(false));
 
             entity.HasIndex(e => e.InsumoProveedorId, "IX_HistorialPrecioInsumo_InsumoProveedorId");
 
@@ -208,7 +208,7 @@ public partial class ChefMetricsContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PK__InsumoPr__3214EC07BAA8F3C6");
 
-            entity.ToTable("InsumoProveedor");
+            entity.ToTable("InsumoProveedor", table => table.UseSqlOutputClause(false));
 
             entity.HasIndex(e => e.ProveedorId, "IX_InsumoProveedor_ProveedorId");
 
@@ -320,6 +320,8 @@ public partial class ChefMetricsContext : DbContext
 
         modelBuilder.Entity<ProductoMenuRecetum>(entity =>
         {
+            entity.ToTable("ProductoMenuReceta", table => table.UseSqlOutputClause(false));
+
             entity.HasKey(e => e.Id).HasName("PK__Producto__3214EC073CF0454B");
 
             entity.HasIndex(e => e.RecetaId, "IX_ProductoMenuReceta_RecetaId");
@@ -342,7 +344,7 @@ public partial class ChefMetricsContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PK_ProductoMenuInsumo");
 
-            entity.ToTable("ProductoMenuInsumo");
+            entity.ToTable("ProductoMenuInsumo", table => table.UseSqlOutputClause(false));
 
             entity.HasIndex(e => e.InsumoId, "IX_ProductoMenuInsumo_InsumoId");
 
@@ -386,7 +388,7 @@ public partial class ChefMetricsContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PK__RecetaIn__3214EC07FBC68EB1");
 
-            entity.ToTable("RecetaInsumo");
+            entity.ToTable("RecetaInsumo", table => table.UseSqlOutputClause(false));
 
             entity.HasIndex(e => e.InsumoId, "IX_RecetaInsumo_InsumoId");
 

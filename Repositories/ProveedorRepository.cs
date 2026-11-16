@@ -52,6 +52,14 @@ public sealed class ProveedorRepository : IProveedorRepository
 
     public async Task<List<Proveedor>> ListarPorNegocioAsync(int negocioId)
     {
+        if (_context.Database.IsSqlServer())
+        {
+            return await _context.Proveedors
+                .FromSql($"EXEC [dbo].[ListarProveedoresPorNegocio] {negocioId}")
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
         return await _context.Proveedors
             .AsNoTracking()
             .Where(p => p.NegocioId == negocioId)
