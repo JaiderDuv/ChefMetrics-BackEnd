@@ -65,6 +65,12 @@ builder.Services.AddScoped<ICredencialProtector, CredencialProtector>();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.PostConfigure<EmailSettings>(options =>
 {
+    const string archivoClaveBrevo = "/etc/secrets/Email__BrevoApiKey";
+    if (!options.UsaBrevo && File.Exists(archivoClaveBrevo))
+    {
+        options.BrevoApiKey = File.ReadAllText(archivoClaveBrevo).Trim();
+    }
+
     options.VerificationUrl = FrontendUrls.ResolveEmailUrl(
         options.VerificationUrl, frontendBaseUrl, "confirmar-cuenta", isDevelopment);
     options.PasswordResetUrl = FrontendUrls.ResolveEmailUrl(

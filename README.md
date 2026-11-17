@@ -38,6 +38,9 @@ En Render Free, configura `Email__BrevoApiKey` como secreto y `Email__From`
 con un remitente verificado en Brevo. El backend usa la API HTTPS de Brevo
 para recuperación de contraseña, verificación e invitaciones. Sin una clave
 de Brevo, el backend usa la configuración SMTP existente.
+También puedes guardar la clave en **Secret Files** de Render como
+`Email__BrevoApiKey`, con solo la clave en el contenido del archivo.
+Si están configuradas ambas opciones, tiene prioridad la variable de entorno.
 
 ## Documentación
 

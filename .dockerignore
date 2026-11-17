@@ -1,4 +1,5 @@
 .git
+/Email__BrevoApiKey
 .vs
 **/bin
 **/obj

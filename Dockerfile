@@ -16,5 +16,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 RUN mkdir -p /app/wwwroot/uploads && chown -R app:app /app/wwwroot/uploads
-USER app
+# Render monta los archivos secretos con el grupo 1000.
+USER app:1000
 ENTRYPOINT ["dotnet", "ChefMetrics-BackEnd.dll"]
