@@ -1,10 +1,10 @@
-# Ejecuta pruebas y genera el reporte comparable con la medición inicial (7.123 líneas).
+# Ejecuta pruebas y genera el reporte con los filtros de la medición inicial.
 # Conserva además el XML sin filtros, incluyendo Contracts, Program y migraciones.
 [CmdletBinding()]
 param(
     [string]$ReportDirectory,
     [ValidateRange(0, 100)]
-    [double]$MinimumLineCoverage = 70
+    [double]$MinimumLineCoverage = 78
 )
 
 $ErrorActionPreference = "Stop"
