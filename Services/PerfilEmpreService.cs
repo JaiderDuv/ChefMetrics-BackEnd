@@ -303,6 +303,16 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
     public async Task<PerfilUsuarioDto?> ObtenerPerfilUsuarioAsync(int cuentaId)
     {
         var cuenta = await _perfilRepository.ObtenerPerfilCompletoAsync(cuentaId);
+        if (cuenta is not null && EsCuentaEmpleado(cuenta))
+        {
+            return new PerfilUsuarioDto
+            {
+                NombreCompleto = cuenta.NombreCompleto ?? string.Empty,
+                TelefonoContacto = cuenta.Telefono ?? string.Empty,
+                Correo = cuenta.Correo
+            };
+        }
+
         if (cuenta?.UsuarioEmprendedor is null)
         {
             return null;
@@ -325,6 +335,11 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
     PerfilUsuarioDto dto)
     {
         var cuenta = await _perfilRepository.ObtenerPerfilCompletoAsync(cuentaId);
+        if (cuenta is not null && EsCuentaEmpleado(cuenta))
+        {
+            return await ActualizarPerfilEmpleadoAsync(cuenta, dto);
+        }
+
         if (cuenta?.UsuarioEmprendedor?.Negocio is null)
         {
             return Error("El perfil del usuario todavía no está completo.");
@@ -389,6 +404,42 @@ public sealed class PerfilEmpreService : IPerfilEmpreService
             Exito = true,
             Mensaje = "El perfil fue actualizado correctamente."
         };
+    }
+
+    private static bool EsCuentaEmpleado(Cuenta cuenta) =>
+        cuenta.UsuarioEmprendedor is null &&
+        string.Equals(cuenta.TipoCuenta, "empleado", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<ActualizarPerfilResultadoDto> ActualizarPerfilEmpleadoAsync(Cuenta cuenta, PerfilUsuarioDto dto)
+    {
+        var nombre = NullIfWhiteSpace(dto.NombreCompleto);
+        if (nombre is null || nombre.Length > 150)
+        {
+            return Error("Escribe tu nombre completo con un máximo de 150 caracteres.");
+        }
+
+        var telefono = NullIfWhiteSpace(dto.TelefonoContacto);
+        if (telefono is { Length: < 7 or > 20 })
+        {
+            return Error("El teléfono debe tener entre 7 y 20 caracteres.");
+        }
+
+        cuenta.NombreCompleto = nombre;
+        cuenta.Telefono = telefono;
+        try
+        {
+            await _perfilRepository.GuardarCambiosUsuarioAsync();
+            return new ActualizarPerfilResultadoDto
+            {
+                Exito = true,
+                Mensaje = "El perfil fue actualizado correctamente."
+            };
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "No se pudo actualizar el perfil de la cuenta {CuentaId}.", cuenta.Id);
+            return Error("No se pudo actualizar el perfil. Intenta de nuevo.");
+        }
     }
 
     private async Task<PerfilEditGrant?> ObtenerPermisoValidoAsync(

@@ -103,6 +103,11 @@ public class ActualizarPerfilResultadoDto
 
 public class PerfilUsuarioDto
 {
+    [StringLength(150)]
+    public string NombreCompleto { get; set; } = string.Empty;
+
+    public string Correo { get; set; } = string.Empty;
+
     public string? FotoPerfilUrl { get; set; }
 
     [StringLength(5)]

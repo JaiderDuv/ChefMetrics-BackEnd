@@ -34,6 +34,58 @@ public sealed class PerfilEmpreServiceTests
         service = new(users.Object, profiles.Object, mail.Object, NullLogger<PerfilEmpreService>.Instance);
     }
 
+    [Theory]
+    [InlineData("Chef")]
+    [InlineData("Cajero")]
+    public async Task Empleado_lee_y_edita_solo_sus_datos_personales(string rol)
+    {
+        var empleado = new Empleado { Rol = new Role { Nombre = rol }, Negocio = account.UsuarioEmprendedor!.Negocio! };
+        var cuentaEmpleado = new Cuenta
+        {
+            Id = 8, TipoCuenta = "empleado", Correo = "empleado@example.com",
+            NombreCompleto = "Nombre anterior", Telefono = "3005550100", Empleado = empleado
+        };
+        profiles.Setup(x => x.ObtenerPerfilCompletoAsync(8)).ReturnsAsync(cuentaEmpleado);
+
+        var perfil = Assert.IsType<PerfilUsuarioDto>(await service.ObtenerPerfilUsuarioAsync(8));
+        Assert.Equal("Nombre anterior", perfil.NombreCompleto);
+        Assert.Equal("3005550100", perfil.TelefonoContacto);
+        Assert.Equal("empleado@example.com", perfil.Correo);
+        Assert.Empty(perfil.NumeroDocumento);
+
+        var resultado = await service.ActualizarPerfilUsuarioAsync(8, new()
+        {
+            NombreCompleto = " Nombre nuevo ", TelefonoContacto = " 3005550101 ",
+            Correo = "ajeno@example.com", NumeroDocumento = "999"
+        });
+
+        Assert.True(resultado.Exito);
+        Assert.Equal("Nombre nuevo", cuentaEmpleado.NombreCompleto);
+        Assert.Equal("3005550101", cuentaEmpleado.Telefono);
+        Assert.Equal("empleado@example.com", cuentaEmpleado.Correo);
+        Assert.Equal(rol, empleado.Rol.Nombre);
+        Assert.Equal("3001234567", empleado.Negocio.TelefonoContacto);
+        profiles.Verify(x => x.GuardarCambiosUsuarioAsync(), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("  ", "3005550100")]
+    [InlineData("Nombre válido", "123")]
+    public async Task Empleado_no_guarda_un_nombre_o_telefono_invalido(string nombre, string telefono)
+    {
+        var cuentaEmpleado = new Cuenta { Id = 8, TipoCuenta = "empleado", NombreCompleto = "Original" };
+        profiles.Setup(x => x.ObtenerPerfilCompletoAsync(8)).ReturnsAsync(cuentaEmpleado);
+
+        var resultado = await service.ActualizarPerfilUsuarioAsync(8, new()
+        {
+            NombreCompleto = nombre, TelefonoContacto = telefono
+        });
+
+        Assert.False(resultado.Exito);
+        Assert.Equal("Original", cuentaEmpleado.NombreCompleto);
+        profiles.Verify(x => x.GuardarCambiosUsuarioAsync(), Times.Never);
+    }
+
     private static PerfilEmprendedorDto Valid() => new() { CorreoCuenta = "ana@example.com", NombreEmprendimiento = " Cocina ", CategoriaNegocio = "Restaurante",
         TelefonoContacto = "3001234567", CorreoContacto = " CONTACTO@example.com ", CorreoEmpresa = "empresa@example.com", TipoDocumento = "cc", NumeroDocumento = "1234567" };
 
