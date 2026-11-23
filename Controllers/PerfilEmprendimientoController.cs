@@ -18,6 +18,7 @@ public sealed class PerfilEmprendimientoController : ControllerBase
         _perfilService = perfilService;
     }
 
+    [CredentialRequest]
     [HttpPost("confirmar-identidad")]
     public async Task<IActionResult> ConfirmarIdentidad(
         [FromBody] ConfirmarEdicionPerfilDto dto)

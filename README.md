@@ -42,6 +42,12 @@ También puedes guardar la clave en **Secret Files** de Render como
 `Email__BrevoApiKey`, con solo la clave en el contenido del archivo.
 Si están configuradas ambas opciones, tiene prioridad la variable de entorno.
 
+## Solicitudes con contraseña
+
+El inicio de sesión, el registro, el restablecimiento de contraseña, la confirmación de identidad y la creación o edición de empleados reciben `application/jose` sobre HTTPS. El cliente obtiene `header` y `publicKey` mediante `GET /api/auth/desafio`. Envía un JWE compacto RSA-OAEP-256/A256GCM con ese encabezado protegido y un objeto JSON con `target` (por ejemplo, `POST /api/auth/login`) y `body` (el DTO habitual). Cada envío, incluidos los reintentos, requiere un desafío nuevo.
+
+Los desafíos caducan a los dos minutos. La clave privada y los desafíos viven en la instancia de la API. Si se despliegan varias réplicas, las dos peticiones deben llegar a la misma instancia o se debe compartir la clave y consumir los desafíos de forma atómica en un almacén común.
+
 ## Documentación
 
 - [Matriz de trazabilidad](docs/trazabilidad.md)

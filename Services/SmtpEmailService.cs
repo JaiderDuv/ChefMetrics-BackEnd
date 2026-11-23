@@ -331,7 +331,7 @@ namespace ChefMetrics_BackEnd.Services
                 <div lang="es" style="font-family:Arial,sans-serif;max-width:600px;margin:24px auto;padding:24px;color:#243047">
                   <h1>Invitación a ChefMetrics</h1>
                   <p>Te invitaron a colaborar con <strong>{negocio}</strong>.</p>
-                  <p>Abre el siguiente enlace para aceptar la invitación y ver tus datos de acceso:</p>
+                  <p>Abre el siguiente enlace para aceptar la invitación y activar tu cuenta.</p>
                   <p><a href="{linkHtml}" style="display:inline-block;padding:12px 18px;background:#8F4A12;color:white;text-decoration:none;border-radius:8px">Aceptar invitación</a></p>
                   <p>Si no esperabas esta invitación, puedes ignorar este mensaje.</p>
                 </div>

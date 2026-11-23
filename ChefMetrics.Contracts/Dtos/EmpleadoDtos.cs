@@ -34,7 +34,6 @@ public sealed class AceptarInvitacionDto
 public sealed class AceptarInvitacionRespuestaDto
 {
     public string Correo { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
     public string Mensaje { get; set; } = string.Empty;
 }
 

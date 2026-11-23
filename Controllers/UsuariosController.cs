@@ -17,6 +17,7 @@ namespace ChefMetrics_BackEnd.Controllers
         }
 
         [AllowAnonymous]
+        [CredentialRequest]
         [HttpPost("registro-formalizado")]
         public async Task<IActionResult> RegistrarFormalizado([FromBody] EmprendedorFormalizado dto)
         {
@@ -42,6 +43,7 @@ namespace ChefMetrics_BackEnd.Controllers
         }
 
         [AllowAnonymous]
+        [CredentialRequest]
         [HttpPost("registro-no-formalizado")]
         public async Task<IActionResult> RegistrarNoFormalizado([FromBody] Emprendedor dto)
         {

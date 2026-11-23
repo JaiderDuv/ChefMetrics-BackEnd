@@ -15,21 +15,19 @@ public sealed class EmpleadosController : ControllerBase
 {
     private readonly ChefMetricsContext _db;
     private readonly IEmailService _email;
-    private readonly ICredencialProtector _protector;
     private readonly ILogger<EmpleadosController> _logger;
 
     public EmpleadosController(
         ChefMetricsContext db,
         IEmailService email,
-        ICredencialProtector protector,
         ILogger<EmpleadosController> logger)
     {
         _db = db;
         _email = email;
-        _protector = protector;
         _logger = logger;
     }
 
+    [CredentialRequest]
     [HttpPost("invitaciones")]
     [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> Invitar([FromBody] InvitarEmpleadoDto dto)
@@ -78,7 +76,6 @@ public sealed class EmpleadosController : ControllerBase
             EstadoInvitacion = "pendiente",
             TokenInvitacion = TokenGenerator.CalcularHash(token),
             TokenInvitacionExpira = DateTime.UtcNow.AddDays(7),
-            CredencialCifrada = _protector.Proteger(dto.Password),
             Activo = true,
             Rol = rol,
             InvitadoPor = usuario.Id,
@@ -102,6 +99,7 @@ public sealed class EmpleadosController : ControllerBase
         }
     }
 
+    [CredentialRequest]
     [HttpPut("{id:int}")]
     [Authorize(Policy = "SoloEmprendedor")]
     public async Task<IActionResult> Actualizar(int id, [FromBody] ActualizarEmpleadoDto dto)
@@ -170,7 +168,6 @@ public sealed class EmpleadosController : ControllerBase
                     FechaCreacion = DateTime.UtcNow
                 };
                 empleado.Cuenta = cuenta;
-                empleado.CredencialCifrada = _protector.Proteger(dto.NuevaPassword!);
             }
             else if (correoCambiado)
             {
@@ -182,14 +179,10 @@ public sealed class EmpleadosController : ControllerBase
             if (passwordNueva && !requiereCuentaNueva)
             {
                 cuenta!.PasswordHash = PasswordHasher.HashPassword(dto.NuevaPassword!);
-                if (reenviarInvitacion ||
-                    string.Equals(empleado.EstadoInvitacion, "pendiente", StringComparison.OrdinalIgnoreCase))
-                    empleado.CredencialCifrada = _protector.Proteger(dto.NuevaPassword!);
-                else
-                    empleado.CredencialCifrada = null;
             }
 
             empleado.CorreoInvitado = correo;
+            empleado.CredencialCifrada = null;
             empleado.RolId = rol.Id;
             empleado.Rol = rol;
             empleado.SessionVersion++;
@@ -255,19 +248,6 @@ public sealed class EmpleadosController : ControllerBase
             empleado.TokenInvitacionExpira <= DateTime.UtcNow)
             return BadRequest(new { mensaje = "La invitación no es válida o ya expiró." });
 
-        string password = string.Empty;
-        if (!string.IsNullOrWhiteSpace(empleado.CredencialCifrada))
-        {
-            try
-            {
-                password = _protector.Desproteger(empleado.CredencialCifrada);
-            }
-            catch
-            {
-                return BadRequest(new { mensaje = "No se pudieron recuperar los datos de acceso. Solicita una nueva invitación." });
-            }
-        }
-
         empleado.EstadoInvitacion = "aceptada";
         empleado.FechaAceptacion = DateTime.UtcNow;
         empleado.TokenInvitacion = null;
@@ -280,10 +260,7 @@ public sealed class EmpleadosController : ControllerBase
         return Ok(new AceptarInvitacionRespuestaDto
         {
             Correo = empleado.CorreoInvitado,
-            Password = password,
-            Mensaje = string.IsNullOrWhiteSpace(password)
-                ? "Invitación aceptada. El correo fue actualizado; inicia sesión con tu contraseña actual."
-                : "Invitación aceptada. Ya puedes iniciar sesión con estos datos."
+            Mensaje = "Invitación aceptada. Inicia sesión con tu contraseña o solicita un enlace para establecer una nueva."
         });
     }
 

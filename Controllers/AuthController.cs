@@ -19,6 +19,12 @@ namespace ChefMetrics_BackEnd.Controllers
         }
 
         [AllowAnonymous]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        [HttpGet("desafio")]
+        public IActionResult Desafio([FromServices] CredentialChallenges challenges) => Ok(challenges.Issue());
+
+        [AllowAnonymous]
+        [CredentialRequest]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
@@ -101,6 +107,7 @@ namespace ChefMetrics_BackEnd.Controllers
         }
 
         [AllowAnonymous]
+        [CredentialRequest]
         [HttpPost("restablecer-password")]
         public async Task<IActionResult> RestablecerPassword([FromBody] RestablecerPasswordDto dto)
         {

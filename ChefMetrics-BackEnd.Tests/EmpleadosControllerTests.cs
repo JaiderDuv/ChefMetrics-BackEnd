@@ -16,11 +16,10 @@ public sealed class EmpleadosControllerTests
     private const string InitialPassword = "Password123!";
     private const string EmployeeEmail = "chef@example.com";
     private readonly Mock<IEmailService> _mail = new();
-    private readonly Mock<ICredencialProtector> _protector = new();
 
     private EmpleadosController Controller(TestDatabase database, string? owner = "7") =>
         CrudControllerTests.WithUser(new EmpleadosController(
-            database.Context, _mail.Object, _protector.Object, NullLogger<EmpleadosController>.Instance), owner);
+            database.Context, _mail.Object, NullLogger<EmpleadosController>.Instance), owner);
 
     private static async Task<Role> AddRole(TestDatabase database, string name = "Chef")
     {
@@ -56,7 +55,6 @@ public sealed class EmpleadosControllerTests
         using var database = new TestDatabase(relational: true);
         var role = await AddRole(database);
         string? token = null;
-        _protector.Setup(x => x.Proteger(InitialPassword)).Returns("cifrada");
         _mail.Setup(x => x.EnviarInvitacionEmpleadoAsync(EmployeeEmail, "Cocina", It.IsAny<string>()))
             .Callback<string, string, string>((_, _, value) => token = value)
             .Returns(() => mailFails ? Task.FromException(new HttpRequestException()) : Task.CompletedTask);
@@ -77,7 +75,7 @@ public sealed class EmpleadosControllerTests
 
         Assert.IsType<OkObjectResult>(result);
         var employee = await database.Context.Empleados.Include(e => e.Cuenta).SingleAsync();
-        Assert.Equal("cifrada", employee.CredencialCifrada);
+        Assert.Null(employee.CredencialCifrada);
         Assert.NotNull(token);
         Assert.Equal(TokenGenerator.CalcularHash(token), employee.TokenInvitacion);
         Assert.False(employee.Cuenta!.EmailVerificado);
@@ -88,7 +86,6 @@ public sealed class EmpleadosControllerTests
     [InlineData("vigente")]
     [InlineData("sin credencial")]
     [InlineData("expirada")]
-    [InlineData("cifrado inválido")]
     public async Task Aceptacion_exige_token_vigente_y_lo_invalida_tras_usarlo(string scenario)
     {
         using var database = new TestDatabase();
@@ -98,12 +95,10 @@ public sealed class EmpleadosControllerTests
         employee.TokenInvitacionExpira = scenario == "expirada" ? DateTime.UtcNow.AddHours(-1) : DateTime.UtcNow.AddHours(1);
         employee.CredencialCifrada = scenario == "sin credencial" ? null : "cifrada";
         await database.Context.SaveChangesAsync();
-        _protector.Setup(x => x.Desproteger("cifrada"))
-            .Returns(() => scenario == "cifrado inválido" ? throw new InvalidOperationException() : InitialPassword);
 
         var controller = Controller(database, null);
         var result = await controller.Aceptar(new() { Token = token });
-        if (scenario is "expirada" or "cifrado inválido")
+        if (scenario == "expirada")
         {
             Assert.IsType<BadRequestObjectResult>(result);
             Assert.Equal("pendiente", employee.EstadoInvitacion);
@@ -113,7 +108,7 @@ public sealed class EmpleadosControllerTests
 
         var response = Assert.IsType<AceptarInvitacionRespuestaDto>(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Equal(EmployeeEmail, response.Correo);
-        Assert.Equal(scenario == "sin credencial" ? "" : InitialPassword, response.Password);
+        Assert.DoesNotContain("Password", System.Text.Json.JsonSerializer.Serialize(response));
         Assert.True(employee.Cuenta!.EmailVerificado);
         Assert.Null(employee.TokenInvitacion);
         Assert.Null(employee.CredencialCifrada);
@@ -133,7 +128,6 @@ public sealed class EmpleadosControllerTests
         var nextRole = await AddRole(database, "Cajero");
         const string newPassword = "Nueva123!";
         string? token = null;
-        _protector.Setup(x => x.Proteger(newPassword)).Returns("nueva-cifrada");
         _mail.Setup(x => x.EnviarInvitacionEmpleadoAsync(It.IsAny<string>(), "Cocina", It.IsAny<string>()))
             .Callback<string, string, string>((_, _, value) => token = value)
             .Returns(Task.CompletedTask);

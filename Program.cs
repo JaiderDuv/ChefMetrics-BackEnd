@@ -60,8 +60,7 @@ builder.Services.AddScoped<IPerfilEmpreService, PerfilEmpreService>();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
 builder.Services.AddHttpClient<IEmailService, SmtpEmailService>(client =>
     client.Timeout = TimeSpan.FromSeconds(15));
-builder.Services.AddDataProtection();
-builder.Services.AddScoped<ICredencialProtector, CredencialProtector>();
+builder.Services.AddSingleton<CredentialChallenges>();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.PostConfigure<EmailSettings>(options =>
 {
